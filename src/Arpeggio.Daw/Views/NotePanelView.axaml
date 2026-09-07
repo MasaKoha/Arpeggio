@@ -3,7 +3,7 @@
   <StackPanel Margin="12" Spacing="8">
     <TextBlock Text="ノート" Classes="heading" />
     <TextBlock x:Name="NoteSummary" Classes="numeric" Text="ノートを選択してください。" TextWrapping="Wrap" />
-    <StackPanel x:Name="EffectEditor" Spacing="8" IsEnabled="False">
+    <StackPanel x:Name="EffectEditor" Spacing="8" IsEnabled="False" IsVisible="False">
       <TextBlock Text="エフェクト（kind / value）" />
       <ListBox x:Name="EffectList" MinHeight="48" MaxHeight="140" />
       <ComboBox x:Name="KindSelector" HorizontalAlignment="Stretch" />

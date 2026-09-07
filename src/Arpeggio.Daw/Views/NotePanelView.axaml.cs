@@ -69,7 +69,9 @@ namespace Arpeggio.Daw.Views
             displayedNote = note;
             summary.Text = note == null ? "ノートを選択してください。" :
                 $"tick {note.Tick} / 長さ {note.DurationTicks}\n{NoteName.Format(note.MidiNote)} / 音量 {note.Volume} / 音色 ID {note.InstrumentId}";
+            // 未選択時は無効化ではなく非表示にし、右ペインの縦幅を音色パネルへ譲る
             editor.IsEnabled = note != null;
+            editor.IsVisible = note != null;
             effects.ItemsSource = note?.Effects.Select(FormatEffect).ToArray() ?? Array.Empty<string>();
             effects.SelectedIndex = note != null && note.Effects.Length > 0
                 ? Math.Clamp(previousIndex, 0, note.Effects.Length - 1) : -1;

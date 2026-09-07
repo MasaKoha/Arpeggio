@@ -30,7 +30,7 @@ namespace Arpeggio.Daw.Views
         private readonly CheckBox loopSampleInput;
         private readonly Button importWavButton;
         private readonly Button clearSampleButton;
-        private readonly StackPanel presetPanel;
+        private readonly Grid presetPanel;
         private readonly ComboBox presetSelector;
         private readonly SnesDspView snesDsp;
         private readonly List<ComboBoxItem> presetItems = new List<ComboBoxItem>();
@@ -62,7 +62,7 @@ namespace Arpeggio.Daw.Views
             loopSampleInput = RequireControl<CheckBox>("LoopSampleInput");
             importWavButton = RequireControl<Button>("ImportWavButton");
             clearSampleButton = RequireControl<Button>("ClearSampleButton");
-            presetPanel = RequireControl<StackPanel>("PresetPanel");
+            presetPanel = RequireControl<Grid>("PresetPanel");
             presetSelector = RequireControl<ComboBox>("PresetSelector");
             snesDsp = RequireControl<SnesDspView>("SnesDsp");
         }
