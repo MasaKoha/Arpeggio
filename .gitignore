@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Rider / IDE
+.idea/
+*.DotSettings.user
+
+# テスト成果物
+TestResults/
+coverage/
+*.trx
+
+# 一時ファイル
+*.tmp
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db

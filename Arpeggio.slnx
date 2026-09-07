@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Arpeggio.Core/Arpeggio.Core.csproj" />
+    <Project Path="src/Arpeggio.Cli/Arpeggio.Cli.csproj" />
+    <Project Path="src/Arpeggio.Mcp/Arpeggio.Mcp.csproj" />
+    <Project Path="src/Arpeggio.Daw/Arpeggio.Daw.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Arpeggio.Core.Tests/Arpeggio.Core.Tests.csproj" />
+  </Folder>
+</Solution>
