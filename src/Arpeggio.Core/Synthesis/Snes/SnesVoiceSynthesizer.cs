@@ -19,7 +19,7 @@ namespace Arpeggio.Core.Synthesis.Snes
         private bool _loop;
         private bool _looped;
         private bool _sampleEnded;
-        private bool _hasEmbeddedSample;
+        private bool _hasSampleSource;
         private bool _noiseEnabled;
         private bool _pitchModulation;
         private bool _externalClock;
@@ -57,13 +57,17 @@ namespace Arpeggio.Core.Synthesis.Snes
         {
             var sample = (SnesSampleInstrument)instrument;
             ConfigureMacros(null, sample.ArpeggioMacro, sample.PitchMacro);
-            _hasEmbeddedSample = sample.SampleData != null;
-            _sample = _hasEmbeddedSample ? sample.PreparedSample! : _waveforms[(int)sample.Waveform - 1];
+            _hasSampleSource = sample.SampleData != null || sample.Preset != null;
+            _sample = sample.SampleData != null ? sample.PreparedSample : sample.PreparedPreset;
+            if (!_hasSampleSource)
+            {
+                _sample = _waveforms[(int)sample.Waveform - 1];
+            }
             _sourceSampleRate = sample.SampleRate;
             _rootMidiNote = sample.RootMidiNote;
             _loop = sample.Loop;
-            _loopStart = _hasEmbeddedSample ? _sample.LoopStart : 0;
-            _loopEnd = _hasEmbeddedSample && _loop ? _sample.LoopEnd : _sample.Samples.Length;
+            _loopStart = _hasSampleSource ? _sample!.LoopStart : 0;
+            _loopEnd = _hasSampleSource && _loop ? _sample!.LoopEnd : _sample!.Samples.Length;
             _samplePosition = 0;
             _looped = false;
             _sampleEnded = false;
@@ -133,7 +137,7 @@ namespace Arpeggio.Core.Synthesis.Snes
         /// <summary>元レートを含む増分を 32 kHz の 14 bit レジスタに量子化する。</summary>
         protected override double GetPhaseIncrement()
         {
-            double step = _hasEmbeddedSample
+            double step = _hasSampleSource
                 ? Math.Pow(2, (MidiNote - _rootMidiNote) / SemitonesPerOctave) * _sourceSampleRate / SnesRateTable.SampleRate
                 : PitchTable.Quantize(ChipKind.Snes, ChannelKind.Sample, MidiNote) * PitchTable.SnesWaveformLength / SnesRateTable.SampleRate;
             _pitchRegister = PitchTable.GetSnesPitchRegister(step);

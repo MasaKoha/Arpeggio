@@ -14,11 +14,13 @@ namespace Arpeggio.Cli
     {
         private const int EnvelopeValueCount = 4;
         private readonly List<(Option<string?> Option, string PropertyName, Func<string, JsonNode?> Parse)> bindings = new();
+        private readonly Option<string?> preset = new("--preset") { Description = "SNES 内蔵音色名。推奨値も再適用" };
         private readonly Option<string?> waveform = new("--waveform") { Description = "SNES: Sine/Square/Saw/Triangle/Pulse/Noise、GB Wave: 32 個の 0〜15 のカンマ区切り" };
 
         internal InstrumentOptions(Command command)
         {
             command.Options.Add(Kind);
+            command.Options.Add(preset);
             Add(command, "--name", "name", "音色名", value => JsonValue.Create(value));
             Add(command, "--duty", "duty", "12.5 / 25 / 50 / 75", ParseDuty);
             Add(command, "--volume-macro", "volumeMacro", "0〜15 の値列[/loopIndex]。null で解除", ParseMacro);
@@ -33,6 +35,8 @@ namespace Arpeggio.Cli
             Add(command, "--lfsr-width", "lfsrWidth", "GB Noise: 7 / 15", ParseInteger);
             Add(command, "--loop", "loop", "SNES: true / false", ParseBoolean);
             Add(command, "--adsr", "envelope", "SNES: attack秒,decay秒,sustain(0〜1),release秒", ParseEnvelope);
+            Add(command, "--adsr-registers", "adsrRegisters", "SNES: attack,decay,sustainLevel,sustainRate", ParseRegisters);
+            Add(command, "--root", "rootMidiNote", "SNES: 元の MIDI 音程または音名", value => JsonValue.Create(Arpeggio.Core.Document.NoteName.Parse(value))!);
             Add(command, "--echo-send", "echoSend", "SNES: エコー送り 0〜1", ParseDouble);
             Add(command, "--pan", "pan", "SNES: 左右定位 -1〜1", ParseDouble);
             command.Options.Add(waveform);
@@ -48,7 +52,18 @@ namespace Arpeggio.Cli
 
         internal Instrument Apply(ParseResult result, Instrument instrument)
         {
-            JsonObject document = ParseDocument(InstrumentJson.Serialize(instrument));
+            Instrument replacement = instrument;
+            string? selectedPreset = result.GetValue(preset);
+            if (selectedPreset != null)
+            {
+                replacement = InstrumentJson.Deserialize(InstrumentJson.Serialize(instrument));
+                if (replacement is not SnesSampleInstrument sample)
+                {
+                    throw new ArgumentException("--preset は SnesSample にだけ指定できます。");
+                }
+                sample.ApplyPreset(selectedPreset);
+            }
+            JsonObject document = ParseDocument(InstrumentJson.Serialize(replacement));
             foreach ((Option<string?> option, string propertyName, Func<string, JsonNode?> parse) in bindings)
             {
                 string? value = result.GetValue(option);
@@ -58,6 +73,10 @@ namespace Arpeggio.Cli
                 }
                 RequireProperty(document, propertyName, option.Name);
                 document[propertyName] = parse(value);
+                if (propertyName == "envelope")
+                {
+                    document["adsrRegisters"] = null;
+                }
             }
             ApplyWaveform(result, document);
             return InstrumentJson.Deserialize(document.ToJsonString());
@@ -198,6 +217,20 @@ namespace Arpeggio.Cli
                 throw new ArgumentException($"有限の数値を指定してください: {text}");
             }
             return value;
+        }
+
+        private static JsonNode ParseRegisters(string text)
+        {
+            int[] values = MacroOption.ParseValues(text);
+            if (values.Length != EnvelopeValueCount)
+            {
+                throw new ArgumentException("ADSR レジスタは attack,decay,sustainLevel,sustainRate の 4 値です。");
+            }
+            return new JsonObject
+            {
+                ["attack"] = values[0], ["decay"] = values[1],
+                ["sustainLevel"] = values[2], ["sustainRate"] = values[3]
+            };
         }
 
         private static JsonNode ParseEnvelope(string text)

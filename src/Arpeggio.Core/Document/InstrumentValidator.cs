@@ -1,5 +1,6 @@
 using System;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Instruments.Snes;
 
 namespace Arpeggio.Core.Document
 {
@@ -150,9 +151,24 @@ namespace Arpeggio.Core.Document
                 SongValidator.Require(registers.SustainLevel >= 0 && registers.SustainLevel <= MaximumSnesDecay, "ADSR sustainLevel は 0〜7 です。");
                 SongValidator.Require(registers.SustainRate >= 0 && registers.SustainRate <= MaximumSnesRate, "ADSR sustainRate は 0〜31 です。");
             }
+            ValidatePreset(sample);
             ValidateEmbeddedSample(sample);
             ValidateMacro(sample.ArpeggioMacro);
             ValidateMacro(sample.PitchMacro);
+        }
+
+        private static void ValidatePreset(SnesSampleInstrument sample)
+        {
+            SongValidator.Require(sample.Preset is null || sample.SampleData is null, "preset と sampleData はどちらか一方だけ指定してください。");
+            if (sample.Preset != null)
+            {
+                SongValidator.Require(SnesInstrumentCatalog.TryGet(sample.Preset, out _), $"未知の SNES プリセットです: {sample.Preset}");
+                SongValidator.Require(sample.SampleRate > 0, "sampleRate は正の整数です。");
+                int count = SnesInstrumentCatalog.Get(sample.Preset).SampleCount;
+                int end = sample.LoopEnd == 0 ? count : sample.LoopEnd;
+                SongValidator.Require(!sample.Loop || (sample.LoopStart >= 0 && sample.LoopStart < end && end <= count),
+                    "プリセットのループ範囲が不正です。");
+            }
         }
 
         internal static void ValidateEmbeddedSample(SnesSampleInstrument sample)

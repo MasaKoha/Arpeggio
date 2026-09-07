@@ -25,6 +25,11 @@ namespace Arpeggio.Core.Document
         [JsonPropertyOrder(4)]
         public double Pan { get; set; }
 
+        /// <summary>音色 ID 省略時の割り当て。null は従来のチャンネル別選択。</summary>
+        [JsonPropertyOrder(6)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? DefaultInstrumentId { get; set; }
+
         /// <summary>開始 tick 昇順のノート列。編集時はリスト参照を差し替える。</summary>
         [JsonPropertyOrder(5)]
         public List<Note> Notes { get; set; } = new List<Note>();

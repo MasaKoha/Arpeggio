@@ -68,8 +68,23 @@ namespace Arpeggio.Core.Document
                 channelCounts[channels[index]] = channelIndex + 1;
                 Require(track.Name != null, "track.name は null にできません。");
                 Require(IsInRange(track.Pan, -1, 1), "track.pan は -1〜1 です。");
+                ValidateDefaultInstrument(track, song.Chip, instruments);
                 ValidateNotes(track, song.LengthTicks, instruments);
             }
+        }
+
+        private static void ValidateDefaultInstrument(Track track, ChipKind chip, Dictionary<int, Instrument> instruments)
+        {
+            if (track.DefaultInstrumentId is not int instrumentId)
+            {
+                return;
+            }
+            Require(chip == ChipKind.Snes, "defaultInstrumentId は SNES のバンク用です。");
+            if (!instruments.TryGetValue(instrumentId, out Instrument? instrument))
+            {
+                throw new SongValidationException($"既定音色 ID {instrumentId} が存在しません。");
+            }
+            Require(InstrumentValidator.GetChannel(instrument.Kind) == track.Channel, "既定音色とチャンネルの種類が一致しません。");
         }
 
         private static void ValidateNotes(Track track, int lengthTicks, Dictionary<int, Instrument> instruments)

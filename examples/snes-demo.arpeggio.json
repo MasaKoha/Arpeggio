@@ -1,0 +1,620 @@
+{
+  "version": 1,
+  "title": "snes-demo",
+  "chip": "Snes",
+  "tempoBpm": 150,
+  "ticksPerBeat": 48,
+  "lengthTicks": 768,
+  "loopStartTick": 0,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "strings",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": true,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.35,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 59,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 9,
+        "decay": 3,
+        "sustainLevel": 6,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "strings"
+    },
+    {
+      "id": 2,
+      "name": "brass",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": true,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.2,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 59,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 14,
+        "decay": 3,
+        "sustainLevel": 6,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "brass"
+    },
+    {
+      "id": 3,
+      "name": "flute",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": true,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.25,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 59,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 13,
+        "decay": 2,
+        "sustainLevel": 6,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "flute"
+    },
+    {
+      "id": 4,
+      "name": "choir",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": true,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.4,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 59,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 8,
+        "decay": 2,
+        "sustainLevel": 6,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "choir"
+    },
+    {
+      "id": 5,
+      "name": "bass",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": true,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.05,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 59,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 15,
+        "decay": 4,
+        "sustainLevel": 5,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "bass"
+    },
+    {
+      "id": 6,
+      "name": "kick",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": false,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.0,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 60,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 15,
+        "decay": 0,
+        "sustainLevel": 7,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "kick"
+    },
+    {
+      "id": 7,
+      "name": "snare",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": false,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.1,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 60,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 15,
+        "decay": 0,
+        "sustainLevel": 7,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "snare"
+    },
+    {
+      "id": 8,
+      "name": "hat",
+      "kind": "SnesSample",
+      "waveform": "Sine",
+      "loop": false,
+      "envelope": {
+        "attackSeconds": 0,
+        "decaySeconds": 0,
+        "sustainLevel": 1,
+        "releaseSeconds": 0.05
+      },
+      "echoSend": 0.05,
+      "pan": 0,
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "sampleData": null,
+      "sampleRate": 32000,
+      "rootMidiNote": 60,
+      "loopStart": 0,
+      "loopEnd": 0,
+      "adsrRegisters": {
+        "attack": 15,
+        "decay": 0,
+        "sustainLevel": 7,
+        "sustainRate": 0
+      },
+      "pitchModulation": false,
+      "noiseEnabled": false,
+      "noiseRate": 31,
+      "preset": "hat"
+    }
+  ],
+  "tracks": [
+    {
+      "channel": "Sample",
+      "channelIndex": 0,
+      "name": "strings",
+      "muted": false,
+      "pan": -0.3,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 168,
+          "midiNote": 60,
+          "volume": 10,
+          "instrumentId": 1,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 168,
+          "midiNote": 64,
+          "volume": 10,
+          "instrumentId": 1,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 168,
+          "midiNote": 67,
+          "volume": 10,
+          "instrumentId": 1,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 168,
+          "midiNote": 62,
+          "volume": 10,
+          "instrumentId": 1,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 1
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 1,
+      "name": "brass",
+      "muted": false,
+      "pan": 0.3,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 168,
+          "midiNote": 55,
+          "volume": 10,
+          "instrumentId": 2,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 168,
+          "midiNote": 60,
+          "volume": 10,
+          "instrumentId": 2,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 168,
+          "midiNote": 64,
+          "volume": 10,
+          "instrumentId": 2,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 168,
+          "midiNote": 59,
+          "volume": 10,
+          "instrumentId": 2,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 2
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 2,
+      "name": "flute",
+      "muted": false,
+      "pan": -0.15,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 168,
+          "midiNote": 72,
+          "volume": 10,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 168,
+          "midiNote": 76,
+          "volume": 10,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 168,
+          "midiNote": 79,
+          "volume": 10,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 168,
+          "midiNote": 74,
+          "volume": 10,
+          "instrumentId": 3,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 3
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 3,
+      "name": "choir",
+      "muted": false,
+      "pan": 0.15,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 168,
+          "midiNote": 64,
+          "volume": 10,
+          "instrumentId": 4,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 168,
+          "midiNote": 67,
+          "volume": 10,
+          "instrumentId": 4,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 168,
+          "midiNote": 71,
+          "volume": 10,
+          "instrumentId": 4,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 168,
+          "midiNote": 65,
+          "volume": 10,
+          "instrumentId": 4,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 4
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 4,
+      "name": "bass",
+      "muted": false,
+      "pan": 0,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 168,
+          "midiNote": 36,
+          "volume": 10,
+          "instrumentId": 5,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 168,
+          "midiNote": 40,
+          "volume": 10,
+          "instrumentId": 5,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 168,
+          "midiNote": 43,
+          "volume": 10,
+          "instrumentId": 5,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 168,
+          "midiNote": 38,
+          "volume": 10,
+          "instrumentId": 5,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 5
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 5,
+      "name": "kick",
+      "muted": false,
+      "pan": 0,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 6,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 6,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 6,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 6,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 6
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 6,
+      "name": "snare",
+      "muted": false,
+      "pan": 0.1,
+      "notes": [
+        {
+          "tick": 48,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 7,
+          "effects": []
+        },
+        {
+          "tick": 240,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 7,
+          "effects": []
+        },
+        {
+          "tick": 432,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 7,
+          "effects": []
+        },
+        {
+          "tick": 624,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 7,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 7
+    },
+    {
+      "channel": "Sample",
+      "channelIndex": 7,
+      "name": "hat",
+      "muted": false,
+      "pan": -0.2,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 8,
+          "effects": []
+        },
+        {
+          "tick": 192,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 8,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 8,
+          "effects": []
+        },
+        {
+          "tick": 576,
+          "durationTicks": 24,
+          "midiNote": 60,
+          "volume": 12,
+          "instrumentId": 8,
+          "effects": []
+        }
+      ],
+      "defaultInstrumentId": 8
+    }
+  ],
+  "snesEcho": {
+    "delayMilliseconds": 0,
+    "feedback": 0,
+    "volume": 0,
+    "firCoefficients": [
+      127,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+}

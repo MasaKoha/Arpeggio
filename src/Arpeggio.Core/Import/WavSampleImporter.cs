@@ -35,6 +35,7 @@ namespace Arpeggio.Core.Import
                 Loop = loop
             };
             InstrumentValidator.ValidateEmbeddedSample(candidate);
+            instrument.Preset = null;
             instrument.SampleData = candidate.SampleData;
             instrument.SampleRate = candidate.SampleRate;
             instrument.RootMidiNote = candidate.RootMidiNote;

@@ -2,6 +2,7 @@ using System;
 using System.CommandLine;
 using Arpeggio.Codecs;
 using Arpeggio.Core.Document;
+using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
 
@@ -23,17 +24,19 @@ namespace Arpeggio.Cli
             Option<string> chip = new Option<string>("--chip") { Required = true, Description = "nes / gameboy / snes" };
             Option<int> tempo = new Option<int>("--tempo") { DefaultValueFactory = _ => DefaultTempo };
             Option<int> length = new Option<int>("--length-beats") { DefaultValueFactory = _ => DefaultLengthBeats };
+            Option<string?> bank = new Option<string?>("--bank") { Description = "SNES: orchestral / band / chip" };
             Option<string?> title = new Option<string?>("--title");
             command.Arguments.Add(path);
             command.Options.Add(chip);
             command.Options.Add(tempo);
             command.Options.Add(length);
             command.Options.Add(title);
+            command.Options.Add(bank);
             command.SetAction(result => CliExecution.Run(() =>
             {
                 EditSession session = new EditSession();
                 session.New(result.GetValue(path)!, ChipReference.ParseChip(result.GetValue(chip)!),
-                    result.GetValue(tempo), checked(result.GetValue(length) * Song.FixedTicksPerBeat), result.GetValue(title) ?? string.Empty);
+                    result.GetValue(tempo), checked(result.GetValue(length) * Song.FixedTicksPerBeat), result.GetValue(title) ?? string.Empty, SnesBankLayout.Parse(result.GetValue(bank)));
                 CliHistoryStore.Save(session);
                 Console.WriteLine(session.Path);
                 return CliExecution.Success;

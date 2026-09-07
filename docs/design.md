@@ -320,6 +320,31 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 | HighPass | 64, -64, 0, 0, 0, 0, 0, 0 | 差分による低域除去 |
 | Wide | 64, 0, 32, 0, 16, 0, 16, 0 | 時間方向に広がる残響 |
 
+## M2-E の SNES 音色バンク（2026-09-08）
+
+- `SnesSampleInstrument.Preset` は小文字の正式名を保存する。JSON version は 1。生成 PCM / BRR は保存せず、プリセット名から復元する。`sampleData` は従来どおり PCM Base64 であり、両方を指定したドキュメントはエラー。検証を経由しないボイス単体では `SampleData` を優先する。
+- `SnesInstrumentCatalog` が名前・カテゴリ・説明・推奨 ADSR レジスタ・ルート MIDI 音・ループ・EchoSend・生成長を持つ。`SnesInstrumentBank.Build(name)` は素材を合成し、`BrrSample.Create` で BRR 往復した新しいキャッシュを返す純関数。推奨値は `Catalog.Get(name)` から取得する。
+- 素材は全て 32000 Hz。持続系は 128 サンプルの一周期ループ、ループ範囲は全体。BRR ブロック境界を保つため周期は整数とし、原音 250 Hz に最も近い root MIDI 59 を割り当てる。C4 再生は約 264.9 Hz（平均律から約 +21 cent、受け入れ範囲内）。減衰系は root 60、基音は平均律 C4。ドラムの root 60 は原速再生の基準。
+- 持続系の strings は高次倍音を削った鋸歯状倍音の二声。短い周期内でデチューンの位相差を滑らかに戻し、ループ境界を接続する。brass は奇数倍音中心＋微小位相変調。organ は第 1〜4 倍音の固定比。choir は基本波中心と第 4 倍音（素材の約 1 kHz）の山。flute は弱い第 2 倍音と息のノイズ。lead は 25 % パルスの帯域制限合成。bass は三角波寄りの奇数倍音と第 2 倍音。
+- piano は 800 ms、高次倍音が先に消えるアタックと遅い基音減衰。pluck は 500 ms の速い倍音別減衰。bell は 1000 ms、1 : 2.76 : 5.4 の非整数倍音。末尾フェードを掛け、いずれも既定でワンショット。
+- ドラムは kick 300 ms（150→50 Hz を 60 ms で下降＋微小クリック）、snare 150 ms（200 Hz のトーン＋ノイズ）、hat 40 ms、openhat 200 ms、tom 200 ms、crash 800 ms。ドラムの個別指定時間を「減衰系 0.3〜1.0 秒」の共通目安より優先する。hat / openhat / crash は二階差分で高域を強調したノイズ。乱数はプリセット別の名前付き固定シードの `System.Random` を使う。
+- 生成素材は DC を除去し、ピークを 0.72 にそろえて BRR へ入力する。キャッシュの生成は Preset の代入時だけ。Loop / LoopStart / LoopEnd の変更は同じ PCM のループ情報だけ更新する。NoteOn / Render では生成・復号・辞書登録を行わない。
+- 推奨値は未指定プロパティの既定値として働く。JSON の項目順に依存せず、明示した Loop / SampleRate / RootMidiNote / EchoSend / AdsrRegisters を優先する。`adsrRegisters: null` は秒指定 Envelope に戻す。CLI `--preset` は既存素材・ループ・ルート・ADSR・EchoSend を推奨値へリセットしてから同じコマンドの明示オプションを適用する。Pan / 名前 / マクロは保持する。NoiseEnabled は false に戻す。
+- `instrument import-wav` は検証成功後に Preset を解除する。プリセットへ切り替える CLI は SampleData を解除する。入力 JSON の二重指定を黙って解消することはしない。
+- `new --chip snes --bank` / MCP `new_song(bank: ...)` は八音色を ID 1〜8 として作り、トラック名をプリセット名にする。`Track.DefaultInstrumentId`（省略時 null、保存時 null は省略）で割り当てを永続化する。SNES 専用で、存在・チャンネル適合性を検証し、割り当て中の音色削除は拒否する。音色 ID 省略時の解決順は明示 ID → トラック既定 ID → 従来のチャンネル別選択。改名・保存復元・履歴操作でも割り当てを保持する。
+
+| バンク | トラック 0〜7 |
+|---|---|
+| orchestral | strings / brass / flute / choir / bass / kick / snare / hat |
+| band | lead / organ / pluck / bass / piano / kick / snare / hat |
+| chip | lead / lead / bass / organ / bell / kick / snare / hat |
+
+orchestral の依頼一覧は kick / snare を分けると 9 音色になるため、8 ボイス制約を優先して piano を除いた暫定編成とする。piano 自体はバンクのプリセットとして利用できる。bank 未指定時は従来どおり名前 lead の合成波形音色が一つだけで、Preset は null。
+
+- CLI: `instrument presets snes`、`instrument add ... --kind SnesSample --preset strings --name str`、`instrument set ... --id N --preset brass`。推奨レジスタは `--adsr-registers attack,decay,sustainLevel,sustainRate`、ルートは `--root C4` で上書きできる。`--adsr` はレジスタ指定を解除して秒指定に戻す。両方ある場合は `--adsr-registers` を優先する。
+- MCP: `snes_presets()` は一覧を返し、既存 `add_instrument` / `update_instrument` の音色 JSON に `preset` を指定できる。更新は既存契約どおりオブジェクト全体の置換。show / instrument list は `SnesSample strings` の形で名前参照を表示する。
+- M2-E-A の BRR・補間・ADSR・FIR 自体は変更しない。release は既存 DSP の固定約 8 ms。既存 SFX の素材は維持し、DAW のプリセット選択 UI は対象外。
+
 ## 未決事項
 
 - SPC ファイル・RAM・命令単位までの互換性は M3 以降で決める

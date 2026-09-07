@@ -59,6 +59,7 @@ namespace Arpeggio.Core.Session
             current.Name = candidate.Name;
             current.Muted = candidate.Muted;
             current.Pan = candidate.Pan;
+            current.DefaultInstrumentId = candidate.DefaultInstrumentId;
             // 公開済みリストを変更せず、無関係なノート編集による再発音も防ぐ。
             current.Notes = PreserveNotes(current.Notes, candidate.Notes);
         }

@@ -7,6 +7,7 @@ using Arpeggio.Codecs;
 using Arpeggio.Core.Analysis;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
@@ -45,14 +46,23 @@ namespace Arpeggio.Mcp
             [Description("nes / gameboy / snes")] string chip,
             [Description("毎分の四分音符数")] int tempo = DefaultTempo,
             [Description("四分音符単位の曲の長さ")] int lengthBeats = DefaultLengthBeats,
-            [Description("曲名")] string? title = null)
+            [Description("曲名")] string? title = null,
+            [Description("SNES: orchestral / band / chip。省略時は従来の単一音色")] string? bank = null)
         {
             return Invoke(() =>
             {
                 int lengthTicks = checked(lengthBeats * Song.FixedTicksPerBeat);
-                session.New(path, ChipReference.ParseChip(chip), tempo, lengthTicks, title ?? string.Empty);
+                session.New(path, ChipReference.ParseChip(chip), tempo, lengthTicks, title ?? string.Empty, SnesBankLayout.Parse(bank));
                 return SessionOutput.Info(session);
             });
+        }
+
+        /// <summary>SNES 内蔵音色の説明と推奨値を返す。</summary>
+        [McpServerTool(Name = "snes_presets", ReadOnly = true, Destructive = false)]
+        [Description("SNES 内蔵音色の名前・カテゴリ・説明・推奨 ADSR・ルート音・ループ・EchoSend を返す。")]
+        public string SnesPresets()
+        {
+            return Invoke(() => SnesInstrumentCatalog.All);
         }
 
         /// <summary>ソングを開いてセッション履歴を初期化する。</summary>

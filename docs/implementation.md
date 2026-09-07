@@ -750,3 +750,86 @@ tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesDspSettingsTests.cs
 docs/design.md
 docs/implementation.md
 ```
+
+## M2-E-B の実装判断
+
+- **保存と既定値**: `SnesSampleInstrument.Preset` を追加した。推奨値の根拠は `SnesInstrumentCatalog` 一箇所。Loop / SampleRate / RootMidiNote / EchoSend は nullable な明示値とプリセット既定値を分けて保持し、ADSR は「未指定」と「明示 null」を区別する。これにより JSON の項目順にかかわらず上書きを保つ。保存には有効な設定値と preset 名を出し、生成 PCM / BRR を埋め込まない。
+- **生成とキャッシュ**: `SnesInstrumentBank.Build` は呼び出しごとに新しい BrrSample を返す純関数。素材の合成責務は持続系・減衰系・ドラムの三型に分けた。Preset setter で Build を呼び、音色所有のキャッシュを用意する。ループ設定変更は BrrSample.WithLoop だけで、PCM を再生成しない。SnesVoiceSynthesizer は SampleData → PreparedPreset → 従来波形の順で参照を選ぶ。JSON の読み込み・編集の度に新しい音色キャッシュを準備し、グローバルな可変キャッシュは導入していない。
+- **素材の音程と音量**: 持続系は全て 128 サンプル / 32000 Hz / root 59。250 Hz の整数周期を維持し、C4 は約 264.9 Hz（約 +21 cent）になる設計。半音以内の受け入れ範囲を満たす想定だが、実出力の値はテスト未実行につき未確認。減衰系は平均律 C4 / root 60、ドラムも root 60 を原速基準とする。DC 除去後の素材ピークを 0.72 に正規化して BRR へ渡し、ミキサーの既存ヘッドルームを使う。
+- **strings のデチューン**: 128 サンプルで二つの非整数周期をそのまま切ると毎周回で位相が飛ぶため、二声の微小な位相差を周期内で戻す形にした。ゆっくり独立にうなる二発振器の完全再現ではない。鋸歯状倍音のロールオフと第七倍音の差をテストで確認する。
+- **短いドラム**: snare / hat / openhat / tom は依頼の個別指定時間（150 / 40 / 200 / 200 ms）を優先する。kick は 300 ms、crash は 800 ms。高域ノイズは二階差分、クリックは微小な固定シードノイズ。ピッチ下降は位相を積分して連続にする。DSP NoiseEnabled は使用せず、ノイズ込み素材を BRR 往復させる。
+- **入力境界**: 未知 preset と SampleData との二重指定は InstrumentValidator でエラーにする。検証を迂回したボイスでは SampleData の優先を維持した。WavSampleImporter は入力検証成功後に Preset を解除する。CLI の ApplyPreset は SampleData を解除して推奨値を再適用し、名前・Pan・マクロを保持する。明示 `--adsr` はレジスタ指定を解除し、`--adsr-registers` があればそちらを優先する。
+- **トラックの割り当て**: 既存 Track には既定音色 ID がなかったため、SNES 用の nullable DefaultInstrumentId を追加した。名前から音色を推測すると改名や chip バンクの lead 二声を扱えないため、ID を保存する。Validator・DefaultInstrumentResolver・スナップショット公開・音色削除の両経路にも反映した。既存曲では null を保存しない。NES / GB の音色・合成器・既定音色選択は変更していない。
+- **orchestral の編成**: 依頼一覧は kick と snare を分けると 9 音色。確認を提示し、返答待ちの暫定値として piano を除外した `strings / brass / flute / choir / bass / kick / snare / hat` を採用した。band / chip は指定どおり。bank 未指定時の既存 lead 一音色は変更していない。
+- **CLI / MCP / 表示**: instrument presets snes、add / set の --preset、new の --bank、MCP snes_presets と new_song(bank) を追加。音色 JSON は既存の add / update 経路で扱う。show と instrument list は `SnesSample strings` を表示する。MCP の公開ツール数の既存テストを 23 個へ更新した。
+- **音域警告**: SongRenderer の素材判定に Preset を加え、プリセットの警告も root 基準で出す。DSP・PitchTable の計算自体は変更していない。元 SampleRate を任意に上書きした場合の厳密な警告範囲は M2-E-A の既存課題を継承する。
+- **SFX**: 既存 SNES SFX は維持した。効果音の高音域・急なピッチスライドに対する内蔵素材の改善を試聴で確認できないため、今回は任意の置き換えを採用しない。既存 Pulse / Noise を引き続き使用する。
+- **デモ**: examples/snes-demo.arpeggio.json と snes-demo-ops.json を追加。4 小節、8 トラック、各 4 音と Pan。CLI と同じ既定値・操作列に相当する JSON を生成した。実 CLI 実行から得た成果物ではなく、下記テストで同値性を検証する構成。WAV 自体はまだ生成していない。
+
+## M2-E-B のテストコード
+
+| ファイル | 確認対象 |
+|---|---|
+| SnesInstrumentBankTests | 全 16 音色の二回生成一致、生成長・ループ境界、C4 一秒の非無音・無クリップ・音程、kick / hat 帯域、strings / organ 第七倍音比、全三編成の分割 Render 一致と GC 0 byte |
+| SnesPresetDocumentTests | 名前のみの入力と推奨値、JSON 項目順、明示 null ADSR、保存再生一致、未知名・二重指定・不正メタデータの拒否、埋め込み優先、八トラックの既定 ID、従来曲の互換性 |
+| SnesBankCommandsTests | 一覧・追加・差し替え・推奨値と明示上書き、不正入力時の保存維持、WAV とプリセットの相互切り替え・undo/redo、同梱バッチの CLI 再生成と同梱曲との同値性、export wav 後の AudioAnalyzer |
+| SnesBankToolsTests / ArpeggioToolsTests | snes_presets のスキーマ、全三編成の new_song、音色 ID 省略、add/update JSON、保存再オープン、不正入力・削除拒否、公開ツール名 |
+
+## M2-E-B の静的確認
+
+- 変更 C# の括弧対応・doc XML・public summary の隣接を確認した。参照する型の定義と namespace、CLI / MCP / AudioAnalyzer / BrrSample / WavReader の既存 API を照合した。
+- Render / NoteOn の変更はキャッシュ選択と素材判定のみ。生成・復号・新しい配列・辞書登録・LINQ を追加していない。GC 数値は未実測。
+- デモの JSON 構文とテスト csproj の XML 構文を確認した。
+- git 操作、Unity 起動、コンパイル、dotnet build / dotnet test、CLI の実行は行っていない。
+
+## M2-E-B 未完了
+
+依頼の「コンパイル・テスト実行は依頼者が行う」に従い、以下は実行していない。テスト成功や音響条件達成はまだ確認できていない。
+
+- コンパイルのエラー・警告ゼロ、既存テスト全件および追加テストの実行。
+- 全音色の C4・ドラム帯域・倍音比・非無音／無クリップの実測、全三バンクの Render GC 0 byte 実測。
+- SnesBankCommandsTests のデモ再生成・同梱 JSON との同値性・export wav・解析の実行。実 CLI でのデモ生成と WAV の書き出しは README の手順で再現する。
+- 試聴によるループ継ぎ目・音色の区別・減衰・エコーの確認。
+- orchestral の 9 音色指定から除外する音色について、piano 除外の暫定編成を最終確認する。
+
+## M2-E-B 変更ファイル一覧
+
+```text
+src/Arpeggio.Cli/InstrumentCommands.cs
+src/Arpeggio.Cli/InstrumentOptions.cs
+src/Arpeggio.Cli/SongCommands.cs
+src/Arpeggio.Core/Document/InstrumentValidator.cs
+src/Arpeggio.Core/Document/SongFactory.cs
+src/Arpeggio.Core/Document/SongTextRenderer.cs
+src/Arpeggio.Core/Document/SongValidator.cs
+src/Arpeggio.Core/Document/Track.cs
+src/Arpeggio.Core/Import/WavSampleImporter.cs
+src/Arpeggio.Core/Instruments/Snes/SnesBankKind.cs
+src/Arpeggio.Core/Instruments/Snes/SnesBankLayout.cs
+src/Arpeggio.Core/Instruments/Snes/SnesInstrumentBank.cs
+src/Arpeggio.Core/Instruments/Snes/SnesInstrumentCatalog.cs
+src/Arpeggio.Core/Instruments/Snes/SnesInstrumentPreset.cs
+src/Arpeggio.Core/Instruments/Snes/SnesInstrumentRecipeDecay.cs
+src/Arpeggio.Core/Instruments/Snes/SnesInstrumentRecipeDrums.cs
+src/Arpeggio.Core/Instruments/Snes/SnesInstrumentRecipeSustained.cs
+src/Arpeggio.Core/Instruments/SnesSampleInstrument.cs
+src/Arpeggio.Core/Render/SongRenderer.cs
+src/Arpeggio.Core/Session/BatchOperationApplier.cs
+src/Arpeggio.Core/Session/DefaultInstrumentResolver.cs
+src/Arpeggio.Core/Session/EditSession.cs
+src/Arpeggio.Core/Session/InstrumentEditor.cs
+src/Arpeggio.Core/Session/SongSnapshotPublisher.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesVoiceSynthesizer.cs
+src/Arpeggio.Mcp/ArpeggioTools.cs
+tests/Arpeggio.Core.Tests/Cli/SnesBankCommandsTests.cs
+tests/Arpeggio.Core.Tests/Instruments/Snes/SnesInstrumentBankTests.cs
+tests/Arpeggio.Core.Tests/Instruments/Snes/SnesPresetDocumentTests.cs
+tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
+tests/Arpeggio.Core.Tests/Mcp/SnesBankToolsTests.cs
+tests/Arpeggio.Core.Tests/Arpeggio.Core.Tests.csproj
+examples/snes-demo.arpeggio.json
+examples/snes-demo-ops.json
+docs/design.md
+docs/implementation.md
+README.md
+```

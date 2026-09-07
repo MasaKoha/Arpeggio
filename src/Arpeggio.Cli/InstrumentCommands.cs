@@ -3,6 +3,7 @@ using System.CommandLine;
 using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Session;
 
 namespace Arpeggio.Cli
@@ -14,10 +15,28 @@ namespace Arpeggio.Cli
         {
             Command command = new("instrument", "チップ固有の音色を管理");
             command.Subcommands.Add(CreateList());
+            command.Subcommands.Add(CreatePresets());
             command.Subcommands.Add(CreateAdd());
             command.Subcommands.Add(CreateSet());
             command.Subcommands.Add(CreateRemove());
             command.Subcommands.Add(CreateImportWav());
+            return command;
+        }
+
+        private static Command CreatePresets()
+        {
+            Command command = new("presets", "内蔵音色一覧");
+            Command snes = new("snes", "SNES のカテゴリ・説明・推奨値");
+            snes.SetAction(_ => CliExecution.Run(() =>
+            {
+                foreach (SnesInstrumentPreset preset in SnesInstrumentCatalog.All)
+                {
+                    SnesAdsrRegisters registers = preset.AdsrRegisters;
+                    Console.WriteLine(FormattableString.Invariant($"{preset.Name} | {preset.Category} | {preset.Description} | ADSR {registers.Attack},{registers.Decay},{registers.SustainLevel},{registers.SustainRate} | root {preset.RootMidiNote} | loop {preset.Loop} | echo {preset.EchoSend} | {preset.SampleCount} smp @ {preset.SampleRate} Hz"));
+                }
+                return CliExecution.Success;
+            }));
+            command.Subcommands.Add(snes);
             return command;
         }
 
@@ -41,7 +60,9 @@ namespace Arpeggio.Cli
                 {
                     string sampleDescription = instrument is SnesSampleInstrument sample && sample.SampleData != null
                         ? $" | {sample.SampleSummary}" : string.Empty;
-                    Console.WriteLine($"{instrument.Id:D2} {instrument.Kind} {instrument.Name}{sampleDescription}");
+                    string presetDescription = instrument is SnesSampleInstrument presetSample && presetSample.Preset != null
+                        ? $" {presetSample.Preset}" : string.Empty;
+                    Console.WriteLine($"{instrument.Id:D2} {instrument.Kind}{presetDescription} {instrument.Name}{sampleDescription}");
                 }
                 return CliExecution.Success;
             }));
