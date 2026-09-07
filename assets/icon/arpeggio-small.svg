@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Arpeggio（小サイズ用）</title>
+  <desc id="description">16〜32 px 用。矩形波を省き、階段状の四つの音だけを大きく描く。</desc>
+  <rect width="1024" height="1024" rx="180" fill="#0E131A" />
+  <rect x="96" y="672" width="208" height="208" fill="#5DF2A4" />
+  <rect x="304" y="496" width="208" height="208" fill="#FFB347" />
+  <rect x="512" y="320" width="208" height="208" fill="#FF6FD8" />
+  <rect x="720" y="144" width="208" height="208" fill="#B892FF" />
+</svg>

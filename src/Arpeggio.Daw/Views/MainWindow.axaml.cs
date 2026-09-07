@@ -104,6 +104,7 @@ namespace Arpeggio.Daw.Views
             Title = $"Arpeggio — {current.Title}";
             tracks.ShowTracks(current.Tracks, selectedTrack);
             pianoRoll.ShowSong(current, selectedTrack, selectedTick);
+            instruments.ShowChannel(current.Tracks[selectedTrack]);
             instruments.Refresh();
             notes.Refresh();
             analysis.ShowTracks(current);
@@ -122,6 +123,7 @@ namespace Arpeggio.Daw.Views
             if (displayedWarningCount != warningCount)
             {
                 warningsButton.Content = $"警告 {warningCount}";
+                warningsButton.Classes.Set("danger", warningCount > 0);
                 displayedWarningCount = warningCount;
             }
         }

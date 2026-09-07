@@ -1,0 +1,107 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StreamGeometry x:Key="Icon.Play">M7 3 L21 12 L7 21 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Stop">M4 4 H20 V20 H4 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Loop">M6 4 H18 V2 L23 6 L18 10 V8 H6 V12 H2 V8 Q2 4 6 4 Z M18 20 H6 V22 L1 18 L6 14 V16 H18 V12 H22 V16 Q22 20 18 20 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Export">M11 15 V5 L7 9 L5.5 7.5 L12 1 L18.5 7.5 L17 9 L13 5 V15 Z M3 13 H5 V20 H19 V13 H21 V22 H3 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.FolderOpen">M2 4 H9 L12 7 H22 V10 H20 V9 H11 L8 6 H4 V18 L7 11 H23 L19 21 H2 Z M8.5 13 L6 19 H17.5 L20 13 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Analyze">M1 10 H3 V5 H5 V15 H7 V8 H9 V10 H7 V17 H3 V12 H1 Z M16 2 A7 7 0 1 1 16 16 A7 7 0 1 1 16 2 Z M16 4 A5 5 0 1 0 16 14 A5 5 0 1 0 16 4 Z M20 14 L24 18 L22 20 L18 16 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Sfx">M13 1 L15 9 L23 11 L15 14 L12 23 L9 15 L1 12 L9 9 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Mute">M2 9 H6 L12 4 V20 L6 15 H2 Z M15 4 L23 20 L21 21 L13 5 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Unmute">M2 9 H6 L12 4 V20 L6 15 H2 Z M15 8 Q20 12 15 16 L14 14 Q17 12 14 10 Z M18 4 Q24 12 18 20 L17 18 Q24 12 17 6 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Add">M11 3 H13 V11 H21 V13 H13 V21 H11 V13 H3 V11 H11 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Remove">M3 11 H21 V13 H3 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Save">M3 2 H18 L22 6 V22 H2 V2 Z M5 4 V10 H17 V4 Z M6 14 V20 H18 V14 Z M13 5 H15 V9 H13 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Warning">M12 1 L24 22 H0 Z M12 5 L3.5 20 H20.5 Z M11 9 H13 V15 H11 Z M11 17 H13 V19 H11 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Import">M11 2 H13 V12 L17 8 L18.5 9.5 L12 16 L5.5 9.5 L7 8 L11 12 Z M3 14 H5 V20 H19 V14 H21 V22 H3 Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.App">M2 11 H6 V15 H2 Z M7 8 H11 V12 H7 Z M12 5 H16 V9 H12 Z M17 2 H21 V6 H17 Z M2 19 H7 V16 H13 V21 H18 V18 H22 V20 H20 V23 H11 V18 H9 V21 H2 Z</StreamGeometry>
+  <DataTemplate x:Key="Arpeggio.Content.Play" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Play}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="再生" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Stop" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Stop}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="停止" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Loop" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Loop}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Export" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Export}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.FolderOpen" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.FolderOpen}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Analyze" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Analyze}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Sfx" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Sfx}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Mute" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Mute}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Unmute" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Unmute}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Add" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Add}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Remove" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Remove}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Save" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Save}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Warning" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Warning}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.Import" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.Import}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="Arpeggio.Content.App" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <PathIcon Data="{StaticResource Icon.App}" Width="16" Height="16" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

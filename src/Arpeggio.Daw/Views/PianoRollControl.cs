@@ -1,10 +1,13 @@
 using System;
+using System.Globalization;
 using Arpeggio.Core.Document;
 using Arpeggio.Daw.Presenters;
+using Arpeggio.Daw.Themes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 
 namespace Arpeggio.Daw.Views
 {
@@ -20,18 +23,39 @@ namespace Arpeggio.Daw.Views
         private const double ResizeHandleWidth = 7;
         private const double NoteInset = 1;
         private const int BeatsPerBar = 4;
-        private const double EffectMarkRadius = 2;
-        private const double EffectMarkInset = 4;
-        private readonly Pen effectMarkPen = new Pen(Brushes.White);
-        private readonly IBrush background = new SolidColorBrush(Color.Parse("#151B24"));
-        private readonly IBrush blackKeyBackground = new SolidColorBrush(Color.Parse("#11161E"));
-        private readonly IBrush noteBrush = new SolidColorBrush(Color.Parse("#69C7AD"));
-        private readonly IBrush selectedBrush = new SolidColorBrush(Color.Parse("#FFE09A"));
-        private readonly IBrush ghostBrush = new SolidColorBrush(Color.Parse("#364A57"));
-        private readonly Pen gridPen = new Pen(new SolidColorBrush(Color.Parse("#242E3A")));
-        private readonly Pen beatPen = new Pen(new SolidColorBrush(Color.Parse("#394657")));
-        private readonly Pen barPen = new Pen(new SolidColorBrush(Color.Parse("#647488")));
-        private readonly Pen cursorPen = new Pen(new SolidColorBrush(Color.Parse("#FF8594")), 2);
+        private const int SemitonesPerOctave = 12;
+        private const int MaximumVolume = 15;
+        private const double MinimumBrightness = 0.45;
+        private const double GhostOpacity = 0.25;
+        private const double NoteCornerRadius = 2;
+        private const double LabelInset = 4;
+        private const double LabelSize = 11;
+        private const double EffectMarkSize = 6;
+        private const double SelectionThickness = 2;
+        private readonly IBrush background = ThemeResources.GetBrush("Arpeggio.Background");
+        private readonly IBrush blackKeyBackground = ThemeResources.GetBrush("Arpeggio.Grid.BlackKey");
+        private readonly IBrush accent = ThemeResources.GetBrush("Arpeggio.Accent");
+        private readonly IBrush playhead = ThemeResources.GetBrush("Arpeggio.Playhead");
+        private readonly IBrush labelBrush = ThemeResources.GetBrush("Arpeggio.Background");
+        private readonly Pen noteEdge = new Pen(ThemeResources.GetBrush("Arpeggio.Background"));
+        private readonly Pen selectedPen = new Pen(ThemeResources.GetBrush("Arpeggio.Accent"), SelectionThickness);
+        private readonly Pen gridPen = new Pen(ThemeResources.GetBrush("Arpeggio.Grid.Sixteenth"));
+        private readonly Pen beatPen = new Pen(ThemeResources.GetBrush("Arpeggio.Grid.Beat"));
+        private readonly Pen barPen = new Pen(ThemeResources.GetBrush("Arpeggio.Grid.Bar"));
+        private readonly Pen octavePen = new Pen(ThemeResources.GetBrush("Arpeggio.Border"));
+        private readonly Pen cursorPen = new Pen(ThemeResources.GetBrush("Arpeggio.Playhead"), SelectionThickness);
+        private readonly Typeface labelTypeface = new Typeface(ThemeResources.NumericFont, FontStyle.Normal, FontWeight.Normal, FontStretch.Normal);
+        private readonly StreamGeometry effectMark = StreamGeometry.Parse("M0 0 H6 V6 Z");
+        private readonly StreamGeometry cursorMark = StreamGeometry.Parse("M-4 0 H4 L0 6 Z");
+        private IBrush[][] volumeBrushes = Array.Empty<IBrush[]>();
+        private IBrush[] ghostBrushes = Array.Empty<IBrush>();
+        private IBrush[] channelBrushes = Array.Empty<IBrush>();
+        private readonly IBrush ghostLabelBrush = ThemeResources.GetBrush("Arpeggio.TextPrimary");
+        private FormattedText[] channelLabels = Array.Empty<FormattedText>();
+        private FormattedText[] ghostLabels = Array.Empty<FormattedText>();
+        private string[] shortLabels = Array.Empty<string>();
+        private string[] trackToolTips = Array.Empty<string>();
+        private int hoveredTrack = -1;
         private PianoRollPresenter? presenter;
         private Action<Action>? execute;
         private Song? song;
@@ -55,9 +79,12 @@ namespace Arpeggio.Daw.Views
         /// <summary>編集データと選択だけを受け取る。</summary>
         public void ShowSong(Song current, int trackIndex, int? tick)
         {
+            PrepareChannelVisuals(current);
             song = current;
             selectedTrack = trackIndex;
             selectedTick = tick;
+            hoveredTrack = -1;
+            ToolTip.SetTip(this, trackToolTips[trackIndex]);
             Width = current.LengthTicks * PixelsPerTick;
             Height = (PianoRollPresenter.MaximumMidiNote + 1) * NoteHeight;
             InvalidateVisual();
@@ -78,11 +105,15 @@ namespace Arpeggio.Daw.Views
             DrawTickLines(context, visible);
             for (int trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
             {
-                if (trackIndex != selectedTrack) { DrawNotes(context, song.Tracks[trackIndex], ghostBrush, visible, false); }
+                if (trackIndex != selectedTrack) { DrawNotes(context, trackIndex, visible, false); }
             }
-            DrawNotes(context, song.Tracks[selectedTrack], noteBrush, visible, true);
+            DrawNotes(context, selectedTrack, visible, true);
             double cursorPosition = positionTick * PixelsPerTick;
             context.DrawLine(cursorPen, new Point(cursorPosition, visible.Top), new Point(cursorPosition, visible.Bottom));
+            using (context.PushTransform(Matrix.CreateTranslation(cursorPosition, visible.Top)))
+            {
+                context.DrawGeometry(playhead, null, cursorMark);
+            }
         }
         /// <summary>ピクセル座標を tick と MIDI 音高に変換して操作を開始する。</summary>
         protected override void OnPointerPressed(PointerPressedEventArgs arguments)
@@ -108,6 +139,7 @@ namespace Arpeggio.Daw.Views
         protected override void OnPointerMoved(PointerEventArgs arguments)
         {
             base.OnPointerMoved(arguments);
+            UpdateNoteToolTip(arguments.GetPosition(this));
             if (presenter == null || execute == null || presenter.DragMode == PianoRollDragMode.None) { return; }
             Point position = arguments.GetPosition(this);
             execute(() => presenter.Drag(position.X / PixelsPerTick, GetPitch(position.Y), arguments.KeyModifiers.HasFlag(KeyModifiers.Alt)));
@@ -150,7 +182,10 @@ namespace Arpeggio.Daw.Views
                 {
                     context.DrawRectangle(blackKeyBackground, null, new Rect(visible.Left, top, visible.Width, NoteHeight));
                 }
-                context.DrawLine(gridPen, new Point(visible.Left, top), new Point(visible.Right, top));
+                if ((PianoRollPresenter.MaximumMidiNote - row) % SemitonesPerOctave == 0)
+                {
+                    context.DrawLine(octavePen, new Point(visible.Left, top + NoteHeight), new Point(visible.Right, top + NoteHeight));
+                }
             }
         }
         private void DrawTickLines(DrawingContext context, Rect visible)
@@ -166,25 +201,139 @@ namespace Arpeggio.Daw.Views
                 context.DrawLine(pen, new Point(left, visible.Top), new Point(left, visible.Bottom));
             }
         }
-        private void DrawNotes(DrawingContext context, Track track, IBrush brush, Rect visible, bool isSelectedTrack)
+        private void UpdateNoteToolTip(Point position)
         {
+            if (song == null) { return; }
+            int trackIndex = FindHoveredTrack(position);
+            if (trackIndex == hoveredTrack) { return; }
+            hoveredTrack = trackIndex;
+            ToolTip.SetTip(this, trackToolTips[trackIndex]);
+        }
+
+        private int FindHoveredTrack(Point position)
+        {
+            if (ContainsNoteAt(song!.Tracks[selectedTrack], position)) { return selectedTrack; }
+            for (int trackIndex = song.Tracks.Count - 1; trackIndex >= 0; trackIndex--)
+            {
+                if (ContainsNoteAt(song.Tracks[trackIndex], position)) { return trackIndex; }
+            }
+            return selectedTrack;
+        }
+
+        private bool ContainsNoteAt(Track track, Point position)
+        {
+            int pitch = GetPitch(position.Y);
+            double tick = position.X / PixelsPerTick;
             foreach (Note note in track.Notes)
+            {
+                if (note.MidiNote == pitch && tick >= note.Tick && tick < (long)note.Tick + note.DurationTicks)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void PrepareChannelVisuals(Song current)
+        {
+            if (channelBrushes.Length != current.Tracks.Count)
+            {
+                channelBrushes = new IBrush[current.Tracks.Count];
+                volumeBrushes = new IBrush[current.Tracks.Count][];
+                ghostBrushes = new IBrush[current.Tracks.Count];
+                channelLabels = new FormattedText[current.Tracks.Count];
+                ghostLabels = new FormattedText[current.Tracks.Count];
+                shortLabels = new string[current.Tracks.Count];
+                trackToolTips = new string[current.Tracks.Count];
+            }
+            for (int trackIndex = 0; trackIndex < current.Tracks.Count; trackIndex++)
+            {
+                Track track = current.Tracks[trackIndex];
+                IBrush channelBrush = ChannelPalette.GetBrush(track.Channel, track.ChannelIndex);
+                string shortLabel = ChannelPalette.GetShortLabel(track.Channel, track.ChannelIndex);
+                trackToolTips[trackIndex] = $"{shortLabel} · {track.Name}";
+                if (ReferenceEquals(channelBrushes[trackIndex], channelBrush) && shortLabels[trackIndex] == shortLabel)
+                {
+                    continue;
+                }
+                channelBrushes[trackIndex] = channelBrush;
+                shortLabels[trackIndex] = shortLabel;
+                Color color = ((ISolidColorBrush)channelBrush).Color;
+                ghostBrushes[trackIndex] = new ImmutableSolidColorBrush(color, GhostOpacity);
+                volumeBrushes[trackIndex] = CreateVolumeBrushes(color);
+                channelLabels[trackIndex] = new FormattedText(shortLabel, CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight, labelTypeface, LabelSize, labelBrush);
+                ghostLabels[trackIndex] = new FormattedText(shortLabel, CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight, labelTypeface, LabelSize, ghostLabelBrush);
+            }
+        }
+
+        private static IBrush[] CreateVolumeBrushes(Color color)
+        {
+            IBrush[] brushes = new IBrush[MaximumVolume + 1];
+            for (int volume = 0; volume <= MaximumVolume; volume++)
+            {
+                double brightness = MinimumBrightness + (1 - MinimumBrightness) * volume / MaximumVolume;
+                brushes[volume] = new ImmutableSolidColorBrush(Color.FromRgb(
+                    (byte)Math.Round(color.R * brightness), (byte)Math.Round(color.G * brightness), (byte)Math.Round(color.B * brightness)));
+            }
+            return brushes;
+        }
+
+        private void DrawNotes(DrawingContext context, int trackIndex, Rect visible, bool isSelectedTrack)
+        {
+            foreach (Note note in song!.Tracks[trackIndex].Notes)
             {
                 Rect rectangle = new Rect(note.Tick * PixelsPerTick, (PianoRollPresenter.MaximumMidiNote - note.MidiNote) * NoteHeight + NoteInset,
                     Math.Max(1, note.DurationTicks * PixelsPerTick - NoteInset), NoteHeight - NoteInset * 2);
                 if (!rectangle.Intersects(visible)) { continue; }
-                context.DrawRectangle(isSelectedTrack && note.Tick == selectedTick ? selectedBrush : brush, null, rectangle);
+                if (!isSelectedTrack)
+                {
+                    context.DrawRectangle(ghostBrushes[trackIndex], null, rectangle, NoteCornerRadius, NoteCornerRadius);
+                    DrawGhostLabel(context, trackIndex, rectangle);
+                    continue;
+                }
+                context.DrawRectangle(volumeBrushes[trackIndex][note.Volume], null, rectangle, NoteCornerRadius, NoteCornerRadius);
+                double edgeInset = Math.Min(NoteCornerRadius, rectangle.Width / 2);
+                context.DrawLine(noteEdge, new Point(rectangle.Left + edgeInset, rectangle.Bottom - NoteInset),
+                    new Point(rectangle.Right - edgeInset, rectangle.Bottom - NoteInset));
+                DrawChannelLabel(context, trackIndex, rectangle);
                 if (note.Effects.Length > 0) { DrawEffectMark(context, rectangle); }
+                if (note.Tick == selectedTick)
+                {
+                    context.DrawRectangle(null, selectedPen, rectangle, NoteCornerRadius, NoteCornerRadius);
+                }
             }
         }
+
+        private void DrawChannelLabel(DrawingContext context, int trackIndex, Rect rectangle)
+        {
+            FormattedText label = channelLabels[trackIndex];
+            if (rectangle.Width < label.Width + LabelInset * 2 + EffectMarkSize) { return; }
+            // 音量の低いノートでも文字のコントラストを保つため、記号の面は元のチャンネル色にする。
+            Rect badge = new Rect(rectangle.Left + LabelInset, rectangle.Top + NoteInset,
+                label.Width + LabelInset, rectangle.Height - NoteInset * 2);
+            context.DrawRectangle(channelBrushes[trackIndex], null, badge, NoteCornerRadius, NoteCornerRadius);
+            context.DrawText(label, new Point(badge.Left + LabelInset / 2, rectangle.Top + (rectangle.Height - label.Height) / 2));
+        }
+
+        private void DrawGhostLabel(DrawingContext context, int trackIndex, Rect rectangle)
+        {
+            FormattedText label = ghostLabels[trackIndex];
+            if (rectangle.Width < label.Width + LabelInset * 2) { return; }
+            // 複数ゴーストが重なっても識別記号の背景輝度を一定に保つ。
+            context.DrawRectangle(background, null, new Rect(rectangle.Left + LabelInset / 2, rectangle.Top + NoteInset,
+                label.Width + LabelInset, rectangle.Height - NoteInset * 2), NoteCornerRadius, NoteCornerRadius);
+            context.DrawText(label, new Point(rectangle.Left + LabelInset, rectangle.Top + (rectangle.Height - label.Height) / 2));
+        }
+
         private void DrawEffectMark(DrawingContext context, Rect rectangle)
         {
-            double radius = Math.Min(EffectMarkRadius, rectangle.Width / 2);
-            double centerLeft = Math.Max(rectangle.Left + radius, rectangle.Right - EffectMarkInset);
-            double centerTop = rectangle.Top + EffectMarkInset;
-            context.DrawLine(effectMarkPen, new Point(centerLeft - radius, centerTop), new Point(centerLeft + radius, centerTop));
-            context.DrawLine(effectMarkPen, new Point(centerLeft, centerTop - radius), new Point(centerLeft, centerTop + radius));
-            context.DrawLine(effectMarkPen, new Point(centerLeft - radius, centerTop - radius), new Point(centerLeft + radius, centerTop + radius));
+            using (context.PushClip(rectangle))
+            using (context.PushTransform(Matrix.CreateTranslation(rectangle.Right - EffectMarkSize, rectangle.Top)))
+            {
+                context.DrawGeometry(accent, null, effectMark);
+            }
         }
     }
 }
