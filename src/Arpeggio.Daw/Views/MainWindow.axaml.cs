@@ -16,7 +16,6 @@ namespace Arpeggio.Daw.Views
     public partial class MainWindow : Window, IMainWindowView, IDisposable
     {
         private const int DisplayIntervalMilliseconds = 33;
-        private const int InitialTopPitch = 84;
         private readonly PianoRollControl pianoRoll;
         private readonly KeyboardStripControl keyboard;
         private readonly TimeRulerControl ruler;
@@ -141,7 +140,8 @@ namespace Arpeggio.Daw.Views
             this.FindControl<TControl>(name) ?? throw new InvalidOperationException($"{name} がありません。");
         private void OnOpened(object? sender, EventArgs arguments)
         {
-            rollScroll.Offset = new Vector(0, (PianoRollPresenter.MaximumMidiNote - InitialTopPitch) * PianoRollControl.NoteHeight);
+            int initialTopPitch = PianoRollPresenter.GetInitialTopPitch(MainPresenter.PianoRoll.Song);
+            rollScroll.Offset = new Vector(0, (PianoRollPresenter.MaximumMidiNote - initialTopPitch) * PianoRollControl.NoteHeight);
             SynchronizeViewport();
             displayTimer.Start();
             pianoRoll.Focus();

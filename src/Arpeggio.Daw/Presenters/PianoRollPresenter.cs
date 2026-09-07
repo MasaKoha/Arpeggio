@@ -33,6 +33,9 @@ namespace Arpeggio.Daw.Presenters
             this.instrument = instrument;
         }
         /// <summary>選択トラック。</summary>
+        /// <summary>編集中のソング。View が初期表示位置の計算に使う。</summary>
+        public Song Song => document.Song;
+
         public int SelectedTrack { get; private set; }
         /// <summary>選択ノートの開始 tick。</summary>
         public int? SelectedTick { get; private set; }
@@ -171,6 +174,26 @@ namespace Arpeggio.Daw.Presenters
             changed();
         }
         /// <summary>Alt 時だけ整数 tick 単位にする。</summary>
+        /// <summary>起動時に最初に見せる最高音。全トラックの最高ノートに余白を足して返し、ノートが無ければ C6 を返す。</summary>
+        public static int GetInitialTopPitch(Song song)
+        {
+            const int DefaultTopPitch = 84;
+            const int MarginRows = 3;
+            int highest = -1;
+            foreach (Track track in song.Tracks)
+            {
+                foreach (Note note in track.Notes)
+                {
+                    highest = Math.Max(highest, note.MidiNote);
+                }
+            }
+            if (highest < 0)
+            {
+                return DefaultTopPitch;
+            }
+            return Math.Min(MaximumMidiNote, highest + MarginRows);
+        }
+
         public static int Snap(double tick, bool bypassSnap)
         {
             int resolution = bypassSnap ? 1 : GridTicks;
