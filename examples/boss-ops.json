@@ -1,0 +1,1719 @@
+[
+ {
+  "kind": "UpdateInstrument",
+  "instrument": {
+   "id": 1,
+   "name": "lead",
+   "kind": "NesPulse",
+   "duty": "Percent50",
+   "volumeMacro": {
+    "values": [
+     15,
+     14,
+     13,
+     12,
+     11,
+     11,
+     10,
+     10
+    ],
+    "loopIndex": 7
+   },
+   "arpeggioMacro": null,
+   "pitchMacro": null,
+   "dutyMacro": null
+  }
+ },
+ {
+  "kind": "AddInstrument",
+  "instrument": {
+   "id": 2,
+   "name": "chord-min",
+   "kind": "NesPulse",
+   "duty": "Percent25",
+   "volumeMacro": {
+    "values": [
+     9,
+     8,
+     7,
+     7
+    ],
+    "loopIndex": 3
+   },
+   "arpeggioMacro": {
+    "values": [
+     0,
+     3,
+     7
+    ],
+    "loopIndex": 0
+   },
+   "pitchMacro": null,
+   "dutyMacro": null
+  }
+ },
+ {
+  "kind": "AddInstrument",
+  "instrument": {
+   "id": 3,
+   "name": "chord-maj",
+   "kind": "NesPulse",
+   "duty": "Percent25",
+   "volumeMacro": {
+    "values": [
+     9,
+     8,
+     7,
+     7
+    ],
+    "loopIndex": 3
+   },
+   "arpeggioMacro": {
+    "values": [
+     0,
+     4,
+     7
+    ],
+    "loopIndex": 0
+   },
+   "pitchMacro": null,
+   "dutyMacro": null
+  }
+ },
+ {
+  "kind": "AddInstrument",
+  "instrument": {
+   "id": 4,
+   "name": "bass",
+   "kind": "NesTriangle",
+   "arpeggioMacro": null,
+   "pitchMacro": null
+  }
+ },
+ {
+  "kind": "AddInstrument",
+  "instrument": {
+   "id": 5,
+   "name": "drum",
+   "kind": "NesNoise",
+   "noiseMode": "Long",
+   "volumeMacro": {
+    "values": [
+     13,
+     10,
+     6,
+     3,
+     1,
+     0
+    ],
+    "loopIndex": -1
+   },
+   "pitchMacro": null
+  }
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 0,
+  "durationTicks": 24,
+  "midiNote": 69,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 24,
+  "durationTicks": 24,
+  "midiNote": 72,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 48,
+  "durationTicks": 24,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 72,
+  "durationTicks": 48,
+  "midiNote": 81,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 120,
+  "durationTicks": 24,
+  "midiNote": 79,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 144,
+  "durationTicks": 48,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 192,
+  "durationTicks": 48,
+  "midiNote": 77,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 240,
+  "durationTicks": 24,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 264,
+  "durationTicks": 24,
+  "midiNote": 74,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 288,
+  "durationTicks": 48,
+  "midiNote": 72,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 336,
+  "durationTicks": 24,
+  "midiNote": 74,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 360,
+  "durationTicks": 24,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 384,
+  "durationTicks": 24,
+  "midiNote": 79,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 408,
+  "durationTicks": 24,
+  "midiNote": 77,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 432,
+  "durationTicks": 24,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 456,
+  "durationTicks": 48,
+  "midiNote": 74,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 504,
+  "durationTicks": 24,
+  "midiNote": 71,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 528,
+  "durationTicks": 48,
+  "midiNote": 74,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 576,
+  "durationTicks": 24,
+  "midiNote": 72,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 600,
+  "durationTicks": 24,
+  "midiNote": 71,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 624,
+  "durationTicks": 96,
+  "midiNote": 69,
+  "volume": 15,
+  "instrumentId": 1,
+  "effects": [
+   {
+    "kind": "Vibrato",
+    "value": 12
+   }
+  ]
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 768,
+  "durationTicks": 24,
+  "midiNote": 81,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 792,
+  "durationTicks": 24,
+  "midiNote": 79,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 816,
+  "durationTicks": 24,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 840,
+  "durationTicks": 48,
+  "midiNote": 72,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 888,
+  "durationTicks": 24,
+  "midiNote": 74,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 912,
+  "durationTicks": 48,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 960,
+  "durationTicks": 48,
+  "midiNote": 77,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1008,
+  "durationTicks": 48,
+  "midiNote": 81,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1056,
+  "durationTicks": 24,
+  "midiNote": 79,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1080,
+  "durationTicks": 24,
+  "midiNote": 77,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1104,
+  "durationTicks": 48,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1152,
+  "durationTicks": 48,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1200,
+  "durationTicks": 48,
+  "midiNote": 80,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1248,
+  "durationTicks": 48,
+  "midiNote": 83,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1296,
+  "durationTicks": 48,
+  "midiNote": 76,
+  "volume": 15,
+  "instrumentId": 1
+ },
+ {
+  "kind": "AddNote",
+  "track": 0,
+  "tick": 1344,
+  "durationTicks": 144,
+  "midiNote": 81,
+  "volume": 15,
+  "instrumentId": 1,
+  "effects": [
+   {
+    "kind": "Vibrato",
+    "value": 12
+   }
+  ]
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 0,
+  "durationTicks": 180,
+  "midiNote": 69,
+  "volume": 8,
+  "instrumentId": 2
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 192,
+  "durationTicks": 180,
+  "midiNote": 65,
+  "volume": 8,
+  "instrumentId": 3
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 384,
+  "durationTicks": 180,
+  "midiNote": 67,
+  "volume": 8,
+  "instrumentId": 3
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 576,
+  "durationTicks": 180,
+  "midiNote": 69,
+  "volume": 8,
+  "instrumentId": 2
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 768,
+  "durationTicks": 180,
+  "midiNote": 69,
+  "volume": 8,
+  "instrumentId": 2
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 960,
+  "durationTicks": 180,
+  "midiNote": 65,
+  "volume": 8,
+  "instrumentId": 3
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 1152,
+  "durationTicks": 180,
+  "midiNote": 64,
+  "volume": 8,
+  "instrumentId": 3
+ },
+ {
+  "kind": "AddNote",
+  "track": 1,
+  "tick": 1344,
+  "durationTicks": 180,
+  "midiNote": 69,
+  "volume": 8,
+  "instrumentId": 2
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 0,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 24,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 48,
+  "durationTicks": 22,
+  "midiNote": 69,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 72,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 96,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 120,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 144,
+  "durationTicks": 22,
+  "midiNote": 64,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 168,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 192,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 216,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 240,
+  "durationTicks": 22,
+  "midiNote": 65,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 264,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 288,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 312,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 336,
+  "durationTicks": 22,
+  "midiNote": 60,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 360,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 384,
+  "durationTicks": 22,
+  "midiNote": 55,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 408,
+  "durationTicks": 22,
+  "midiNote": 55,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 432,
+  "durationTicks": 22,
+  "midiNote": 67,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 456,
+  "durationTicks": 22,
+  "midiNote": 55,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 480,
+  "durationTicks": 22,
+  "midiNote": 55,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 504,
+  "durationTicks": 22,
+  "midiNote": 55,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 528,
+  "durationTicks": 22,
+  "midiNote": 62,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 552,
+  "durationTicks": 22,
+  "midiNote": 55,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 576,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 600,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 624,
+  "durationTicks": 22,
+  "midiNote": 69,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 648,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 672,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 696,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 720,
+  "durationTicks": 22,
+  "midiNote": 64,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 744,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 768,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 792,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 816,
+  "durationTicks": 22,
+  "midiNote": 69,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 840,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 864,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 888,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 912,
+  "durationTicks": 22,
+  "midiNote": 64,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 936,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 960,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 984,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1008,
+  "durationTicks": 22,
+  "midiNote": 65,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1032,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1056,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1080,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1104,
+  "durationTicks": 22,
+  "midiNote": 60,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1128,
+  "durationTicks": 22,
+  "midiNote": 53,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1152,
+  "durationTicks": 22,
+  "midiNote": 52,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1176,
+  "durationTicks": 22,
+  "midiNote": 52,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1200,
+  "durationTicks": 22,
+  "midiNote": 64,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1224,
+  "durationTicks": 22,
+  "midiNote": 52,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1248,
+  "durationTicks": 22,
+  "midiNote": 52,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1272,
+  "durationTicks": 22,
+  "midiNote": 52,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1296,
+  "durationTicks": 22,
+  "midiNote": 59,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1320,
+  "durationTicks": 22,
+  "midiNote": 52,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1344,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1368,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1392,
+  "durationTicks": 22,
+  "midiNote": 69,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1416,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1440,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1464,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1488,
+  "durationTicks": 22,
+  "midiNote": 64,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 2,
+  "tick": 1512,
+  "durationTicks": 22,
+  "midiNote": 57,
+  "volume": 15,
+  "instrumentId": 4
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 0,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 48,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 96,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 144,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 24,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 72,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 120,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 168,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 192,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 240,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 288,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 336,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 216,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 264,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 312,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 360,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 384,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 432,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 480,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 528,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 408,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 456,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 504,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 552,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 576,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 624,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 672,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 720,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 600,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 648,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 696,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 732,
+  "durationTicks": 6,
+  "midiNote": 8,
+  "volume": 9,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 744,
+  "durationTicks": 6,
+  "midiNote": 8,
+  "volume": 11,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 756,
+  "durationTicks": 6,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 768,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 816,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 864,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 912,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 792,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 840,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 888,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 936,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 960,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1008,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1056,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1104,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 984,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1032,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1080,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1128,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1152,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1200,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1248,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1296,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1176,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1224,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1272,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1320,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1344,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1392,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1440,
+  "durationTicks": 12,
+  "midiNote": 14,
+  "volume": 15,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1488,
+  "durationTicks": 12,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1368,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1416,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1464,
+  "durationTicks": 6,
+  "midiNote": 2,
+  "volume": 7,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1500,
+  "durationTicks": 6,
+  "midiNote": 8,
+  "volume": 9,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1512,
+  "durationTicks": 6,
+  "midiNote": 8,
+  "volume": 11,
+  "instrumentId": 5
+ },
+ {
+  "kind": "AddNote",
+  "track": 3,
+  "tick": 1524,
+  "durationTicks": 6,
+  "midiNote": 8,
+  "volume": 13,
+  "instrumentId": 5
+ }
+]

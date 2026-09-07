@@ -20,3 +20,6 @@ tmp/
 # OS
 .DS_Store
 Thumbs.db
+
+# CLI の undo 履歴
+*.history/
