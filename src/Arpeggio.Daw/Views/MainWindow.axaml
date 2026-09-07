@@ -46,7 +46,10 @@
     </Border>
     <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="12,8">
       <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" />
-      <Button x:Name="WarningsButton" ContentTemplate="{StaticResource Arpeggio.Content.Warning}" Grid.Column="1" Content="警告 0" Margin="8,0,0,0" ToolTip.Tip="{ReflectionBinding Content, RelativeSource={RelativeSource Self}}" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="8,0,0,0">
+        <Button x:Name="RevealExportButton" ContentTemplate="{StaticResource Arpeggio.Content.FolderOpen}" Content="フォルダを開く" IsVisible="False" ToolTip.Tip="最後に書き出したファイルを Finder / Explorer で表示" />
+        <Button x:Name="WarningsButton" ContentTemplate="{StaticResource Arpeggio.Content.Warning}" Content="警告 0" ToolTip.Tip="{ReflectionBinding Content, RelativeSource={RelativeSource Self}}" />
+      </StackPanel>
     </Grid>
     <TextBox x:Name="WarningsText" Grid.Row="4" IsVisible="False" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" TextWrapping="Wrap" />
   </Grid>
