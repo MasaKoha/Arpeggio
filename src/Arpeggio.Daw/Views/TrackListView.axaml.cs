@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Arpeggio.Core.Document;
+using Arpeggio.Daw.Themes;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
@@ -13,7 +15,11 @@ namespace Arpeggio.Daw.Views
     public partial class TrackListView : UserControl, IDisposable
     {
         private const double TrackNameWidth = 118;
-        private const double RowSpacing = 6;
+        private const double RowSpacing = 8;
+        private const double BadgePadding = 4;
+        private readonly IBrush badgeForeground = ThemeResources.GetBrush("Arpeggio.Background");
+        private readonly List<TextBlock> channelLabels = new List<TextBlock>();
+        private readonly List<TextBlock> trackNames = new List<TextBlock>();
         private readonly StackPanel rows;
         private readonly List<Button> buttons = new List<Button>();
         private readonly List<CheckBox> muteBoxes = new List<CheckBox>();
@@ -37,9 +43,12 @@ namespace Arpeggio.Daw.Views
                 if (buttons.Count != tracks.Count) { CreateRows(tracks.Count); }
                 for (int trackIndex = 0; trackIndex < tracks.Count; trackIndex++)
                 {
-                    buttons[trackIndex].Content = tracks[trackIndex].Name;
+                    Track track = tracks[trackIndex];
+                    trackNames[trackIndex].Text = track.Name;
+                    channelLabels[trackIndex].Text = ChannelPalette.GetShortLabel(track.Channel, track.ChannelIndex);
+                    channelLabels[trackIndex].Background = ChannelPalette.GetBrush(track.Channel, track.ChannelIndex);
+                    buttons[trackIndex].Classes.Set("selected", trackIndex == selectedTrack);
                     buttons[trackIndex].FontWeight = trackIndex == selectedTrack ? FontWeight.Bold : FontWeight.Normal;
-                    buttons[trackIndex].Foreground = trackIndex == selectedTrack ? Brushes.Aquamarine : Brushes.LightGray;
                     muteBoxes[trackIndex].IsChecked = tracks[trackIndex].Muted;
                 }
             }
@@ -52,8 +61,18 @@ namespace Arpeggio.Daw.Views
             ClearRows();
             for (int trackIndex = 0; trackIndex < count; trackIndex++)
             {
-                Button button = new Button { Tag = trackIndex, Width = TrackNameWidth };
+                TextBlock channelLabel = new TextBlock { Foreground = badgeForeground, Padding = new Thickness(BadgePadding, 0),
+                    HorizontalAlignment = HorizontalAlignment.Left };
+                TextBlock trackName = new TextBlock { TextWrapping = TextWrapping.Wrap };
+                StackPanel content = new StackPanel { Spacing = BadgePadding };
+                content.Children.Add(channelLabel);
+                content.Children.Add(trackName);
+                channelLabels.Add(channelLabel);
+                trackNames.Add(trackName);
+                Button button = new Button { Tag = trackIndex, Width = TrackNameWidth, Content = content,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch };
                 CheckBox muteBox = new CheckBox { Tag = trackIndex, Content = "M" };
+                muteBox.Classes.Add("mute");
                 ToolTip.SetTip(muteBox, "ミュート");
                 button.Click += OnSelected;
                 muteBox.IsCheckedChanged += OnMuteChanged;
@@ -77,6 +96,8 @@ namespace Arpeggio.Daw.Views
         {
             foreach (Button button in buttons) { button.Click -= OnSelected; }
             foreach (CheckBox muteBox in muteBoxes) { muteBox.IsCheckedChanged -= OnMuteChanged; }
+            channelLabels.Clear();
+            trackNames.Clear();
             buttons.Clear();
             muteBoxes.Clear();
             rows.Children.Clear();
