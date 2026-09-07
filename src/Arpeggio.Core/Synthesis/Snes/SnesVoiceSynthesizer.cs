@@ -4,7 +4,7 @@ using Arpeggio.Core.Instruments;
 
 namespace Arpeggio.Core.Synthesis.Snes
 {
-    /// <summary>内蔵サンプルの線形補間再生とサンプル単位の ADSR。</summary>
+    /// <summary>内蔵／埋め込みサンプルの線形補間再生とサンプル単位の ADSR。</summary>
     public sealed class SnesVoiceSynthesizer : ChannelSynthesizer
     {
         private const int WaveformCount = 6;
@@ -13,6 +13,12 @@ namespace Arpeggio.Core.Synthesis.Snes
         private float[] _waveform = Array.Empty<float>();
         private AdsrEnvelope _envelope;
         private bool _loop;
+        private bool _hasEmbeddedSample;
+        private int _sourceSampleRate;
+        private int _rootMidiNote;
+        private int _loopStart;
+        private int _loopEnd;
+        private double _samplePosition;
         private bool _releasing;
         private long _ageSamples;
         private long _releaseSamples;
@@ -38,7 +44,13 @@ namespace Arpeggio.Core.Synthesis.Snes
         {
             var sample = (SnesSampleInstrument)instrument;
             ConfigureMacros(null, sample.ArpeggioMacro, sample.PitchMacro);
-            _waveform = _waveforms[(int)sample.Waveform - 1];
+            _hasEmbeddedSample = sample.SampleData != null;
+            _waveform = _hasEmbeddedSample ? sample.DecodedSamples : _waveforms[(int)sample.Waveform - 1];
+            _sourceSampleRate = sample.SampleRate;
+            _rootMidiNote = sample.RootMidiNote;
+            _loopStart = sample.LoopStart;
+            _loopEnd = sample.LoopEnd == 0 ? _waveform.Length : sample.LoopEnd;
+            _samplePosition = 0;
             _envelope = sample.Envelope;
             _loop = sample.Loop;
             _releasing = false;
@@ -69,6 +81,10 @@ namespace Arpeggio.Core.Synthesis.Snes
         protected override double ReadSample()
         {
             // perf: NoteOn を含めて既存の波形配列を参照するだけで再生成しない。
+            if (_hasEmbeddedSample)
+            {
+                return ReadEmbeddedSample();
+            }
             double position = Phase * _waveform.Length;
             int index = (int)position;
             int next = (index + 1) % _waveform.Length;
@@ -79,6 +95,42 @@ namespace Arpeggio.Core.Synthesis.Snes
             {
                 IsActive = false;
             }
+            return interpolated * _level * Volume;
+        }
+
+        /// <summary>元サンプルのレートと基準音を再生位置の増分に織り込む。</summary>
+        protected override double GetPhaseIncrement()
+        {
+            return _hasEmbeddedSample
+                ? PitchTable.GetSnesSampleRatio(MidiNote, _rootMidiNote) * _sourceSampleRate / SampleRate
+                : base.GetPhaseIncrement();
+        }
+
+        private double ReadEmbeddedSample()
+        {
+            // perf: 位置・補間・ループの更新は既存配列と値型だけで完結する。
+            int end = _loop ? _loopEnd : _waveform.Length;
+            int index = (int)_samplePosition;
+            int next = index + 1;
+            if (next >= end)
+            {
+                next = _loop ? _loopStart : index;
+            }
+            double interpolated = _waveform[index] + (_waveform[next] - _waveform[index]) * (_samplePosition - index);
+            _samplePosition += PhaseIncrement;
+            if (_samplePosition >= end)
+            {
+                if (_loop)
+                {
+                    _samplePosition = _loopStart + (_samplePosition - _loopStart) % (_loopEnd - _loopStart);
+                }
+                else
+                {
+                    IsActive = false;
+                }
+            }
+            _level = GetEnvelopeLevel();
+            _ageSamples++;
             return interpolated * _level * Volume;
         }
 

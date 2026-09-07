@@ -55,6 +55,31 @@ namespace Arpeggio.Core.Session
             return JsonSerializer.Serialize(instrument, CreateOptions());
         }
 
+        /// <summary>一覧表示用に埋め込み Base64 を除き、短いサンプル説明を返す。</summary>
+        public static string SerializeForDisplay(Instrument instrument)
+        {
+            if (!(instrument is SnesSampleInstrument sample))
+            {
+                return Serialize(instrument);
+            }
+            using JsonDocument document = JsonDocument.Parse(Serialize(instrument));
+            using MemoryStream stream = new MemoryStream();
+            using (Utf8JsonWriter writer = new Utf8JsonWriter(stream))
+            {
+                writer.WriteStartObject();
+                foreach (JsonProperty property in document.RootElement.EnumerateObject())
+                {
+                    if (property.Name != "sampleData")
+                    {
+                        property.WriteTo(writer);
+                    }
+                }
+                writer.WriteString("sampleSummary", sample.SampleSummary);
+                writer.WriteEndObject();
+            }
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+
         internal static JsonSerializerOptions CreateOptions()
         {
             JsonSerializerOptions options = new JsonSerializerOptions

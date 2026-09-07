@@ -1,5 +1,6 @@
 using System;
 using System.CommandLine;
+using Arpeggio.Codecs;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
@@ -125,31 +126,50 @@ namespace Arpeggio.Cli
         internal static Command CreateExport()
         {
             Command command = new Command("export", "音声を書き出す");
-            Command wav = new Command("wav", "16 bit ステレオ PCM WAV を保存");
+            command.Subcommands.Add(CreateAudioExport("wav"));
+            command.Subcommands.Add(CreateAudioExport("ogg"));
+            return command;
+        }
+
+        private static Command CreateAudioExport(string format)
+        {
+            const float DefaultQuality = 0.5f;
+            Command command = new Command(format, $"ステレオ {format.ToUpperInvariant()} を保存");
             Argument<string> path = new Argument<string>("path");
             Argument<string> output = new Argument<string>("output");
             Option<int> loops = new Option<int>("--loops") { DefaultValueFactory = _ => DefaultLoops };
             Option<int> sampleRate = new Option<int>("--sample-rate") { DefaultValueFactory = _ => DefaultSampleRate };
             Option<double> tail = new Option<double>("--tail") { DefaultValueFactory = _ => DefaultTailSeconds };
             Option<bool> json = new Option<bool>("--json");
-            wav.Arguments.Add(path);
-            wav.Arguments.Add(output);
-            wav.Options.Add(loops);
-            wav.Options.Add(sampleRate);
-            wav.Options.Add(tail);
-            wav.Options.Add(json);
-            wav.SetAction(result => CliExecution.Run(() =>
+            Option<float> quality = new Option<float>("--quality") { DefaultValueFactory = _ => DefaultQuality, Description = "Vorbis VBR 品質（-0.1〜1）" };
+            command.Arguments.Add(path);
+            command.Arguments.Add(output);
+            command.Options.Add(loops);
+            command.Options.Add(sampleRate);
+            command.Options.Add(tail);
+            command.Options.Add(json);
+            if (format == "ogg")
+            {
+                command.Options.Add(quality);
+            }
+            command.SetAction(result => CliExecution.Run(() =>
             {
                 Song song = CliExecution.Open(result.GetValue(path)!).Song!;
                 RenderSettings settings = new RenderSettings(result.GetValue(sampleRate), result.GetValue(loops), result.GetValue(tail));
                 SongRenderer renderer = new SongRenderer(song, settings);
                 float[] samples = renderer.RenderAll();
                 string outputPath = result.GetValue(output)!;
-                WavWriter.Write(outputPath, samples, settings.SampleRate);
+                if (format == "ogg")
+                {
+                    OggWriter.Write(outputPath, samples, settings.SampleRate, result.GetValue(quality));
+                }
+                else
+                {
+                    WavWriter.Write(outputPath, samples, settings.SampleRate);
+                }
                 WriteExportResult(outputPath, renderer.Report, result.GetValue(json));
                 return CliExecution.Success;
             }));
-            command.Subcommands.Add(wav);
             return command;
         }
 

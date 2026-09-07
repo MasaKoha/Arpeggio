@@ -56,6 +56,21 @@ namespace Arpeggio.Core.Synthesis
             return frequency;
         }
 
+        /// <summary>埋め込みサンプルの基準音に対して SNES 風の整数ピッチ倍率を求める。</summary>
+        public static double GetSnesSampleRatio(double midiNote, int rootMidiNote)
+        {
+            double ratio = Math.Pow(2, (midiNote - rootMidiNote) / SemitonesPerOctave);
+            return Math.Clamp(Math.Round(ratio * SnesUnityPitch), 1, MaximumSnesPitch) / SnesUnityPitch;
+        }
+
+        /// <summary>埋め込みサンプルのピッチ倍率上限・下限に対応する音程へ制限する。</summary>
+        public static double ClampSnesSampleMidiNote(double midiNote, int rootMidiNote)
+        {
+            double minimum = rootMidiNote + SemitonesPerOctave * Math.Log2(1.0 / SnesUnityPitch);
+            double maximum = rootMidiNote + SemitonesPerOctave * Math.Log2((double)MaximumSnesPitch / SnesUnityPitch);
+            return Math.Clamp(midiNote, minimum, maximum);
+        }
+
         private static void GetRange(ChipKind chip, ChannelKind channel, out double minimum, out double maximum)
         {
             minimum = GetFrequency(0);

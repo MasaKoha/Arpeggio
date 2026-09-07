@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using Arpeggio.Core.Instruments;
 
 namespace Arpeggio.Core.Document
 {
@@ -39,7 +40,15 @@ namespace Arpeggio.Core.Document
                 }
                 AddRow(rows, columnWidths, row);
             }
-            return JoinRows(rows, columnWidths);
+            StringBuilder output = new StringBuilder(JoinRows(rows, columnWidths));
+            foreach (Instrument instrument in song.Instruments)
+            {
+                if (instrument is SnesSampleInstrument sample && sample.SampleData != null)
+                {
+                    output.AppendLine().Append($"{sample.Id:D2} {sample.Name}: {sample.SampleSummary}");
+                }
+            }
+            return output.ToString();
         }
 
         private static void ValidateRange(Song song, int? trackIndex, int fromTick, int endTick)

@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Arpeggio.Codecs/Arpeggio.Codecs.csproj" />
+    <Project Path="src/Arpeggio.Codecs.Vorbis/Arpeggio.Codecs.Vorbis.csproj" />
     <Project Path="src/Arpeggio.Core/Arpeggio.Core.csproj" />
     <Project Path="src/Arpeggio.Cli/Arpeggio.Cli.csproj" />
     <Project Path="src/Arpeggio.Mcp/Arpeggio.Mcp.csproj" />

@@ -233,7 +233,10 @@ namespace Arpeggio.Core.Render
             {
                 return;
             }
-            double actual = PitchTable.ClampMidiNote(_song.Chip, channel, note.MidiNote);
+            Instrument? instrument = FindInstrument(note.InstrumentId);
+            double actual = instrument is SnesSampleInstrument sample && sample.SampleData != null
+                ? PitchTable.ClampSnesSampleMidiNote(note.MidiNote, sample.RootMidiNote)
+                : PitchTable.ClampMidiNote(_song.Chip, channel, note.MidiNote);
             if (Math.Abs(actual - note.MidiNote) > PitchWarningEpsilon)
             {
                 Report.Add(new RenderWarning(RenderWarningKind.PitchClamped, index, note.Tick, note.MidiNote, actual));

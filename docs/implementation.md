@@ -475,3 +475,118 @@ tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
 tests/Arpeggio.Core.Tests/Render/WavWriterTests.cs
 tests/Arpeggio.Core.Tests/Sfx/SfxPresetFactoryTests.cs
 ```
+
+
+# M2-B 実装記録（2026-09-07）
+
+## M2-B の実装範囲
+
+SNES 音色への WAV 埋め込み、キャッシュ済みサンプルの再生、CLI / MCP からの取り込みと OGG 書き出し、Arpeggio.Codecs と対応テストを追加した。JSON version は 1、Core は BCL のみ。DAW は csproj の Codecs 参照追加だけを行った。git 操作・ビルド・コンパイル・テスト実行・アプリ起動は行っていない。
+
+## M2-B の実装判断
+
+- **保存とキャッシュ**: PCM は little-endian 16 bit mono の Base64。上限は 2 MiB、空・奇数バイト・不正 Base64 を拒否する。SampleData の setter でデコードし、音色自身が float 配列を所有するため、別のグローバルキャッシュや音色 ID の辞書は設けない。新しい JSON・音色置換・undo/redo はそれぞれ読み込み側でキャッシュが完成し、既存の参照交換で公開される。setter の形式不正はエラー情報として保持し、プロパティ順に依存しない InstrumentValidator で拒否する。SampleCount / SampleSummary は JsonIgnore、デコード配列は internal で保存しない。
+- **WAV**: WavReader の既存公開 API は維持し、内部だけフレーム数の上限指定を追加した。これにより、ステレオ WAV のファイルサイズではなくモノラル化後の PCM サイズで、配列確保前に制限できる。左右を算術平均し、正側 32767・負側 32768 で PCM に四捨五入する。元レートは保持する。壊れた WAV・上限超過は ArgumentException、空サンプルや音色のメタデータ不正は SongValidationException、ファイル I/O は既存分類を使う。
+- **編集の原子性**: WavSampleImporter は候補サンプルを検証後にだけ渡された音色へ適用する。InstrumentEditor.ImportWavSample は既存音色を複製して取り込み、既存 Update で一履歴として保存する。名前・波形・ADSR・パン・エコー・マクロは保持する。読み込み・検証・保存に失敗した場合、公開済み音色と履歴を変更しない。
+- **再生**: SampleData があれば ConfigureInstrument は既存配列を参照するだけ。ChannelSynthesizer に位相増分計算の protected virtual フックを一つ追加し、SNES 埋め込み時のみ RootMidiNote 基準の量子化倍率 × 元レート / 出力レートとする。合成波形と他チップの計算は従来どおり。PitchTable に埋め込み用倍率・クランプを追加し、SongRenderer の音域警告も同じ root 基準へ合わせた。
+- **ループ**: 最初はサンプル先頭から再生し、[LoopStart, LoopEnd) を繰り返す。LoopEnd=0 は末尾。終端直前の線形補間は開始サンプルへ接続し、大きい再生増分は剰余で折り返す。非ループでは最後の値を補間用に保持し、末尾到達時に停止する。ADSR の NoteOff / リリース・マクロ・効果・パン・エコーは既存経路を使う。
+- **表示**: show / show --json / show_song の text と instrument list は sample 数・元 Hz を表示する。instrument list --json は他の音色プロパティを保持し、sampleData の代わりに sampleSummary を加える。これは表示用 JSON で、音色更新へ渡す完全な保存 JSON とは異なる。song_info など他の既存 API の保存形式出力は変更していない。
+- **OGG**: NuGet OggVorbisEncoder 1.2.2 の依存を Codecs へ隔離した。quality は有限の -0.1〜1、既定 0.5 の VBR。左右各 1024 フレームのバッファを再利用し、範囲外振幅は ±1 に制限する。入力検証と VorbisInfo 初期化をファイル作成前に済ませ、ヘッダー・音声パケット・EOS・残ページを順に出力する。Stream は呼び出し側所有で閉じない。CLI は WAV / OGG のオプション構築を共通化し、警告出力を維持した。
+
+## M2-B の API 照合
+
+ローカル `~/.nuget/packages/oggvorbisencoder/1.2.2/` にパッケージと DLL があることを確認した。XML ドキュメントは同梱されていないため、netstandard2.0 DLL のメタデータと IL を monodis で読み、以下のシグネチャを確認した（コンパイル・エンコーダ実行はしていない）。
+
+- `VorbisInfo.InitVariableBitRate(int channels, int sampleRate, float baseQuality)`
+- `ProcessingState.Create(VorbisInfo)`、`WriteData(float[][], int length, int read_offset = 0)`、`WriteEndOfStream()`、`PacketOut(out OggPacket)`
+- `OggStream(int serialNumber)`、`PacketIn(OggPacket)`、`PageOut(out OggPage, bool force)`、`Finished`
+- `HeaderPacketBuilder.BuildInfoPacket` / `BuildCommentsPacket` / `BuildBooksPacket`、`Comments()`、`OggPage.Header` / `Body`（byte[]）
+
+これらのエンコーダ型は IDisposable を実装していない。ストリームだけ所有権に従って破棄する。IL で品質の端点処理とテンプレート不適合時の InvalidOperationException も確認した。DLL 全体の逆アセンブルでは未配置の System.Memory による一部シグネチャの読み取り警告があったが、上記の使用 API はすべて読み取れた。手順は [公式エンコード例](https://github.com/SteveLillis/.NET-Ogg-Vorbis-Encoder/blob/master/OggVorbisEncoder.Example/Encoder.cs) とも照合した。
+
+## M2-B のテストコード
+
+| 対象 | 検証内容 |
+|---|---|
+| Instruments/SampleDataCodecTests | little-endian バイト列、全 65536 PCM 値の float 往復、正負端点、空・不正 Base64・奇数バイト・上限超過・非有限 float |
+| Instruments/SnesSampleInstrumentTests | 追加項目なしの旧 JSON、version 1 往復、既定値、キャッシュ非保存、サンプル解除、レート・基準音・ループ範囲・2 MiB 境界 |
+| Import/WavSampleImporterTests | mono の保持、stereo の平均と逆相、音色設定保持、mono/stereo の取り込み上限ちょうど、失敗時の元音色保持 |
+| Synthesis/Snes/SnesEmbeddedSampleTests | ループ継ぎ目の補間、非ループ末尾、単一サンプル・複数周飛び越し、基準音・元レートと三出力レート、アルペジオ、ADSR 解放、合成波形への復帰、NoteOn と全曲遷移・音色差し替えの GC 0 byte、root 基準の警告 |
+| Codecs/OggWriterTests | OggS、三秒の同一 WAV より小さいサイズ、品質両端、EOS ページ、空・端数バッファ、Stream 所有権、無効入力で既存出力保持 |
+| Cli/SampleCodecCommandsTests | import-wav 引数・保存・短い text/JSON 表示・undo/redo・no-loop、失敗時の曲と側車保持、export ogg の共通オプション・品質・警告・出力保護 |
+| Mcp/SampleCodecToolsTests / ArpeggioToolsTests | 22 ツールの公開契約、共有セッションの取り込み・一履歴・undo/redo、OGG のレート・フレーム数・警告項目、エラー JSON・状態保持 |
+
+## M2-B の静的確認
+
+- docs/design.md 全文、docs/implementation.md の M1〜M2-A、CLAUDE.md と C# 規約を読んだ。
+- 新規に使う Core の型と namespace、BCL の BinaryPrimitives / Base64 / JSON API、OggVorbisEncoder の上記 API を定義・参照 XML・DLL から照合した。
+- C# 25 ファイルの括弧対応、doc XML、public/protected summary の隣接、ブロック namespace、および csproj / slnx の XML 形式を静的スクリプトで確認した。
+- Render → NoteOn / フレーム更新 → サンプル補間・警告の経路にデコード・配列生成・LINQ・キャッシュ登録が入らないことを読み取り確認した。GC の数値は実測していない。
+- Unity lifecycle / GetComponent / AddComponent は追加していない。検索に現れる既存の InstrumentEditor.Update / StartNote は通常の編集・発音メソッドであり Unity lifecycle ではない。
+
+## M2-B 未完了
+
+実装上の残タスクはなし。以下は依頼者による実行確認が必要。
+
+- `dotnet build Arpeggio.slnx` のコンパイル・警告ゼロ、および `dotnet test tests/Arpeggio.Core.Tests` の既存テストを含む全件成功。Codex は両コマンドを実行していない。
+- 実 WAV の取り込み・音程・ループ継ぎ目・ADSR の試聴、既存合成波形の回帰、NoteOn / Render / 音色差し替え時の GC 0 byte の実測。
+- OGG の実ファイル出力、品質両端・サイズ・EOS、Unity 等での再生。指定どおりデコーダ依存の波形往復テストは追加していない。
+- CLI の引数解釈と MCP ホスト経由の import_wav_sample / export_ogg 呼び出し。ここで追加したテストは公開コマンド・ツールをプロセス内で呼ぶ。
+
+## M2-B の利用例
+
+```sh
+arpeggio instrument import-wav song.arpeggio.json --id 1 sample.wav --root C4 --loop-start 100 --loop-end 12000
+arpeggio instrument import-wav song.arpeggio.json --id 1 hit.wav --no-loop
+arpeggio instrument list song.arpeggio.json
+arpeggio export ogg song.arpeggio.json song.ogg --loops 1 --sample-rate 44100 --tail 0.5 --quality 0.5
+```
+
+MCP: `import_wav_sample(instrumentId, wavPath, rootNote?, loopStart?, loopEnd?, loop?)`、`export_ogg(path, loops?, sampleRate?, tail?, quality?)`。import の省略値は C4・開始 0・終端 0（末尾）・loop=true。
+
+## M2-B 変更ファイル一覧
+
+33 ファイル（新規 12、更新 21）。DAW は csproj の参照一行のみ、Core の csproj と既存依存バージョンは変更していない。
+
+```text
+Arpeggio.slnx
+docs/design.md
+docs/implementation.md
+src/Arpeggio.Core/Instruments/SnesSampleInstrument.cs
+src/Arpeggio.Core/Instruments/SampleDataCodec.cs
+src/Arpeggio.Core/Document/InstrumentValidator.cs
+src/Arpeggio.Core/Document/SongTextRenderer.cs
+src/Arpeggio.Core/Synthesis/ChannelSynthesizer.cs
+src/Arpeggio.Core/Synthesis/PitchTable.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesVoiceSynthesizer.cs
+src/Arpeggio.Core/Render/SongRenderer.cs
+src/Arpeggio.Core/Render/WavReader.cs
+src/Arpeggio.Core/Import/WavSampleImporter.cs
+src/Arpeggio.Core/Session/InstrumentEditor.cs
+src/Arpeggio.Core/Session/InstrumentJson.cs
+src/Arpeggio.Codecs/Arpeggio.Codecs.csproj
+src/Arpeggio.Codecs/OggWriter.cs
+src/Arpeggio.Cli/Arpeggio.Cli.csproj
+src/Arpeggio.Cli/InstrumentCommands.cs
+src/Arpeggio.Cli/SongCommands.cs
+src/Arpeggio.Mcp/Arpeggio.Mcp.csproj
+src/Arpeggio.Mcp/ArpeggioTools.cs
+src/Arpeggio.Daw/Arpeggio.Daw.csproj
+tests/Arpeggio.Core.Tests/Arpeggio.Core.Tests.csproj
+tests/Arpeggio.Core.Tests/Instruments/SampleDataCodecTests.cs
+tests/Arpeggio.Core.Tests/Instruments/SnesSampleInstrumentTests.cs
+tests/Arpeggio.Core.Tests/Import/SampleFileFixture.cs
+tests/Arpeggio.Core.Tests/Import/WavSampleImporterTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesEmbeddedSampleTests.cs
+tests/Arpeggio.Core.Tests/Codecs/OggWriterTests.cs
+tests/Arpeggio.Core.Tests/Cli/SampleCodecCommandsTests.cs
+tests/Arpeggio.Core.Tests/Mcp/SampleCodecToolsTests.cs
+tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
+```
+
+## M2-B の依頼者側修正（OggVorbisEncoder の静的テーブル汚染）
+
+- 実測: OggVorbisEncoder 1.2.2 は同一プロセスで 32 kHz 以上をエンコードした後、32 kHz 未満・品質 0.5 未満（8 kHz / 11.025 kHz は全品質）のエンコードで `ResidueLookup` が `IndexOutOfRangeException` を投げる。逆順（低→高）と同レート同士は問題ない。テストが並列実行で順序依存に当たり 2 件落ちた
+- 対処: エンコード本体を `Arpeggio.Codecs.Vorbis`（OggVorbisEncoder を参照する唯一のアセンブリ）へ切り出し、`Arpeggio.Codecs.IsolatedVorbisEncoder` が呼び出しごとに使い捨ての `AssemblyLoadContext` へ読み込んでリフレクションで実行する。`Resolving` イベントでは既定コンテキスト（deps.json 由来）が先に共有インスタンスを解決するため、`Load` をオーバーライドしたサブクラスで先回りして自分のディレクトリから読み込む
+- 空入力（0 フレーム）は音声パケットが無く EOS ページが出ないため、無音 1 フレームを書いて閉じる
+- 回帰テスト: `Codecs/OggWriterTests.Write_LowRateAfterHighRateDoesNotThrow`

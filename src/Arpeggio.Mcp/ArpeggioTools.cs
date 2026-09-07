@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Arpeggio.Codecs;
 using Arpeggio.Core.Analysis;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
@@ -231,6 +232,50 @@ namespace Arpeggio.Mcp
             {
                 session.Instruments.Remove(instrumentId);
                 return new { instrumentId, removed = true };
+            });
+        }
+
+        /// <summary>WAV を既存 SNES 音色へ埋め込み、一回の履歴として自動保存する。</summary>
+        [McpServerTool(Name = "import_wav_sample", ReadOnly = false, Destructive = false)]
+        [Description("PCM 16 bit mono/stereo WAV を SNES 音色へ埋め込む。ステレオは平均し、元レートを保持する。上限はモノラル PCM で 2 MiB。")]
+        public string ImportWavSample(
+            [Description("既存の SNES 音色 ID")] int instrumentId,
+            [Description("入力 WAV パス")] string wavPath,
+            [Description("元の音程 C4 / C#4 / 60。省略時 C4")] string? rootNote = null,
+            [Description("ループ開始サンプル。省略時 0")] int? loopStart = null,
+            [Description("ループ終端（含まない）。省略または 0 は末尾")] int? loopEnd = null,
+            [Description("ループ再生。省略時 true")] bool? loop = null)
+        {
+            return Invoke(() =>
+            {
+                session.Instruments.ImportWavSample(instrumentId, wavPath, NoteName.Parse(rootNote ?? "C4"), loopStart, loopEnd, loop ?? true);
+                SnesSampleInstrument sample = (SnesSampleInstrument)GetSong().Instruments.Find(instrument => instrument.Id == instrumentId)!;
+                return new { instrumentId, sample.SampleSummary, sample.SampleRate, sample.SampleCount, sample.RootMidiNote, sample.LoopStart, sample.LoopEnd, sample.Loop };
+            });
+        }
+
+        /// <summary>OGG Vorbis を書き出し、補正警告を JSON に含める。</summary>
+        [McpServerTool(Name = "export_ogg", ReadOnly = false, Destructive = false)]
+        [Description("ステレオ Ogg Vorbis を VBR で書き出す。quality は -0.1〜1、既定 0.5。warnings に音域補正箇所を返す。")]
+        public string ExportOgg(
+            [Description("出力 OGG パス")] string path,
+            [Description("初回の全曲再生を含む再生回数")] int loops = DefaultLoopCount,
+            [Description("サンプルレート Hz")] int sampleRate = DefaultSampleRate,
+            [Description("末尾の残響用余白、秒")] double tail = DefaultTailSeconds,
+            [Description("Vorbis VBR 品質（-0.1〜1）")] float quality = 0.5f)
+        {
+            return Invoke(() =>
+            {
+                SongRenderer renderer = new SongRenderer(GetSong(), new RenderSettings(sampleRate, loops, tail));
+                float[] samples = renderer.RenderAll();
+                OggWriter.Write(path, samples, sampleRate, quality);
+                return new
+                {
+                    path, sampleRate, quality, channels = StereoChannelCount,
+                    frames = samples.Length / StereoChannelCount,
+                    warnings = renderer.Report.Warnings,
+                    droppedWarningCount = renderer.Report.DroppedWarningCount
+                };
             });
         }
 

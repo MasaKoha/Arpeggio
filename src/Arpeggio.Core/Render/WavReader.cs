@@ -20,12 +20,22 @@ namespace Arpeggio.Core.Render
         /// <summary>16 bit PCM を読み、ステレオ float（-1〜1）で返す。モノラルは左右へ複製する。</summary>
         public static float[] Read(string path, out int sampleRate)
         {
+            return Read(path, out sampleRate, int.MaxValue);
+        }
+
+        internal static float[] Read(string path, out int sampleRate, int maximumFrames)
+        {
             using FileStream stream = File.OpenRead(path);
-            return Read(stream, out sampleRate);
+            return Read(stream, out sampleRate, maximumFrames);
         }
 
         /// <summary>シーク可能なストリームの 16 bit PCM をステレオへ変換する。ストリームは閉じない。</summary>
         public static float[] Read(Stream stream, out int sampleRate)
+        {
+            return Read(stream, out sampleRate, int.MaxValue);
+        }
+
+        private static float[] Read(Stream stream, out int sampleRate, int maximumFrames)
         {
             if (!stream.CanRead || !stream.CanSeek)
             {
@@ -44,10 +54,10 @@ namespace Arpeggio.Core.Render
             {
                 throw new InvalidDataException("RIFF の宣言長と実データ長が一致しません。");
             }
-            return ReadChunks(reader, end, out sampleRate);
+            return ReadChunks(reader, end, out sampleRate, maximumFrames);
         }
 
-        private static float[] ReadChunks(BinaryReader reader, long end, out int sampleRate)
+        private static float[] ReadChunks(BinaryReader reader, long end, out int sampleRate, int maximumFrames)
         {
             Stream stream = reader.BaseStream;
             int channels = 0;
@@ -91,7 +101,7 @@ namespace Arpeggio.Core.Render
                 throw new InvalidDataException("fmt または data チャンクがありません。");
             }
             stream.Position = dataPosition;
-            float[] samples = ReadSamples(reader, dataLength, channels);
+            float[] samples = ReadSamples(reader, dataLength, channels, maximumFrames);
             stream.Position = end;
             return samples;
         }
@@ -119,12 +129,17 @@ namespace Arpeggio.Core.Render
             return channels;
         }
 
-        private static float[] ReadSamples(BinaryReader reader, uint length, int channels)
+        private static float[] ReadSamples(BinaryReader reader, uint length, int channels, int maximumFrames)
         {
             int frameBytes = channels * BytesPerSample;
             if (length % frameBytes != 0)
             {
                 throw new InvalidDataException("PCM がフレームの途中で終了しています。");
+            }
+            if (length / frameBytes > maximumFrames)
+            {
+                // 取り込み用途では、過大な WAV の配列を確保する前に上限を適用する。
+                throw new InvalidDataException("WAV のサンプル数が読み込み上限を超えています。");
             }
             long sampleCount = (long)length / frameBytes * StereoChannels;
             if (sampleCount > Array.MaxLength)

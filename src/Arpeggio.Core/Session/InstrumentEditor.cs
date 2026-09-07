@@ -1,6 +1,7 @@
 using System;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Import;
 
 namespace Arpeggio.Core.Session
 {
@@ -33,6 +34,21 @@ namespace Arpeggio.Core.Session
                 int index = GetInstrumentIndex(song, instrument.Id);
                 song.Instruments[index] = instrument;
             });
+        }
+
+        /// <summary>既存 SNES 音色の複製へ WAV を取り込み、一回の履歴として保存する。</summary>
+        public void ImportWavSample(int instrumentId, string wavPath, int rootMidiNote = 60,
+            int? loopStart = null, int? loopEnd = null, bool loop = true)
+        {
+            Song song = _session.GetSong();
+            Instrument existing = song.Instruments[GetInstrumentIndex(song, instrumentId)];
+            if (!(existing is SnesSampleInstrument))
+            {
+                throw new ArgumentException("WAV を取り込めるのは SNES 音色だけです。", nameof(instrumentId));
+            }
+            SnesSampleInstrument replacement = (SnesSampleInstrument)InstrumentJson.Deserialize(InstrumentJson.Serialize(existing));
+            WavSampleImporter.Import(replacement, wavPath, rootMidiNote, loopStart, loopEnd, loop);
+            Update(replacement);
         }
 
         /// <summary>参照されていない音色を削除する。</summary>

@@ -300,7 +300,6 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 
 ## 未決事項
 
-- OGG 書き出しのエンコーダ選定（純 C# の Vorbis エンコーダの有無）— M2
 - SNES の実機互換（BRR・ガウス補間）をどこまで追うか — M3 で NSF/VGM と一緒に決める
 - DAW での MIDI キーボード入力 — 要望が出たら
 
@@ -326,3 +325,14 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - CLI の音色追加は既存最大 ID + 1。set は指定値だけを更新し、マクロ文字列 `null` は解除。kind 変更は ID・name と意味が同じ共通項目を保持し、専用項目は新 kind 既定値。MCP とバッチの音色更新は保存形式の JSON 全体で置き換える。
 - CLI の履歴は colors と同じ `<path>.history/state.json`（current/undo/redo）を使う。外部更新との current 不一致では履歴を復元しない。履歴保存の I/O 失敗時は曲を操作前のバイト列へ戻す。曲と履歴は別ファイルの置換であり、プロセス強制終了まで含む二ファイルの永続トランザクションは対象外。
 - MCP は `EditSession` を DI 共有し、同じセッションのツール実行を直列化する。戻り値は文字列、エラーは error/exitCode JSON。show の既定と chip_reference は CLI と同じテキスト。`UseStructuredContent` は指定しない。
+
+### M2-B の境界・単位（2026-09-07）
+
+- JSON version は 1 のまま。SNES の `sampleData` は little-endian PCM 16 bit モノラルの Base64、null は従来の合成波形。空・奇数バイト・不正 Base64 を拒否し、上限は 2 MiB（2,097,152 byte、1,048,576 サンプル）。Base64 文字列長にも対応する上限を設ける。
+- `sampleRate` の既定は 44100 Hz、埋め込み時は正の整数。`rootMidiNote` は 0〜127、既定 60（C4）。ループは `[loopStart, loopEnd)`、単位はモノラルのサンプル数。既定は両方 0、loopEnd=0 は末尾。loop=true かつ埋め込み時だけ `0 <= start < end <= count` を検証する。合成波形では追加メタデータを再生に使わない。
+- WAV は既存 WavReader と同じ PCM 16 bit mono/stereo。左右の算術平均を正負端点に対応する PCM へ四捨五入する。元レートを保持し、リサンプル・正規化・トリミングはしない。WavReader の内部上限指定で PCM 配列確保前に過大な入力を拒否する。壊れた WAV・上限超過は引数エラー、ファイル I/O は I/O エラーとする。取り込み失敗時は音色を変更しない。CLI / MCP は複製音色を既存 InstrumentEditor.Update で一履歴として保存する。
+- Base64 の代入時（JSON 読み込み・取り込み・音色編集側）に float 配列を作り、音色が所有する。検証失敗情報も保持し InstrumentValidator で拒否する。NoteOn は配列参照だけ取得し、Render 中のデコード・配列生成・辞書登録を行わない。
+- 埋め込みサンプルは先頭から再生し、初回のみループ前区間を通る。倍率は `2^((note-root)/12)` を 1/16384 刻み・1〜65535 の整数へ制限し、位置増分は倍率 × 元レート / 出力レート。マクロ・効果もこの root 基準。線形補間はループ終端から開始へ接続し、複数周分の飛び越しも剰余で処理する。非ループ終端では最終値を補間用に保持し、末尾到達で停止する。ADSR・エコー・パンは既存仕様を継続する。
+- show（JSON 内の text を含む）と instrument list は `sample 12345 smp @ 22050 Hz` の要約を表示する。list --json は既存音色のプロパティを保持し sampleData のみ除去して sampleSummary を加える。保存 JSON には Base64 を保持する。
+- OGG は Arpeggio.Codecs に隔離し OggVorbisEncoder 1.2.2 を参照する。Core は BCL のみ。入力は有限の float interleaved stereo、範囲外振幅は ±1 にクランプする。quality は有限の -0.1〜1、既定 0.5 の VBR。WAV と同じ loops / sample-rate / tail と警告出力を使う。
+- OggWriter の Stream は呼び出し側所有で閉じない。固定長の左右バッファでエンコーダへ供給し、三ヘッダーをフラッシュしてから音声を送り、EOS と残ページを出力する。無効入力は出力ファイルを開く前に拒否する。OGG の短い入力ではヘッダー分が WAV より大きくなりうるため、サイズ比較は数秒の同一波形で行う。

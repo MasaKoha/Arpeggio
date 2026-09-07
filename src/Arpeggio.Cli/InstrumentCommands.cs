@@ -17,6 +17,7 @@ namespace Arpeggio.Cli
             command.Subcommands.Add(CreateAdd());
             command.Subcommands.Add(CreateSet());
             command.Subcommands.Add(CreateRemove());
+            command.Subcommands.Add(CreateImportWav());
             return command;
         }
 
@@ -33,12 +34,14 @@ namespace Arpeggio.Cli
                 Song song = session.Song!;
                 if (result.GetValue(json))
                 {
-                    Console.WriteLine("[" + string.Join(",", song.Instruments.Select(InstrumentJson.Serialize)) + "]");
+                    Console.WriteLine("[" + string.Join(",", song.Instruments.Select(InstrumentJson.SerializeForDisplay)) + "]");
                     return CliExecution.Success;
                 }
                 foreach (Instrument instrument in song.Instruments)
                 {
-                    Console.WriteLine($"{instrument.Id:D2} {instrument.Kind} {instrument.Name}");
+                    string sampleDescription = instrument is SnesSampleInstrument sample && sample.SampleData != null
+                        ? $" | {sample.SampleSummary}" : string.Empty;
+                    Console.WriteLine($"{instrument.Id:D2} {instrument.Kind} {instrument.Name}{sampleDescription}");
                 }
                 return CliExecution.Success;
             }));
@@ -81,6 +84,32 @@ namespace Arpeggio.Cli
                 Instrument replacement = options.Apply(result, InstrumentOptions.ChangeKind(existing, kind));
                 session.Instruments.Update(replacement);
                 Console.WriteLine(replacement.Id);
+            })));
+            return command;
+        }
+
+        private static Command CreateImportWav()
+        {
+            Command command = new Command("import-wav", "WAV を既存 SNES 音色へ埋め込む");
+            Argument<string> path = new Argument<string>("path");
+            Argument<string> wavPath = new Argument<string>("wavPath");
+            Option<int> identifier = new Option<int>("--id") { Required = true, Description = "SNES 音色 ID" };
+            Option<string> root = new Option<string>("--root") { DefaultValueFactory = _ => "C4" };
+            Option<int?> loopStart = new Option<int?>("--loop-start") { Description = "開始サンプル（含む）" };
+            Option<int?> loopEnd = new Option<int?>("--loop-end") { Description = "終端サンプル（含まない）。0 は末尾" };
+            Option<bool> noLoop = new Option<bool>("--no-loop");
+            command.Arguments.Add(path);
+            command.Arguments.Add(wavPath);
+            command.Options.Add(identifier);
+            command.Options.Add(root);
+            command.Options.Add(loopStart);
+            command.Options.Add(loopEnd);
+            command.Options.Add(noLoop);
+            command.SetAction(result => CliExecution.Run(() => CliExecution.Edit(result.GetValue(path)!, session =>
+            {
+                session.Instruments.ImportWavSample(result.GetValue(identifier), result.GetValue(wavPath)!,
+                    NoteName.Parse(result.GetValue(root)!), result.GetValue(loopStart), result.GetValue(loopEnd), !result.GetValue(noLoop));
+                Console.WriteLine(result.GetValue(identifier));
             })));
             return command;
         }

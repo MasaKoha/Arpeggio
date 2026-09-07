@@ -139,8 +139,30 @@ namespace Arpeggio.Core.Document
             SongValidator.Require(SongValidator.IsInRange(envelope.DecaySeconds, 0, double.MaxValue), "decay は有限の非負秒数です。");
             SongValidator.Require(SongValidator.IsInRange(envelope.ReleaseSeconds, 0, double.MaxValue), "release は有限の非負秒数です。");
             SongValidator.Require(SongValidator.IsInRange(envelope.SustainLevel, 0, 1), "sustain は 0〜1 です。");
+            ValidateEmbeddedSample(sample);
             ValidateMacro(sample.ArpeggioMacro);
             ValidateMacro(sample.PitchMacro);
+        }
+
+        internal static void ValidateEmbeddedSample(SnesSampleInstrument sample)
+        {
+            const int MaximumMidiNote = 127;
+            SongValidator.Require(sample.RootMidiNote >= 0 && sample.RootMidiNote <= MaximumMidiNote, "rootMidiNote は 0〜127 です。");
+            if (sample.SampleData is null)
+            {
+                return;
+            }
+            SongValidator.Require(sample.SampleDataError is null, sample.SampleDataError ?? string.Empty);
+            SongValidator.Require(sample.SampleCount > 0 && sample.SampleCount <= SampleDataCodec.MaximumByteCount / SampleDataCodec.BytesPerSample,
+                "埋め込みサンプルは空にできず、PCM で 2 MiB 以下です。");
+            SongValidator.Require(sample.SampleRate > 0, "sampleRate は正の整数です。");
+            if (!sample.Loop)
+            {
+                return;
+            }
+            int end = sample.LoopEnd == 0 ? sample.SampleCount : sample.LoopEnd;
+            SongValidator.Require(sample.LoopStart >= 0 && sample.LoopStart < end && end <= sample.SampleCount,
+                "ループ範囲は 0 <= loopStart < loopEnd <= サンプル数です（loopEnd=0 は末尾）。");
         }
     }
 }

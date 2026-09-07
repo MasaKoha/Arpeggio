@@ -99,6 +99,9 @@ namespace Arpeggio.Core.Synthesis
             };
         }
 
-        private void RefreshPitch() => PhaseIncrement = PitchTable.Quantize(_chip, _channel, MidiNote) / SampleRate;
+        /// <summary>音色固有の基準音がある場合に位相増分の計算を差し替える。</summary>
+        protected virtual double GetPhaseIncrement() => PitchTable.Quantize(_chip, _channel, MidiNote) / SampleRate;
+
+        private void RefreshPitch() => PhaseIncrement = GetPhaseIncrement();
     }
 }

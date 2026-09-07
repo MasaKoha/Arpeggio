@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Arpeggio.Codecs</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Arpeggio.Core\Arpeggio.Core.csproj" />
+    <ProjectReference Include="..\Arpeggio.Codecs.Vorbis\Arpeggio.Codecs.Vorbis.csproj" />
+  </ItemGroup>
+</Project>

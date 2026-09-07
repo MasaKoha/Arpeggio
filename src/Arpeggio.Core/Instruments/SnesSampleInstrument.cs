@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json.Serialization;
 
 namespace Arpeggio.Core.Instruments
@@ -5,6 +6,12 @@ namespace Arpeggio.Core.Instruments
     /// <summary>SnesSample チャンネルの音色。</summary>
     public sealed class SnesSampleInstrument : Instrument
     {
+        private string? _sampleData;
+        private float[] _decodedSamples = Array.Empty<float>();
+
+        internal float[] DecodedSamples => _decodedSamples;
+        internal string? SampleDataError { get; private set; }
+
         /// <summary>音色の種類。</summary>
         [JsonIgnore]
         public override InstrumentKind Kind => InstrumentKind.SnesSample;
@@ -13,7 +20,7 @@ namespace Arpeggio.Core.Instruments
         [JsonPropertyOrder(0)]
         public SnesWaveformKind Waveform { get; set; } = SnesWaveformKind.Sine;
 
-        /// <summary>内蔵サンプルをループ再生するか。</summary>
+        /// <summary>サンプルをループ再生するか。</summary>
         [JsonPropertyOrder(1)]
         public bool Loop { get; set; } = true;
 
@@ -36,5 +43,56 @@ namespace Arpeggio.Core.Instruments
         /// <summary>任意のピッチマクロ。</summary>
         [JsonPropertyOrder(6)]
         public Macro? PitchMacro { get; set; }
+
+        /// <summary>little-endian PCM 16 bit モノラルの Base64。null は合成波形。代入時に再生キャッシュを準備する。</summary>
+        [JsonPropertyOrder(7)]
+        public string? SampleData
+        {
+            get => _sampleData;
+            set
+            {
+                float[] decoded = Array.Empty<float>();
+                string? error = null;
+                try
+                {
+                    if (value != null)
+                    {
+                        decoded = SampleDataCodec.ToFloat(SampleDataCodec.Decode(value));
+                    }
+                }
+                catch (Exception exception) when (exception is FormatException or ArgumentException)
+                {
+                    // JSON のプロパティ順に依存せず、音色全体が揃ってから Validator が拒否する。
+                    error = exception.Message;
+                }
+                _sampleData = value;
+                _decodedSamples = decoded;
+                SampleDataError = error;
+            }
+        }
+
+        /// <summary>埋め込みサンプルの元レート（Hz）。</summary>
+        [JsonPropertyOrder(8)]
+        public int SampleRate { get; set; } = 44100;
+
+        /// <summary>元サンプルの MIDI 音程。既定は C4。</summary>
+        [JsonPropertyOrder(9)]
+        public int RootMidiNote { get; set; } = 60;
+
+        /// <summary>ループ開始位置。モノラルのサンプル単位。</summary>
+        [JsonPropertyOrder(10)]
+        public int LoopStart { get; set; }
+
+        /// <summary>ループ終端（含まない）。0 はサンプル末尾。</summary>
+        [JsonPropertyOrder(11)]
+        public int LoopEnd { get; set; }
+
+        /// <summary>Base64 を含まない表示用の短いサンプル説明。</summary>
+        [JsonIgnore]
+        public string SampleSummary => SampleData is null ? string.Empty : $"sample {SampleCount} smp @ {SampleRate} Hz";
+
+        /// <summary>検証済み埋め込みサンプルの要素数。合成波形または不正データでは 0。</summary>
+        [JsonIgnore]
+        public int SampleCount => _decodedSamples.Length;
     }
 }

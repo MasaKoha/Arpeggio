@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Arpeggio.Codecs\Arpeggio.Codecs.csproj" />
     <ProjectReference Include="..\Arpeggio.Core\Arpeggio.Core.csproj" />
   </ItemGroup>
 
