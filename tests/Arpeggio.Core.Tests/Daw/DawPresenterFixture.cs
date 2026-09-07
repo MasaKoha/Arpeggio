@@ -16,13 +16,13 @@ namespace Arpeggio.Core.Tests.Daw
         private readonly string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
             "arpeggio-daw-tests-" + Guid.NewGuid().ToString("N"));
 
-        /// <summary>空の NES ソングで Presenter を明示的に組み立てる。</summary>
-        public DawPresenterFixture()
+        /// <summary>指定チップの空ソングで Presenter を明示的に組み立てる。省略時は NES。</summary>
+        public DawPresenterFixture(ChipKind chip = ChipKind.Nes)
         {
             Directory.CreateDirectory(directory);
             Path = System.IO.Path.Combine(directory, "song.arpeggio.json");
             EditSession session = new EditSession();
-            session.New(Path, ChipKind.Nes, InitialTempo, SongLength);
+            session.New(Path, chip, InitialTempo, SongLength);
             Presenter = new MainWindowPresenter(View, Document, new PlaybackEngine(Audio));
             try
             {

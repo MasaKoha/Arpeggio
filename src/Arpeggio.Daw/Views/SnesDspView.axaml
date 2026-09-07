@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presenters="using:Arpeggio.Daw.Presenters"
+             x:Class="Arpeggio.Daw.Views.SnesDspView">
+  <StackPanel Spacing="{StaticResource Arpeggio.Space.Medium}">
+    <TextBlock Text="ADSR レジスタ" Classes="heading" />
+    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
+          ColumnSpacing="{StaticResource Arpeggio.Space.Medium}" RowSpacing="{StaticResource Arpeggio.Space.Medium}">
+      <StackPanel Spacing="{StaticResource Arpeggio.Space.Small}">
+        <TextBlock Text="Attack（0〜15）" />
+        <TextBox x:Name="AttackInput" Classes="numeric" PlaceholderText="秒指定を使用" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Spacing="{StaticResource Arpeggio.Space.Small}">
+        <TextBlock Text="Decay（0〜7）" />
+        <TextBox x:Name="DecayInput" Classes="numeric" PlaceholderText="秒指定を使用" />
+      </StackPanel>
+      <StackPanel Grid.Row="1" Spacing="{StaticResource Arpeggio.Space.Small}">
+        <TextBlock Text="Sustain level（0〜7）" />
+        <TextBox x:Name="SustainLevelInput" Classes="numeric" PlaceholderText="秒指定を使用" />
+      </StackPanel>
+      <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource Arpeggio.Space.Small}">
+        <TextBlock Text="Sustain rate（0〜31）" />
+        <TextBox x:Name="SustainRateInput" Classes="numeric" PlaceholderText="秒指定を使用" />
+      </StackPanel>
+    </Grid>
+    <TextBlock Text="全欄を空にすると秒指定を使用します。" Classes="secondary" TextWrapping="Wrap" />
+    <TextBlock x:Name="RegisterError" IsVisible="False" Foreground="{StaticResource Arpeggio.Danger}"
+               Text="各欄を範囲内の整数で入力してください。" TextWrapping="Wrap" />
+    <TextBlock Text="DSP フラグ" Classes="heading" />
+    <Border x:Name="PitchModulationHint" Background="{StaticResource Arpeggio.Transparent}">
+      <CheckBox x:Name="PitchModulationInput" Content="PitchModulation" />
+    </Border>
+    <CheckBox x:Name="NoiseEnabledInput" Content="NoiseEnabled" />
+    <TextBlock Text="NoiseRate（0〜31）" />
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource Arpeggio.Space.Medium}">
+      <Slider x:Name="NoiseRateInput" Minimum="0" Maximum="{x:Static presenters:SnesInstrumentInput.MaximumRateSliderValue}"
+              TickFrequency="1" IsSnapToTickEnabled="True" />
+      <TextBlock x:Name="NoiseRateValue" Grid.Column="1" Classes="numeric" VerticalAlignment="Center" />
+    </Grid>
+  </StackPanel>
+</UserControl>

@@ -18,7 +18,8 @@ namespace Arpeggio.Daw.Presenters
             List<InstrumentParameter> parameters = new List<InstrumentParameter>();
             foreach (KeyValuePair<string, JsonNode?> property in source)
             {
-                if (property.Key is "id" or "name" or "kind" or "sampleData")
+                if (property.Key is "id" or "name" or "kind" or "sampleData" or
+                    "adsrRegisters" or "pitchModulation" or "noiseEnabled" or "noiseRate" or "preset")
                 {
                     continue;
                 }
@@ -89,23 +90,11 @@ namespace Arpeggio.Daw.Presenters
             return loopIndex < 0 ? values : $"{values}/{loopIndex}";
         }
 
-        private static JsonNode? ParseValueWithoutTemplate(string key, string text)
+        private static JsonNode? ParseValueWithoutTemplate(string text)
         {
             if (string.IsNullOrWhiteSpace(text) || text.Trim().Equals("null", StringComparison.OrdinalIgnoreCase))
             {
                 return null;
-            }
-            if (key == "adsrRegisters")
-            {
-                int[] registers = InstrumentMacroText.ParseValues(text);
-                if (registers.Length != 4)
-                {
-                    throw new ArgumentException("ADSR レジスタは attack,decay,sustainLevel,sustainRate の 4 値で指定してください。");
-                }
-                return new JsonObject
-                {
-                    ["attack"] = registers[0], ["decay"] = registers[1], ["sustainLevel"] = registers[2], ["sustainRate"] = registers[3]
-                };
             }
             if (bool.TryParse(text, out bool flag))
             {
@@ -138,8 +127,8 @@ namespace Arpeggio.Daw.Presenters
             }
             if (previous is null)
             {
-                // null で保存されている任意項目（adsrRegisters 等）は型の手掛かりが無いので、キーと入力文字列から決める
-                return ParseValueWithoutTemplate(key, text);
+                // null の任意項目は型の手掛かりが無いため、入力文字列から復元する。
+                return ParseValueWithoutTemplate(text);
             }
             JsonValueKind kind = previous.GetValueKind();
             if (kind == JsonValueKind.String)

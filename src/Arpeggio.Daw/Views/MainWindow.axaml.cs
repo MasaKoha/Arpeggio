@@ -31,6 +31,9 @@ namespace Arpeggio.Daw.Views
         private readonly TabControl editorTabs;
         private readonly Button sfxButton;
         private readonly Button exportButton;
+        private readonly Button echoButton;
+        private readonly SnesEchoView snesEcho;
+        private readonly Flyout echoFlyout;
         private readonly Button revealExportButton;
         private readonly AudioFilePicker filePicker;
         private readonly TextBlock statusLabel;
@@ -65,6 +68,11 @@ namespace Arpeggio.Daw.Views
             editorTabs = Require<TabControl>("EditorTabs");
             sfxButton = Require<Button>("SfxButton");
             exportButton = Require<Button>("ExportButton");
+            echoButton = Require<Button>("EchoButton");
+            echoFlyout = echoButton.Flyout as Flyout
+                ?? throw new InvalidOperationException("エコーの Flyout がありません。");
+            snesEcho = echoFlyout.Content as SnesEchoView
+                ?? throw new InvalidOperationException("エコー Flyout の表示部品がありません。");
             revealExportButton = Require<Button>("RevealExportButton");
             filePicker = new AudioFilePicker(this);
         }
@@ -78,6 +86,7 @@ namespace Arpeggio.Daw.Views
             notes.Bind(mainPresenter.Notes, mainPresenter.Execute);
             analysis.Bind(mainPresenter.Analysis);
             sfxCreation.Bind(mainPresenter.SfxCreation, mainPresenter.Execute);
+            snesEcho.Bind(mainPresenter.SnesEcho, mainPresenter.Execute);
             instruments.WavImportRequested += OnImportWav;
             sfxButton.Click += OnSfx;
             exportButton.Click += OnExport;
@@ -109,6 +118,12 @@ namespace Arpeggio.Daw.Views
             pianoRoll.ShowSong(current, selectedTrack, selectedTick);
             instruments.ShowChannel(current.Tracks[selectedTrack]);
             instruments.Refresh();
+            echoButton.IsVisible = current.Chip == ChipKind.Snes;
+            if (!echoButton.IsVisible)
+            {
+                echoFlyout.Hide();
+            }
+            snesEcho.Refresh();
             notes.Refresh();
             analysis.ShowTracks(current);
             SynchronizeViewport();
@@ -191,6 +206,7 @@ namespace Arpeggio.Daw.Views
             RemoveHandler(KeyDownEvent, OnShortcut);
             tracks.Dispose();
             instruments.Dispose();
+            snesEcho.Dispose();
             notes.Dispose();
             analysis.Dispose();
             sfxCreation.Dispose();
@@ -250,7 +266,7 @@ namespace Arpeggio.Daw.Views
         {
             bool control = arguments.KeyModifiers.HasFlag(KeyModifiers.Control);
             bool shift = arguments.KeyModifiers.HasFlag(KeyModifiers.Shift);
-            bool isParameterInput = FocusManager?.GetFocusedElement() is TextBox or ComboBox or ListBox or ListBoxItem or Button;
+            bool isParameterInput = FocusManager?.GetFocusedElement() is TextBox or ComboBox or ListBox or ListBoxItem or Button or Slider or NumericUpDown;
             Action? action = null;
             if (control && arguments.Key == Key.S) { action = MainPresenter.Save; }
             else if (control && arguments.Key == Key.E) { action = ExportWithPicker; }

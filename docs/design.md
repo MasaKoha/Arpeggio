@@ -386,6 +386,15 @@ orchestral の依頼一覧は kick / snare を分けると 9 音色になるた�
 - MCP: `snes_presets()` は一覧を返し、既存 `add_instrument` / `update_instrument` の音色 JSON に `preset` を指定できる。更新は既存契約どおりオブジェクト全体の置換。show / instrument list は `SnesSample strings` の形で名前参照を表示する。
 - M2-E-A の BRR・補間・ADSR・FIR 自体は変更しない。release は既存 DSP の固定約 8 ms。既存 SFX の素材は維持し、DAW のプリセット選択 UI は対象外。
 
+### M2-E-C の DAW SNES 音色編集（2026-09-08）
+
+- SNES 音色パネルの先頭に、持続系／減衰系／ドラムの選択不可見出しを備えたプリセット ComboBox を表示する。先頭の「（合成波形）」は Preset を解除する。プリセット選択はカタログの推奨 ADSR・ルート音・素材レート・ループ・EchoSend を反映し、NoiseEnabled を解除する。名前・Pan・マクロは保持し、InstrumentEditor.Update の一履歴で公開する。
+- 埋め込み SampleData がある状態のプリセット選択は「埋め込みサンプルを使用中。先に解除してください」で拒否する。明示的な「埋め込みサンプルを解除」ボタンを用意し、解除も Undo 可能な一履歴にする。
+- ADSR レジスタは四つの整数欄とし、全欄空白なら AdsrRegisters を null にして秒指定へ戻す。部分空白・非整数・範囲外は Danger 枠で示し、名前・DSP フラグも含めた適用全体を拒否する。DSP フラグとレートは専用のチェックとスライダー・数値表示で編集し、既存の適用ボタンで一履歴にまとめる。
+- ボイス 0 の PitchModulation は入力を無効化し、理由をツールチップで示す。既に他ボイスと共有している変調音色の設定は、ボイス 0 で別の項目を編集しても保持する。Preset・SampleData・未確定の NoiseEnabled 入力のいずれかが有効なら Waveform を無効化する。
+- ソング全体のエコーは SNES のみトランスポート脇の Flyout に置く。遅延は 0〜240 ms の 16 ms 刻み、フィードバックは絶対値 1 未満、音量は 0〜1、FIR は Flat / LowPass / HighPass / Wide。任意 FIR はプリセットを選ぶまで保持する。適用は一履歴とし、再生中は停止→設定公開→Reset→先頭から再開する。
+- CLI バンクの Track.DefaultInstrumentId をパネルの既定選択にも使う。DAW の新規作成や SFX タブへのバンク作成機能は追加しない。
+
 ## 未決事項
 
 - SPC ファイル・RAM・命令単位までの互換性は M3 以降で決める

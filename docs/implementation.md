@@ -889,3 +889,60 @@ README.md
 - `tests/Arpeggio.Core.Tests/Daw/ChannelPaletteTests.cs`
 - `docs/design.md`
 - `docs/implementation.md`
+
+
+# M2-E-C 実装記録（2026-09-08）
+
+## M2-E-C の実装判断
+
+- **プリセット**: 音色パネルの先頭に「（合成波形）」と、持続系／減衰系／ドラムの選択不可のカテゴリ見出しを持つ ComboBox を追加。カタログの説明は各項目のツールチップに表示する。選択は複製音色の `ApplyPreset` → `InstrumentEditor.Update` の一履歴とし、ADSR・元レート・ルート音・ループ・EchoSend の推奨値を再適用する。名前・Pan・マクロは保持し、NoiseEnabled は Core の既存方針どおり解除する。同じプリセットの再選択は履歴を増やさない。
+- **埋め込み素材の保護**: SampleData がある音色へのプリセット選択は「埋め込みサンプルを使用中。先に解除してください」で拒否し、選択表示も確定値へ戻す。「埋め込みサンプルを解除」を明示操作として追加し、解除自体を Undo 可能な一履歴にする。プリセット解除とサンプル解除では素材固有のループ位置を初期化する。
+- **ADSR / DSP**: `SnesDspView` に固定のレジスタ 4 欄・変調とノイズのチェック・整数ノイズレートのスライダーと数値表示を分離した。入力値は `SnesInstrumentInput` で検証し、名前と既存パラメータと合わせて「音色を適用」の一履歴で公開する。全レジスタ空欄は明示 null、途中の空欄・小数・範囲外は拒否する。無効欄はテーマの Danger 枠と説明文を表示し、Fluent のフォーカス・ホバー状態にもエラー色を渡す。
+- **ボイスと波形**: 選択ボイスの ChannelIndex が 0 の場合は変調を有効化できない。同じ音色参照のままトラックを切り替えても無効状態と「ボイス 0 は変調できません」を更新する。他ボイスと共有する音色に既にある変調設定は、別項目の適用で暗黙解除しない。Waveform は Preset / SampleData / ノイズが有効なときに無効化し、未確定のノイズチェックにも追従する。
+- **バンクの既定選択**: セッション内で明示した既定選択がなければ、保存されている Track.DefaultInstrumentId を優先してパネルに表示する。DAW の新規バンク作成や SFX タブへのバンク操作は追加しない。
+- **エコー**: トランスポート脇に SNES 専用の「エコー」Flyout を追加。遅延は 16 ms 刻みの数値入力、フィードバック・音量は数値欄、FIR は Flat / LowPass / HighPass / Wide。任意の既存 FIR 係数は未選択のカスタムとして保持する。「エコーを適用」で一履歴とし、同値の適用では履歴・再生位置を変えない。
+- **履歴と再生境界**: Core の EditSession.Change は internal で、公開バッチにもエコー操作がないため、DawDocument.UpdateSnesEcho が複製候補を検証・作業ファイルへ保存してから History.Record と設定の参照交換を行う。公開ソングを先行変更しない。編集は Transport.ChangeStructure を通し、停止→Reset→再生中だった場合のみ再開。SongRenderer.Reset が合成パイプラインとエコーを再構築する既存実装を利用する。保存失敗時も元設定で再生を再開する。
+- **UI と寿命**: MainWindowPresenter がエコー Presenter を明示生成し、MainWindow が View と接続する。新規購読は所有 View の Dispose で解除する。既存 AXAML の名前を維持し、Views の追加色・寸法はテーマリソースを使用する。共有ワークスペースで更新されたテーマとエコー入力部品を保持して照合した。モーダル・Core / CLI / MCP / Codecs の変更は行っていない。
+
+## M2-E-C のテストコードと静的確認
+
+- `SnesInstrumentPresenterTests`: 10 メソッド／23 ケース。カテゴリ別の推奨値と一履歴・Undo/Redo、SampleData 拒否と明示解除、プリセット解除、全レジスタの範囲外・欠落・小数拒否、上限値と明示 null、ボイス 0、共有音色の保持、動的入力からの専用項目除外、ノイズレート境界、CLI バンクの既定音色。
+- `SnesEchoPresenterTests`: 7 メソッド／16 ケース。再生中の停止・先頭リセット・再開、一履歴と Undo/Redo、再構築レンダラーとの PCM 一致、停止中の適用と保存復元、同値適用、範囲外・非有限値拒否、カスタム FIR 保持、他チップ拒否、作業ファイルの置換失敗での状態保持。
+- `SnesEchoAcceptanceTests`: 1 メソッド／1 ケース。編集時の作業ファイル更新、明示保存前の正本保持、明示保存後の復元。
+- AXAML の XML 構文、名前付きコントロールの解決、StaticResource の存在を確認した。C# の括弧対応、public summary の隣接、追加イベント購読の解除を確認した。
+- Core の型定義・namespace・公開 API と、ローカル Avalonia 12.1.2 の XML API 資料を照合した。Unity lifecycle / GetComponent / AddComponent の追加はない。
+- git 操作、コンパイル、dotnet build / dotnet test、Unity / DAW 起動は行っていない。
+
+## M2-E-C 未完了
+
+実装コードと Presenter テストの追加は完了。以下の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告ゼロ、および既存テストを含む全件通過。新規 40 ケースも未実行。
+- SNES / NES / GB の表示切替、プリセットカテゴリと選択後の推奨値、SampleData 拒否時のステータスと選択復帰、明示解除後の Undo。
+- ADSR の空欄・範囲外・フォーカス中の Danger 枠、ボイス 0 の無効チェックとツールチップ、共有音色のトラック切替、Waveform の無効化、ノイズのスライダー表示。
+- エコー Flyout の数値入力・カスタム FIR 表示、再生中適用と Undo/Redo の先頭再開、聴取上のエコー反映。
+
+## M2-E-C 変更ファイル一覧
+
+- `src/Arpeggio.Daw/Presenters/InstrumentPanelPresenter.cs`
+- `src/Arpeggio.Daw/Presenters/InstrumentParameterEditor.cs`
+- `src/Arpeggio.Daw/Presenters/SnesInstrumentInput.cs`（新規）
+- `src/Arpeggio.Daw/Presenters/SnesEchoPresenter.cs`（新規）
+- `src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs`
+- `src/Arpeggio.Daw/Editing/DawDocument.cs`
+- `src/Arpeggio.Daw/Views/InstrumentPanelView.axaml`
+- `src/Arpeggio.Daw/Views/InstrumentPanelView.axaml.cs`
+- `src/Arpeggio.Daw/Views/SnesDspView.axaml`（新規）
+- `src/Arpeggio.Daw/Views/SnesDspView.axaml.cs`（新規）
+- `src/Arpeggio.Daw/Views/SnesEchoView.axaml`（新規）
+- `src/Arpeggio.Daw/Views/SnesEchoView.axaml.cs`（新規）
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `src/Arpeggio.Daw/Themes/Icons.axaml`
+- `src/Arpeggio.Daw/Themes/ArpeggioTheme.axaml`（共有側で追加されたエコー幅・アイコン寸法トークンを使用）
+- `tests/Arpeggio.Core.Tests/Daw/DawPresenterFixture.cs`
+- `tests/Arpeggio.Core.Tests/Daw/SnesInstrumentPresenterTests.cs`（新規）
+- `tests/Arpeggio.Core.Tests/Daw/SnesEchoPresenterTests.cs`（新規）
+- `tests/Arpeggio.Core.Tests/Daw/SnesEchoAcceptanceTests.cs`（新規）
+- `docs/design.md`
+- `docs/implementation.md`

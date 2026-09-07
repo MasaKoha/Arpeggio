@@ -105,20 +105,33 @@ namespace Arpeggio.Core.Tests.Synthesis.Snes
             float[] expected = new SongRenderer(song, settings).RenderAll();
             SongRenderer renderer = new SongRenderer(song, settings);
             float[] actual = new float[expected.Length];
+            // 静的テーブルの初回初期化（ADSR の decay 段・FIR エコー・ノイズ）が計測区間に入らないよう、曲全体を一度鳴らす
             float[] warmup = new float[512];
-            renderer.Render(warmup);
+            while (!renderer.IsFinished)
+            {
+                renderer.Render(warmup);
+            }
+            // Reset で合成器が作り直されるため、計測と同じチャンク割りで 2 周目も鳴らし、Reset 後にだけ通る経路も温めておく
+            renderer.Reset();
+            RenderInChunks(renderer, actual);
             renderer.Reset();
             long before = GC.GetAllocatedBytesForCurrentThread();
-            int position = 0;
-            while (position < actual.Length)
-            {
-                int count = Math.Min(514, actual.Length - position);
-                int rendered = renderer.Render(actual.AsSpan(position, count));
-                position += rendered * StereoChannels;
-            }
+            RenderInChunks(renderer, actual);
             long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Assert.Equal(0L, allocated);
             Assert.Equal(expected, actual);
+        }
+
+        private static void RenderInChunks(SongRenderer renderer, float[] destination)
+        {
+            const int ChunkValues = 514;
+            int position = 0;
+            while (position < destination.Length)
+            {
+                int count = Math.Min(ChunkValues, destination.Length - position);
+                int rendered = renderer.Render(destination.AsSpan(position, count));
+                position += rendered * StereoChannels;
+            }
         }
 
         private static float[] RenderNoise(int rate)

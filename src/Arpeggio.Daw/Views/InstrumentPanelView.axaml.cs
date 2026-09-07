@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Daw.Presenters;
 using Arpeggio.Daw.Themes;
 using Avalonia.Controls;
@@ -28,6 +29,11 @@ namespace Arpeggio.Daw.Views
         private readonly TextBox rootNoteInput;
         private readonly CheckBox loopSampleInput;
         private readonly Button importWavButton;
+        private readonly Button clearSampleButton;
+        private readonly StackPanel presetPanel;
+        private readonly ComboBox presetSelector;
+        private readonly SnesDspView snesDsp;
+        private readonly List<ComboBoxItem> presetItems = new List<ComboBoxItem>();
         private readonly Dictionary<string, Control> inputs = new Dictionary<string, Control>();
         private InstrumentPanelPresenter presenter = null!;
         private Action<Action> execute = null!;
@@ -55,6 +61,10 @@ namespace Arpeggio.Daw.Views
             rootNoteInput = RequireControl<TextBox>("RootNoteInput");
             loopSampleInput = RequireControl<CheckBox>("LoopSampleInput");
             importWavButton = RequireControl<Button>("ImportWavButton");
+            clearSampleButton = RequireControl<Button>("ClearSampleButton");
+            presetPanel = RequireControl<StackPanel>("PresetPanel");
+            presetSelector = RequireControl<ComboBox>("PresetSelector");
+            snesDsp = RequireControl<SnesDspView>("SnesDsp");
         }
 
         /// <summary>ルート音名とループ指定を添えて OS ファイル選択を要求する。</summary>
@@ -70,6 +80,10 @@ namespace Arpeggio.Daw.Views
             this.presenter = presenter;
             this.execute = execute;
             isBound = true;
+            PopulatePresets();
+            presetSelector.SelectionChanged += OnPresetSelected;
+            clearSampleButton.Click += OnClearSample;
+            snesDsp.NoiseChanged += UpdateWaveformAvailability;
             instrumentSelector.SelectionChanged += OnInstrumentSelected;
             addButton.Click += OnAddClicked;
             removeButton.Click += OnRemoveClicked;
@@ -88,6 +102,7 @@ namespace Arpeggio.Daw.Views
             IReadOnlyList<Instrument> snapshot = presenter.InstrumentSnapshot;
             Instrument? current = presenter.CurrentInstrument;
             InstrumentKind kind = presenter.RequiredKind;
+            snesDsp.ShowPitchModulationAvailability(presenter.CanUsePitchModulation);
             if (ReferenceEquals(snapshot, displayedInstrumentSnapshot) &&
                 ReferenceEquals(current, displayedInstrument) && kind == displayedKind)
             {
@@ -107,7 +122,14 @@ namespace Arpeggio.Daw.Views
                 sampleImportPanel.IsVisible = kind == InstrumentKind.SnesSample;
                 importWavButton.IsEnabled = current is SnesSampleInstrument;
                 sampleSummary.Text = current is SnesSampleInstrument sample ? sample.SampleSummary : string.Empty;
+                presetPanel.IsVisible = kind == InstrumentKind.SnesSample;
+                presetSelector.IsEnabled = current is SnesSampleInstrument;
+                snesDsp.IsVisible = kind == InstrumentKind.SnesSample;
+                snesDsp.ShowInstrument(current as SnesSampleInstrument);
+                clearSampleButton.IsVisible = current is SnesSampleInstrument { SampleData: not null };
+                SetPresetSelection();
                 RebuildInputs();
+                UpdateWaveformAvailability();
                 displayedInstrumentSnapshot = snapshot;
                 displayedInstrument = current;
                 displayedKind = kind;
@@ -134,6 +156,10 @@ namespace Arpeggio.Daw.Views
             removeButton.Click -= OnRemoveClicked;
             applyButton.Click -= OnApplyClicked;
             importWavButton.Click -= OnImportWav;
+            presetSelector.SelectionChanged -= OnPresetSelected;
+            clearSampleButton.Click -= OnClearSample;
+            snesDsp.NoiseChanged -= UpdateWaveformAvailability;
+            snesDsp.Dispose();
             inputs.Clear();
             parameterPanel.Children.Clear();
             displayedInstrumentSnapshot = null;
@@ -142,6 +168,58 @@ namespace Arpeggio.Daw.Views
         }
 
         private void UpdateKindLabel(InstrumentKind kind) => kindLabel.Text = $"{channelLabel} · {kind}";
+
+        private void PopulatePresets()
+        {
+            presetItems.Clear();
+            presetItems.Add(new ComboBoxItem { Content = "（合成波形）" });
+            string category = string.Empty;
+            foreach (SnesInstrumentPreset preset in presenter.SnesPresets)
+            {
+                if (category != preset.Category)
+                {
+                    category = preset.Category;
+                    presetItems.Add(new ComboBoxItem { Content = category, IsEnabled = false });
+                }
+                ComboBoxItem item = new ComboBoxItem { Content = preset.Name, Tag = preset.Name };
+                ToolTip.SetTip(item, preset.Description);
+                presetItems.Add(item);
+            }
+            presetSelector.ItemsSource = presetItems;
+        }
+
+        private void SetPresetSelection()
+        {
+            string? presetName = (presenter.CurrentInstrument as SnesSampleInstrument)?.Preset;
+            presetSelector.SelectedItem = presetItems.Find(item => item.IsEnabled && (string?)item.Tag == presetName);
+        }
+
+        private void OnPresetSelected(object? sender, SelectionChangedEventArgs arguments)
+        {
+            if (isRefreshing || presetSelector.SelectedItem is not ComboBoxItem { IsEnabled: true } item)
+            {
+                return;
+            }
+            execute(() => presenter.SelectPreset(item.Tag as string));
+            // 拒否時も選択表示を確定済み音色へ戻し、未確定の他の入力は保持する。
+            isRefreshing = true;
+            try
+            {
+                SetPresetSelection();
+            }
+            finally
+            {
+                isRefreshing = false;
+            }
+        }
+
+        private void UpdateWaveformAvailability()
+        {
+            if (inputs.TryGetValue("waveform", out Control? waveform) && presenter.CurrentInstrument is SnesSampleInstrument sample)
+            {
+                waveform.IsEnabled = sample.Preset == null && sample.SampleData == null && !snesDsp.IsNoiseEnabled;
+            }
+        }
 
         private void RebuildInputs()
         {
@@ -186,6 +264,7 @@ namespace Arpeggio.Daw.Views
 
         private void OnAddClicked(object? sender, RoutedEventArgs arguments) => execute(presenter.AddInstrument);
         private void OnRemoveClicked(object? sender, RoutedEventArgs arguments) => execute(presenter.RemoveInstrument);
+        private void OnClearSample(object? sender, RoutedEventArgs arguments) => execute(presenter.ClearSample);
         private void OnImportWav(object? sender, RoutedEventArgs arguments) =>
             WavImportRequested?.Invoke(rootNoteInput.Text ?? string.Empty, loopSampleInput.IsChecked == true);
 
@@ -201,7 +280,8 @@ namespace Arpeggio.Daw.Views
                     _ => throw new InvalidOperationException("未対応の入力部品です。")
                 });
             }
-            execute(() => presenter.Apply(nameInput.Text ?? string.Empty, values));
+            SnesInstrumentInput? snesInput = presenter.CurrentInstrument is SnesSampleInstrument ? snesDsp.ReadInput() : null;
+            execute(() => presenter.Apply(nameInput.Text ?? string.Empty, values, snesInput));
         }
 
         private TControl RequireControl<TControl>(string name) where TControl : Control => this.FindControl<TControl>(name)

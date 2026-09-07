@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Import;
 using Arpeggio.Core.Session;
 using Arpeggio.Daw.Editing;
@@ -28,6 +29,13 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>参照交換による音色一覧の変更検知に使う公開スナップショット。</summary>
         public IReadOnlyList<Instrument> InstrumentSnapshot => document.Song.Instruments;
 
+        /// <summary>カテゴリ順に並ぶ SNES の内蔵音色。</summary>
+        public IReadOnlyList<SnesInstrumentPreset> SnesPresets => SnesInstrumentCatalog.All;
+
+        /// <summary>選択ボイスにピッチ変調元が存在するか。</summary>
+        public bool CanUsePitchModulation => document.Song.Chip == ChipKind.Snes &&
+            document.Song.Tracks[pianoRoll.SelectedTrack].ChannelIndex > 0;
+
         /// <summary>選択チャンネルと互換のある音色。</summary>
         public IReadOnlyList<Instrument> Instruments => document.Song.Instruments
             .Where(instrument => instrument.Kind == RequiredKind).ToArray();
@@ -51,7 +59,10 @@ namespace Arpeggio.Daw.Presenters
                         return remembered;
                     }
                 }
-                return document.Song.Instruments.Find(instrument => instrument.Kind == RequiredKind);
+                int? defaultInstrumentId = document.Song.Tracks[pianoRoll.SelectedTrack].DefaultInstrumentId;
+                return document.Song.Instruments.Find(instrument =>
+                    instrument.Id == defaultInstrumentId && instrument.Kind == RequiredKind)
+                    ?? document.Song.Instruments.Find(instrument => instrument.Kind == RequiredKind);
             }
         }
 
@@ -86,6 +97,51 @@ namespace Arpeggio.Daw.Presenters
             }
             SnesSampleInstrument replacement = (SnesSampleInstrument)InstrumentJson.Deserialize(InstrumentJson.Serialize(current));
             WavSampleImporter.Import(replacement, path, NoteName.Parse(rootNote), null, null, loop);
+            document.Session.Instruments.Update(replacement);
+            changed();
+        }
+
+        /// <summary>埋め込み素材を保護し、プリセットと推奨値を一履歴で設定する。null は合成波形へ戻す。</summary>
+        public void SelectPreset(string? presetName)
+        {
+            SnesSampleInstrument current = RequireSnesInstrument();
+            if (presetName != null && current.SampleData != null)
+            {
+                throw new InvalidOperationException("埋め込みサンプルを使用中。先に解除してください");
+            }
+            if (current.Preset == presetName)
+            {
+                return;
+            }
+            pianoRoll.EndDrag();
+            SnesSampleInstrument replacement = CloneSnesInstrument(current);
+            if (presetName == null)
+            {
+                replacement.Preset = null;
+                replacement.LoopStart = 0;
+                replacement.LoopEnd = 0;
+            }
+            else
+            {
+                replacement.ApplyPreset(presetName);
+            }
+            document.Session.Instruments.Update(replacement);
+            changed();
+        }
+
+        /// <summary>明示操作で埋め込み WAV を解除し、Undo で復元できるようにする。</summary>
+        public void ClearSample()
+        {
+            SnesSampleInstrument current = RequireSnesInstrument();
+            if (current.SampleData == null)
+            {
+                return;
+            }
+            pianoRoll.EndDrag();
+            SnesSampleInstrument replacement = CloneSnesInstrument(current);
+            replacement.SampleData = null;
+            replacement.LoopStart = 0;
+            replacement.LoopEnd = 0;
             document.Session.Instruments.Update(replacement);
             changed();
         }
@@ -138,14 +194,28 @@ namespace Arpeggio.Daw.Presenters
         }
 
         /// <summary>名前とパラメータを一操作で検証して公開する。</summary>
-        public void Apply(string name, IReadOnlyDictionary<string, string> values)
+        public void Apply(string name, IReadOnlyDictionary<string, string> values, SnesInstrumentInput? snesInput = null)
         {
             pianoRoll.EndDrag();
             Instrument current = CurrentInstrument ?? throw new InvalidOperationException("音色を追加してください。");
             Instrument replacement = InstrumentParameterEditor.Apply(current, name, values);
+            if (replacement is SnesSampleInstrument sample && snesInput != null)
+            {
+                if (snesInput.PitchModulation && !sample.PitchModulation && !CanUsePitchModulation)
+                {
+                    throw new InvalidOperationException("ボイス 0 は変調できません");
+                }
+                snesInput.ApplyTo(sample);
+            }
             document.Session.Instruments.Update(replacement);
             changed();
         }
+
+        private SnesSampleInstrument RequireSnesInstrument() => CurrentInstrument as SnesSampleInstrument
+            ?? throw new InvalidOperationException("SNES 音色を選択してください。");
+
+        private static SnesSampleInstrument CloneSnesInstrument(SnesSampleInstrument instrument) =>
+            (SnesSampleInstrument)InstrumentJson.Deserialize(InstrumentJson.Serialize(instrument));
 
         private Instrument CreateInstrument() => RequiredKind switch
         {

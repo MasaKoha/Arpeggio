@@ -38,6 +38,12 @@
       <Grid ColumnDefinitions="*,Auto">
         <views:TransportView x:Name="Transport" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="8">
+          <Button x:Name="EchoButton" ContentTemplate="{StaticResource Arpeggio.Content.Echo}" Content="エコー"
+                  IsVisible="False" ToolTip.Tip="ソング全体の SNES エコーを設定">
+            <Button.Flyout>
+              <Flyout><views:SnesEchoView /></Flyout>
+            </Button.Flyout>
+          </Button>
           <Button x:Name="SfxButton" ContentTemplate="{StaticResource Arpeggio.Content.Sfx}" Content="SFX を作る" ToolTip.Tip="SFX を作る" />
           <Button x:Name="ExportButton" ContentTemplate="{StaticResource Arpeggio.Content.Export}" Content="書き出し" ToolTip.Tip="Ctrl+E · WAV / OGG" />
         </StackPanel>

@@ -104,4 +104,11 @@
       <TextBlock Text="{Binding}" VerticalAlignment="Center" />
     </StackPanel>
   </DataTemplate>
+  <StreamGeometry x:Key="Icon.Echo">M2 10 H5 V14 H2 Z M8 6 H11 V18 H8 Z M14 3 H17 V21 H14 Z M20 7 H23 V17 H20 Z</StreamGeometry>
+  <DataTemplate x:Key="Arpeggio.Content.Echo" x:DataType="x:String">
+    <StackPanel Orientation="Horizontal" Spacing="{StaticResource Arpeggio.Space.Small}">
+      <PathIcon Data="{StaticResource Icon.Echo}" Width="{StaticResource Arpeggio.Icon.Size}" Height="{StaticResource Arpeggio.Icon.Size}" IsHitTestVisible="False" />
+      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+    </StackPanel>
+  </DataTemplate>
 </ResourceDictionary>
