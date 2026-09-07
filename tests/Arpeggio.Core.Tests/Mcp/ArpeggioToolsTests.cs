@@ -16,14 +16,15 @@ namespace Arpeggio.Core.Tests.Mcp
     /// <summary>stdio ホストを起動せず、MCP の公開契約と共有セッション操作を検証する。</summary>
     public sealed class ArpeggioToolsTests
     {
-        /// <summary>全 16 ツールが指定名と string 戻り値で公開され、構造化出力を指定しない。</summary>
+        /// <summary>全 20 ツールが指定名と string 戻り値で公開され、構造化出力を指定しない。</summary>
         [Fact]
         public void ExposesAllToolNamesWithoutStructuredContent()
         {
             string[] expectedNames =
             {
                 "new_song", "open_song", "save_song", "song_info", "show_song", "add_note", "remove_note", "update_note",
-                "apply_operations", "add_instrument", "update_instrument", "remove_instrument", "export_wav", "undo", "redo", "chip_reference"
+                "apply_operations", "add_instrument", "update_instrument", "remove_instrument", "export_wav", "undo", "redo", "chip_reference",
+                "analyze_song", "analyze_wav", "new_sfx", "sfx_presets"
             };
             Assert.NotNull(typeof(ArpeggioTools).GetCustomAttribute<McpServerToolTypeAttribute>());
             MethodInfo[] methods = typeof(ArpeggioTools).GetMethods()

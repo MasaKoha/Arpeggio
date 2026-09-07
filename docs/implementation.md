@@ -376,3 +376,102 @@ tests/Arpeggio.Core.Tests/Daw/MainWindowPresenterTests.cs
 tests/Arpeggio.Core.Tests/Daw/PianoRollPresenterTests.cs
 tests/Arpeggio.Core.Tests/Daw/TransportPresenterTests.cs
 ```
+
+
+# M2-A 実装記録（2026-09-07）
+
+## 実装範囲
+
+AI 向け音声解析と八種類の効果音プリセットを Core / CLI / MCP に追加した。合成・シーケンス・SongRenderer・既存公開 API・ソング JSON / version・DAW・csproj / slnx は変更していない。Core は BCL のみで、NuGet は追加していない。git 操作、ビルド、コンパイル、テスト実行、アプリ起動は行っていない。
+
+## M2-A の実装判断
+
+- **解析の単位**: ステレオフレームで時刻を計算し、全体と各窓の RMS は左右全サンプルから計算する。表示窓は重複なし・端数窓を含み、無音割合は窓数の比率。左右差は左−右。-160 dBFS を無音の有限表現にして、既存の SessionOutput.Serialize でそのまま JSON にできる。
+- **周波数解析**: 基数 2 の自前 FFT、既定 2048 点。表示窓全体を連続ブロックに分割し、左右個別のブロック平均を除去、実長 Hann とゼロ詰めを適用する。パワーを合算して逆相相殺を防ぎ、Hann 二乗和と実フレーム数で重み付けする。DC を除外したパワーから支配的周波数・重心・帯域比率を求める。音程は対数パワーの放物線補間後に A4=440 Hz で最寄り音名へ変換する。基音推定ではなく、支配的な成分のラベルである。
+- **作業配列と責務**: FastFourierTransform は in-place の複素順変換。SpectrumAnalysis が一回の解析中の配列再利用と帯域蓄積、SignalStatistics が元波形の音量統計を担当する。AnalysisBandEnergy は三帯域の比率を名前付きで公開する。窓ごとに作業配列を生成しない。
+- **警告**: クリップ・小音量・先頭無音・末尾無音・左右差を分類する。先頭／末尾は表示窓と独立した 50 ms 単位。AudioAnalysisSource がソングを複製してソロ化し、44100 Hz・余白 0 秒で既存 Renderer を呼ぶ。RenderWarning と保持上限超過数も同じレポートに保存し、テキストは同じ警告節へ表示する。
+- **WAV**: 必須範囲の PCM 16 bit モノラル／ステレオ。未知チャンク、奇数長パディング、data が fmt より前にある配置を扱う。形式・宣言長・バイトレート・フレーム境界・チャンク重複を検証する。正側 32767・負側 32768 で正規化し、書き出された正負の飽和端点を両方クリップとして解析できる。Stream は呼び出し側所有、読み取りとシークが必要。8 / 24 / 32 bit・float・WAVE_FORMAT_EXTENSIBLE は対象外として明示エラー。テスト用 WavReader は Core 呼び出しと既存 short 配列への変換だけにした。
+- **プリセット**: Jump / Coin / Hit / Explosion / PowerUp / Laser / Blip / Select を、ノートの PitchSlide / VolumeSlide / Arpeggio と既存音色で構成する。NES / GB は Pulse と Noise、SNES はループする内蔵 Pulse / Noise、リリース 0 秒。テンポ 150、ノート終端と lengthTicks を一致させる。Blip は個別要件の 30〜50 ms を優先して 5 tick（約 41.7 ms）。通常のプリセットは 100〜400 ms。
+- **保存とカタログ**: SfxPresetDescription / SfxPresetCatalog が名前・説明・長さを共有する。正規名は powerup、power-up も受理する。SfxPresetFile は生成・検証済みの JSON を一時ファイル経由で新規移動し、存在確認後の競合でも上書きしない。CLI / MCP は保存成功後に既存 EditSession.Open で開く。CLI は既存の側車履歴を初期化する。
+- **既存 export との境界**: 既定余白 0.5 秒は変更していない。SFX 本体長で比較する場合は CLI --tail 0 / MCP tail: 0 を指定する。analyze_song / analyze <song> は常に余白 0 秒であり、既定 export の余白を含めた解析とは長さが異なる。
+
+## M2-A の利用例
+
+```sh
+arpeggio sfx list
+arpeggio sfx new jump.arpeggio.json --preset jump --chip nes
+arpeggio analyze jump.arpeggio.json --track 0 --loops 1 --window-ms 50
+arpeggio export wav jump.arpeggio.json jump.wav --tail 0
+arpeggio analyze wav jump.wav --json
+```
+
+MCP は `new_sfx(path, preset, chip?, title?)`、`sfx_presets()`、`analyze_song(track?, loops?, windowMs?)`、`analyze_wav(path, windowMs?)` を追加した。四ツールとも JSON 文字列を返し、既存の共有セッションロックとエラー分類を使う。テキスト表示は AnalysisTextRenderer、JSON は全窓を保持する。
+
+## M2-A のテストコード
+
+| 対象 | 追加した検証 |
+|---|---|
+| FFT / dBFS | インパルス、DC、複素入力の直接 DFT との比較、不正点数、振幅往復、有限の無音下限 |
+| AudioAnalyzer | 440 Hz / A4、既知 RMS・ピーク、三サンプルレート、逆相、DC オフセット、表示窓全体の集計、三帯域、端数窓の重み、クリップ、左右差、独立した無音端点、空入力、不正設定、40 窓表示と全件 JSON |
+| WAV 入力 | 手組み RIFF の mono / stereo、正負端点、未知奇数チャンク、data/fmt 順序、非対応形式、欠損・過大宣言長・端数フレーム、Stream 所有権 |
+| ソング解析 | ソロでミュート解除、元 JSON 不変、ループ長、合成警告、I/O と形式エラーの分類 |
+| SFX Core | 八プリセット × 三チップの生成・検証・JSON 往復・WAV 書き出し／再解析・長さ・非無音・非クリップ、スライド方向、Explosion の減衰、共有可変状態なし |
+| CLI | 全 24 組み合わせの sfx new → export wav → analyze wav、analyze song、ファイル・側車履歴不変、ソロ・ループ・合成警告、一覧・既定チップ・上書き拒否・不正引数 |
+| MCP | 全 24 組み合わせの new_sfx → export_wav → analyze_wav、analyze_song、セッション参照・ミュート・履歴不変、未オープン WAV 解析、一覧・上書き拒否・エラー JSON、20 ツールの公開契約 |
+
+## M2-A の静的確認
+
+- 設計書全文・M1-A/B/C の判断・C# 規約を参照し、既存 API と名前空間を照合した。
+- System.CommandLine 2.0.11 と .NET 10 のローカル参照 XML で追加使用する公開型・メンバーを確認した。
+- 変更した C# 34 ファイルの括弧対応・doc XML・public summary の隣接を確認した。禁止した省略名・ファイルスコープ namespace・Unity lifecycle API は追加していない。
+- 音声合成やコマンド実行による確認は行っていない。下記テストの成功や数値は実測結果として主張しない。
+
+## M2-A 未完了
+
+実装上の残タスクはなし。以下は依頼者による実行確認が必要。
+
+- ソリューションのコンパイルと警告ゼロ、既存テストを含む全件成功。
+- Core / CLI / MCP の全 24 プリセットに対する音響数値・想定長・クリップなしの実測。
+- CLI の analyze 親コマンドと wav サブコマンドの引数解釈、および MCP ホスト経由の四ツール呼び出し。
+- プリセットの試聴による音作りの確認。周波数スライドは既存合成器の 60 Hz 更新粒度に従う。
+
+## M2-A 変更ファイル一覧
+
+更新: `docs/design.md`、`docs/implementation.md`。C# は以下の 34 ファイル（新規 29、更新 5）。
+
+```text
+src/Arpeggio.Cli/AnalysisCommands.cs
+src/Arpeggio.Cli/CommandFactory.cs
+src/Arpeggio.Cli/SfxCommands.cs
+src/Arpeggio.Core/Analysis/AnalysisBandEnergy.cs
+src/Arpeggio.Core/Analysis/AnalysisReport.cs
+src/Arpeggio.Core/Analysis/AnalysisSettings.cs
+src/Arpeggio.Core/Analysis/AnalysisTextRenderer.cs
+src/Arpeggio.Core/Analysis/AnalysisWarning.cs
+src/Arpeggio.Core/Analysis/AnalysisWarningKind.cs
+src/Arpeggio.Core/Analysis/AnalysisWindow.cs
+src/Arpeggio.Core/Analysis/AudioAnalysisSource.cs
+src/Arpeggio.Core/Analysis/AudioAnalyzer.cs
+src/Arpeggio.Core/Analysis/DecibelScale.cs
+src/Arpeggio.Core/Analysis/FastFourierTransform.cs
+src/Arpeggio.Core/Analysis/SignalStatistics.cs
+src/Arpeggio.Core/Analysis/SpectrumAnalysis.cs
+src/Arpeggio.Core/Render/WavReader.cs
+src/Arpeggio.Core/Sfx/SfxPresetCatalog.cs
+src/Arpeggio.Core/Sfx/SfxPresetDescription.cs
+src/Arpeggio.Core/Sfx/SfxPresetFactory.cs
+src/Arpeggio.Core/Sfx/SfxPresetFile.cs
+src/Arpeggio.Core/Sfx/SfxPresetKind.cs
+src/Arpeggio.Mcp/ArpeggioTools.cs
+tests/Arpeggio.Core.Tests/Analysis/AudioAnalysisSourceTests.cs
+tests/Arpeggio.Core.Tests/Analysis/AudioAnalyzerTests.cs
+tests/Arpeggio.Core.Tests/Analysis/DecibelScaleTests.cs
+tests/Arpeggio.Core.Tests/Analysis/FastFourierTransformTests.cs
+tests/Arpeggio.Core.Tests/Analysis/WavReader.cs
+tests/Arpeggio.Core.Tests/Analysis/WavReaderTests.cs
+tests/Arpeggio.Core.Tests/Cli/AnalysisSfxCommandsTests.cs
+tests/Arpeggio.Core.Tests/Mcp/AnalysisSfxToolsTests.cs
+tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
+tests/Arpeggio.Core.Tests/Render/WavWriterTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxPresetFactoryTests.cs
+```

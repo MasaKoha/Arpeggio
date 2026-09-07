@@ -3,10 +3,12 @@ using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Arpeggio.Core.Analysis;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
+using Arpeggio.Core.Sfx;
 using ModelContextProtocol.Server;
 
 namespace Arpeggio.Mcp
@@ -20,6 +22,7 @@ namespace Arpeggio.Mcp
         private const int DefaultVolume = 15;
         private const int DefaultLoopCount = 1;
         private const int DefaultSampleRate = 44100;
+        private const int DefaultAnalysisWindowMilliseconds = 100;
         private const double DefaultTailSeconds = 0.5;
         private const int StereoChannelCount = 2;
         private const int OperationError = 1;
@@ -280,6 +283,54 @@ namespace Arpeggio.Mcp
         public string GetChipReference([Description("nes / gameboy / snes")] string chip)
         {
             return Invoke(() => ChipReference.Get(ChipReference.ParseChip(chip)));
+        }
+
+        /// <summary>開いているソングを複製して音響指標と合成警告を返す。</summary>
+        [McpServerTool(Name = "analyze_song", ReadOnly = true, Destructive = false)]
+        [Description("ソングを 44100 Hz・末尾余白なしで解析し、全時系列・帯域・音響警告・合成警告を JSON で返す。元ソングと履歴は変更しない。")]
+        public string AnalyzeSong(
+            [Description("0 始まりのトラック番号。指定時はミュートを解除してソロ解析")] int? track = null,
+            [Description("初回を含む再生回数。省略時 1")] int? loops = null,
+            [Description("時系列窓のミリ秒数。省略時 100")] int? windowMs = null)
+        {
+            return Invoke(() => AudioAnalysisSource.AnalyzeSong(GetSong(),
+                new AnalysisSettings(WindowMilliseconds: windowMs ?? DefaultAnalysisWindowMilliseconds), track, loops ?? DefaultLoopCount));
+        }
+
+        /// <summary>WAV を読み取り専用で解析し、全時系列を JSON で返す。</summary>
+        [McpServerTool(Name = "analyze_wav", ReadOnly = true, Destructive = false)]
+        [Description("PCM 16 bit モノラル／ステレオ WAV の音量・周波数・警告を JSON で返す。ソングを開かず利用できる。")]
+        public string AnalyzeWav(
+            [Description("解析する WAV パス")] string path,
+            [Description("時系列窓のミリ秒数。省略時 100")] int? windowMs = null)
+        {
+            return Invoke(() => AudioAnalysisSource.AnalyzeWav(path,
+                new AnalysisSettings(WindowMilliseconds: windowMs ?? DefaultAnalysisWindowMilliseconds)));
+        }
+
+        /// <summary>効果音プリセットを保存して編集セッションで開く。</summary>
+        [McpServerTool(Name = "new_sfx", ReadOnly = false, Destructive = false)]
+        [Description("効果音を編集可能な短いソングとして新規保存して開く。既存ファイルは上書きしない。WAV の本体長を保つ書き出しには export_wav の tail=0 を指定する。")]
+        public string NewSfx(
+            [Description("保存先 .arpeggio.json")] string path,
+            [Description("sfx_presets のプリセット名")] string preset,
+            [Description("nes / gameboy / snes。省略時 nes")] string? chip = null,
+            [Description("曲名。省略時はプリセット名")] string? title = null)
+        {
+            return Invoke(() =>
+            {
+                SfxPresetFile.Create(path, ChipReference.ParseChip(chip ?? "nes"), SfxPresetCatalog.Parse(preset), title);
+                session.Open(path);
+                return SessionOutput.Info(session);
+            });
+        }
+
+        /// <summary>効果音の名前・説明・本体長を JSON で返す。</summary>
+        [McpServerTool(Name = "sfx_presets", ReadOnly = true, Destructive = false)]
+        [Description("全八種類の効果音プリセット名・説明・lengthTicks を JSON 配列で返す。全種類で nes / gameboy / snes を指定できる。")]
+        public string SfxPresets()
+        {
+            return Invoke(() => SfxPresetCatalog.GetAll());
         }
 
         private Song GetSong()

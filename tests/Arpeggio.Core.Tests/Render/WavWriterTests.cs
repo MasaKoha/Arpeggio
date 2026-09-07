@@ -4,10 +4,11 @@ using Arpeggio.Core.Document;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Tests.Analysis;
 using Xunit;
+using WavReader = Arpeggio.Core.Tests.Analysis.WavReader;
 
 namespace Arpeggio.Core.Tests.Render
 {
-    /// <summary>独立リーダーによる WAV ヘッダーと PCM 量子化の往復を検証する。</summary>
+    /// <summary>Core のリーダーによる WAV と PCM 量子化の往復を検証する。</summary>
     public sealed class WavWriterTests
     {
         private const int StereoChannels = 2;

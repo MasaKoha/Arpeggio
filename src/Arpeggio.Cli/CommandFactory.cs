@@ -16,6 +16,8 @@ namespace Arpeggio.Cli
             root.Subcommands.Add(InstrumentCommands.Create());
             root.Subcommands.Add(BatchCommands.Create());
             root.Subcommands.Add(SongCommands.CreateExport());
+            root.Subcommands.Add(AnalysisCommands.Create());
+            root.Subcommands.Add(SfxCommands.Create());
             root.Subcommands.Add(SongCommands.CreateChipReference());
             root.Subcommands.Add(SongCommands.CreateHistory("undo"));
             root.Subcommands.Add(SongCommands.CreateHistory("redo"));
