@@ -293,3 +293,13 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - OGG 書き出しのエンコーダ選定（純 C# の Vorbis エンコーダの有無）— M2
 - SNES の実機互換（BRR・ガウス補間）をどこまで追うか — M3 で NSF/VGM と一緒に決める
 - DAW での MIDI キーボード入力 — 要望が出たら
+
+### M1-B の入力・出力境界（2026-09-07 実装時確定）
+
+- バッチは `kind` ごとに必須値を検証するモデルとし、任意値を nullable で表す。UpdateNote は指定した項目だけを更新し、`tick` が検索位置、`toTick` が移動先。effects の省略は保持、空配列は解除。詳細な JSON 項目は README のバッチ表を参照する。
+- バッチの track は各操作を優先し、省略時だけ CLI `--track` / MCP `track` を使う。どちらも無ければノート・トラック操作は引数エラー。空バッチは拒否する。
+- 操作列全体を先に解析し、候補ソング上で各操作後に制約を検証する。最後に既存 `EditSession.Change` で一度だけ保存・履歴確定する。失敗時は公開状態を変更しない。
+- `show` は `[fromTick,toTick)` を fromTick 起点の 12 tick 行で示す。行内の非グリッド開始は `@実tick`、複数開始および継続音との併存は `;` で併記し、短い音も省略しない。JSON は範囲に交差するノートの元の tick・長さとテキストを返す。
+- CLI の音色追加は既存最大 ID + 1。set は指定値だけを更新し、マクロ文字列 `null` は解除。kind 変更は ID・name と意味が同じ共通項目を保持し、専用項目は新 kind 既定値。MCP とバッチの音色更新は保存形式の JSON 全体で置き換える。
+- CLI の履歴は colors と同じ `<path>.history/state.json`（current/undo/redo）を使う。外部更新との current 不一致では履歴を復元しない。履歴保存の I/O 失敗時は曲を操作前のバイト列へ戻す。曲と履歴は別ファイルの置換であり、プロセス強制終了まで含む二ファイルの永続トランザクションは対象外。
+- MCP は `EditSession` を DI 共有し、同じセッションのツール実行を直列化する。戻り値は文字列、エラーは error/exitCode JSON。show の既定と chip_reference は CLI と同じテキスト。`UseStructuredContent` は指定しない。

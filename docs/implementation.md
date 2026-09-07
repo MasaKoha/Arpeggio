@@ -179,3 +179,107 @@ Synthesis/Snes/SnesEchoTests.cs
 Synthesis/Snes/SnesVoiceSynthesizerTests.cs
 ```
 
+
+# M1-B 実装記録（2026-09-07）
+
+## 実装範囲
+
+CLI の全コマンドと stdio MCP の全 16 ツールを実装した。colors の `CliExecution` / `CommandFactory` / コマンド群、MCP のツール属性・DI 共有・stdio ホストに揃えた。MCP の例外は今回の指定に従い `error` / `exitCode` の JSON 文字列へ変換する。
+
+合成器・シーケンサ・レンダラー・WavWriter は変更していない。プロジェクト設定の変更はテスト csproj の CLI / MCP ProjectReference 追加のみ。DAW は終了コード 0 の最小エントリーポイントだけを追加した。git 操作は実施していない。
+
+## M1-B の実装判断
+
+- Core の既存公開 API は維持した。`EditSession.New` に曲名を受け取るオーバーロードを追加し、CLI/MCP のタイトル指定を一回の保存にした。既存 4 引数呼び出しの挙動は同じ。
+- `SongHistory` にスナップショットの取得・全件検証後の復元を追加した。CLI の呼び出し間履歴にだけ必要な薄い追加で、既存の Record / Undo / Redo は変更していない。
+- バッチは `BatchOperation` と kind enum、JSON 入力、候補ソングへの適用に分けた。既存 `EditSession.Change` をアセンブリ内部から呼び、一度の保存・履歴記録・参照公開へ接続する。各操作後に検証し、途中の不正状態を後続の操作で打ち消すバッチは拒否する。
+- 音色 JSON は discriminator の位置を正規化し、保存ファイルと同じ id・name・kind 順や整数 enum を受け付ける。未知のプロパティは引数エラー。CLI の kind 別オプションは生成済み音色の JSON プロパティに対応付け、未指定値保持と不適合オプション拒否を両立する。
+- CLI の履歴は colors と同じ current / undo / redo の側車ファイル。current 不一致は外部更新として履歴を失効させる。側車保存の I/O 失敗では曲を元のバイト列に復元する。強制終了や復元先まで書けなくなる複合 I/O 障害を含む二ファイルの永続トランザクションは保証しない。
+- MCP は共有 `EditSession` をロックし、ツール間の競合を避ける。通常戻り値は JSON 文字列、show の既定と chip_reference は生テキスト。UseStructuredContent は付けていない。
+- show の非グリッド音・複数開始を落とさない表記、バッチ項目、音色更新の差は設計書の「M1-B の入力・出力境界」と README に記録した。
+- WAV の警告は CLI の通常出力で stderr、JSON と MCP では warnings / droppedWarningCount。警告だけでは失敗にしない。
+
+## M1-B の確認対応
+
+| 受け入れ条件 | 対応テスト |
+|---|---|
+| 3 チップ新規作成、info/show、全 note 操作、終了コード | Cli/CliExecutionTests |
+| 4 音の NES ソングから非無音の 16 bit ステレオ WAV | Cli/CliExecutionTests.FourNotesExportNonSilentStereoWav |
+| WAV 警告の stderr / JSON 振り分け、成功コード維持 | Cli/CliExecutionTests.ExportWarningsDoNotFail |
+| CLI 呼び出し間 undo/redo、外部更新失効、バッチ失敗で側車不変 | Cli/CliExecutionTests |
+| 履歴側車の保存失敗で曲を復元 | Cli/CliExecutionTests.HistoryWriteFailureRestoresSong |
+| 全音色 kind・パラメータ・部分更新・マクロ解除 | Cli/InstrumentCommandsTests、Cli/MacroOptionTests |
+| 全 13 バッチ kind、一履歴、必須値、JSON 形、保存失敗・操作失敗の巻き戻し | Session/BatchOperationTests |
+| MIDI 全範囲往復、異名同音、無効名 | Document/NoteNameTests |
+| 12 tick 表示、効果・継続・無音・区間・非グリッド音 | Document/SongTextRendererTests |
+| チップ説明の構成・kind・単位・無効チップ | Document/ChipReferenceTests |
+| MCP 全16ツール属性、DI共有相当、操作・音色JSON・バッチ・WAV警告・エラー文字列 | Mcp/ArpeggioToolsTests |
+
+テストは CLI を `CliExecution.Run`、MCP を `ArpeggioTools` から直接呼び、プロセス起動を使わない。CLI の Console 差し替えは同じ xunit collection にまとめて競合を防ぐ。
+
+## M1-B の静的確認
+
+- colors の CLI / MCP / 永続履歴 / テスト / README を読み、System.CommandLine 2.0.11 と ModelContextProtocol 2.2.0 の API をローカル NuGet の参照 XML で照合した。
+- 新規参照する Core の型・namespace と .NET の JSON API を定義・参照 XML から照合した。
+- 対象 C# 33 ファイルの文字列・コメントを除いた括弧対応、public summary、ブロック namespace、明示ローカル型を静的スクリプトで確認した。
+- MCP ツール名 16 件と string 戻り値、UseStructuredContent の未指定をコードとテストで確認した。
+
+## M1-B 未完了
+
+実装予定範囲は追加済み。以下の実行確認は依頼者が行う。Codex はコンパイル・ビルド・テスト・MCP ホスト起動を実行していないため、警告ゼロ、テスト全件成功、WAV の非無音、stdio 接続の実測は未確認。
+
+```sh
+dotnet build Arpeggio.slnx
+dotnet test tests/Arpeggio.Core.Tests
+```
+
+ビルド済み `arpeggio-mcp` を README の例で登録し、new_song → add_note → show_song → export_wav の stdio 接続確認も必要。
+
+## M1-B 変更ファイル一覧
+
+更新:
+
+```text
+docs/design.md
+docs/implementation.md
+README.md
+src/Arpeggio.Core/Session/EditSession.cs
+src/Arpeggio.Core/History/SongHistory.cs
+tests/Arpeggio.Core.Tests/Arpeggio.Core.Tests.csproj
+```
+
+新規:
+
+```text
+src/Arpeggio.Cli/Program.cs
+src/Arpeggio.Cli/CliExecution.cs
+src/Arpeggio.Cli/CliHistoryStore.cs
+src/Arpeggio.Cli/CommandFactory.cs
+src/Arpeggio.Cli/SongCommands.cs
+src/Arpeggio.Cli/NoteCommands.cs
+src/Arpeggio.Cli/NoteTargetOptions.cs
+src/Arpeggio.Cli/InstrumentCommands.cs
+src/Arpeggio.Cli/InstrumentOptions.cs
+src/Arpeggio.Cli/MacroOption.cs
+src/Arpeggio.Cli/BatchCommands.cs
+src/Arpeggio.Mcp/Program.cs
+src/Arpeggio.Mcp/ArpeggioTools.cs
+src/Arpeggio.Daw/Program.cs
+src/Arpeggio.Core/Document/NoteName.cs
+src/Arpeggio.Core/Document/SongTextRenderer.cs
+src/Arpeggio.Core/Document/ChipReference.cs
+src/Arpeggio.Core/Session/InstrumentJson.cs
+src/Arpeggio.Core/Session/SessionOutput.cs
+src/Arpeggio.Core/Session/BatchOperation.cs
+src/Arpeggio.Core/Session/BatchOperationKind.cs
+src/Arpeggio.Core/Session/BatchOperationJson.cs
+src/Arpeggio.Core/Session/BatchOperationApplier.cs
+tests/Arpeggio.Core.Tests/Cli/CliExecutionTests.cs
+tests/Arpeggio.Core.Tests/Cli/InstrumentCommandsTests.cs
+tests/Arpeggio.Core.Tests/Cli/MacroOptionTests.cs
+tests/Arpeggio.Core.Tests/Document/NoteNameTests.cs
+tests/Arpeggio.Core.Tests/Document/SongTextRendererTests.cs
+tests/Arpeggio.Core.Tests/Document/ChipReferenceTests.cs
+tests/Arpeggio.Core.Tests/Session/BatchOperationTests.cs
+tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
+```

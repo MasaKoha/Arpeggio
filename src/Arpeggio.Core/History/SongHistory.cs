@@ -44,6 +44,43 @@ namespace Arpeggio.Core.History
             _redo.Clear();
         }
 
+        /// <summary>古い順に独立した undo スナップショットを取得する。</summary>
+        public Song[] GetUndoSnapshots()
+        {
+            return _undo.ConvertAll(SongSerializer.Deserialize).ToArray();
+        }
+
+        /// <summary>古い順に独立した redo スナップショットを取得する。</summary>
+        public Song[] GetRedoSnapshots()
+        {
+            return _redo.ConvertAll(SongSerializer.Deserialize).ToArray();
+        }
+
+        /// <summary>永続化済み履歴を全件検証してから置き換える。</summary>
+        public void Restore(IReadOnlyList<Song> undo, IReadOnlyList<Song> redo)
+        {
+            List<string> restoredUndo = SerializeSnapshots(undo);
+            List<string> restoredRedo = SerializeSnapshots(redo);
+            _undo.Clear();
+            _undo.AddRange(restoredUndo);
+            _redo.Clear();
+            _redo.AddRange(restoredRedo);
+        }
+
+        private static List<string> SerializeSnapshots(IReadOnlyList<Song> snapshots)
+        {
+            if (snapshots.Count > Capacity)
+            {
+                throw new ArgumentException("履歴の保持上限を超えています。", nameof(snapshots));
+            }
+            List<string> serialized = new List<string>(snapshots.Count);
+            foreach (Song snapshot in snapshots)
+            {
+                serialized.Add(SongSerializer.Serialize(snapshot));
+            }
+            return serialized;
+        }
+
         internal Song PeekUndo()
         {
             return Peek(_undo);
