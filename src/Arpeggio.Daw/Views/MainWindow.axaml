@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="using:Arpeggio.Daw.Views"
+        x:Class="Arpeggio.Daw.Views.MainWindow" Title="Arpeggio" Width="1380" Height="820" MinWidth="1050" MinHeight="560" Background="#151B24">
+  <Grid RowDefinitions="44,*,Auto,Auto,Auto">
+    <Border Grid.Row="0" Background="#202B38" Padding="16,10">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="ARPEGGIO   /   CHIPTUNE STUDIO" FontWeight="Bold" Foreground="#69C7AD" />
+        <TextBlock Grid.Column="1" Text="1/16 GRID · Alt スナップ解除 · Ctrl+ホイール ズーム" Foreground="#94A8BA" />
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="210,*,340">
+      <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled"><views:TrackListView x:Name="Tracks" /></ScrollViewer>
+      <Grid Grid.Column="1" ColumnDefinitions="60,*" RowDefinitions="30,*" ClipToBounds="True">
+        <Border Background="#202B38"><TextBlock Text="NOTE" FontSize="10" Margin="6" /></Border>
+        <views:TimeRulerControl x:Name="Ruler" Grid.Column="1" />
+        <views:KeyboardStripControl x:Name="Keyboard" Grid.Row="1" />
+        <ScrollViewer x:Name="RollScroll" Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+          <views:PianoRollControl x:Name="PianoRoll" />
+        </ScrollViewer>
+      </Grid>
+      <TabControl x:Name="EditorTabs" Grid.Column="2">
+        <TabItem Header="編集">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+              <views:NotePanelView x:Name="Notes" />
+              <views:InstrumentPanelView x:Name="Instruments" />
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+        <TabItem Header="解析"><views:AnalysisView x:Name="Analysis" /></TabItem>
+        <TabItem Header="SFX"><views:SfxCreationView x:Name="SfxCreation" /></TabItem>
+      </TabControl>
+    </Grid>
+    <Border Grid.Row="2" Background="#202B38">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+      <Grid ColumnDefinitions="*,Auto">
+        <views:TransportView x:Name="Transport" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="8">
+          <Button x:Name="SfxButton" Content="SFX を作る" />
+          <Button x:Name="ExportButton" Content="書き出し" ToolTip.Tip="Ctrl+E · WAV / OGG" />
+        </StackPanel>
+      </Grid>
+      </ScrollViewer>
+    </Border>
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="12,6">
+      <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button x:Name="WarningsButton" Grid.Column="1" Content="警告 0" Margin="10,0,0,0" />
+    </Grid>
+    <TextBox x:Name="WarningsText" Grid.Row="4" IsVisible="False" IsReadOnly="True" AcceptsReturn="True" MaxHeight="180" TextWrapping="Wrap" />
+  </Grid>
+</Window>

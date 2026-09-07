@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.NotePanelView">
+  <StackPanel Margin="12" Spacing="8">
+    <TextBlock Text="ノート" FontSize="18" FontWeight="SemiBold" />
+    <TextBlock x:Name="NoteSummary" Text="ノートを選択してください。" TextWrapping="Wrap" />
+    <StackPanel x:Name="EffectEditor" Spacing="6" IsEnabled="False">
+      <TextBlock Text="エフェクト（kind / value）" />
+      <ListBox x:Name="EffectList" MinHeight="48" MaxHeight="140" />
+      <ComboBox x:Name="KindSelector" HorizontalAlignment="Stretch" />
+      <TextBox x:Name="ValueInput" Text="0" Watermark="整数 value" />
+      <StackPanel x:Name="ArpeggioInputs" Spacing="4" IsVisible="False">
+        <TextBlock Text="第2音 / 第3音の半音差（各 +0〜+15）" FontSize="11" />
+        <Grid ColumnDefinitions="*,*">
+          <TextBox x:Name="FirstSemitones" Text="+4" Margin="0,0,4,0" />
+          <TextBox x:Name="SecondSemitones" Grid.Column="1" Text="+7" />
+        </Grid>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button x:Name="AddEffectButton" Content="追加" />
+        <Button x:Name="UpdateEffectButton" Content="適用" />
+        <Button x:Name="RemoveEffectButton" Content="削除" />
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

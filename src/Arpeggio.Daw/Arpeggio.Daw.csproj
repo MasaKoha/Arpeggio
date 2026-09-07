@@ -4,11 +4,15 @@
     <OutputType>WinExe</OutputType>
     <AssemblyName>arpeggio-daw</AssemblyName>
     <RootNamespace>Arpeggio.Daw</RootNamespace>
+    <LangVersion>14</LangVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SDL3-CS" Version="3.4.12.4" ExcludeAssets="analyzers" />
+    <PackageReference Include="SDL3-CS.Native" Version="3.4.2" ExcludeAssets="analyzers" />
     <PackageReference Include="Avalonia" Version="12.1.2" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
@@ -16,7 +20,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Arpeggio.Codecs\Arpeggio.Codecs.csproj" />
     <ProjectReference Include="..\Arpeggio.Core\Arpeggio.Core.csproj" />
   </ItemGroup>
+
+  <!-- SDL3-CS 3.4.16 のソースジェネレーターは SDK 10.0.300 の Roslyn より新しいコンパイラを要求するため除外する。バインディング本体は lib の DLL に含まれる -->
+  <Target Name="RemoveSdl3Generators" AfterTargets="ResolvePackageAssets;ResolveLockFileAnalyzers">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'SDL3-CS.Generators'" />
+    </ItemGroup>
+  </Target>
 
 </Project>
