@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Arpeggio.Daw.Views.InstrumentPanelView">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="12" Spacing="8">
       <TextBlock Text="音色" FontSize="18" FontWeight="SemiBold" />
       <TextBlock x:Name="KindLabel" />
@@ -12,6 +11,13 @@
       </StackPanel>
       <TextBlock Text="名前" />
       <TextBox x:Name="NameInput" />
+      <StackPanel x:Name="SampleImportPanel" Spacing="6" IsVisible="False">
+        <TextBlock x:Name="SampleSummary" TextWrapping="Wrap" />
+        <TextBlock Text="WAV のルート音名" />
+        <TextBox x:Name="RootNoteInput" Text="C4" />
+        <CheckBox x:Name="LoopSampleInput" Content="サンプル全体をループ" IsChecked="False" />
+        <Button x:Name="ImportWavButton" Content="WAV を取り込む" HorizontalAlignment="Stretch" />
+      </StackPanel>
       <StackPanel x:Name="ParameterPanel" Spacing="6" />
       <TextBlock Text="マクロ：15,14,12/2（/以降は0始まりループ位置）。空欄で解除。"
                  TextWrapping="Wrap" Opacity="0.65" />
@@ -19,5 +25,4 @@
       <TextBlock Text="編集した音色を使うすべてのノートに反映されます。"
                  TextWrapping="Wrap" Opacity="0.65" />
     </StackPanel>
-  </ScrollViewer>
 </UserControl>

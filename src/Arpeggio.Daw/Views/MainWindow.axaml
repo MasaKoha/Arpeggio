@@ -7,7 +7,7 @@
         <TextBlock Grid.Column="1" Text="1/16 GRID · Alt スナップ解除 · Ctrl+ホイール ズーム" Foreground="#94A8BA" />
       </Grid>
     </Border>
-    <Grid Grid.Row="1" ColumnDefinitions="210,*,300">
+    <Grid Grid.Row="1" ColumnDefinitions="210,*,340">
       <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled"><views:TrackListView x:Name="Tracks" /></ScrollViewer>
       <Grid Grid.Column="1" ColumnDefinitions="60,*" RowDefinitions="30,*" ClipToBounds="True">
         <Border Background="#202B38"><TextBlock Text="NOTE" FontSize="10" Margin="6" /></Border>
@@ -17,9 +17,30 @@
           <views:PianoRollControl x:Name="PianoRoll" />
         </ScrollViewer>
       </Grid>
-      <views:InstrumentPanelView x:Name="Instruments" Grid.Column="2" />
+      <TabControl x:Name="EditorTabs" Grid.Column="2">
+        <TabItem Header="編集">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+              <views:NotePanelView x:Name="Notes" />
+              <views:InstrumentPanelView x:Name="Instruments" />
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+        <TabItem Header="解析"><views:AnalysisView x:Name="Analysis" /></TabItem>
+        <TabItem Header="SFX"><views:SfxCreationView x:Name="SfxCreation" /></TabItem>
+      </TabControl>
     </Grid>
-    <Border Grid.Row="2" Background="#202B38"><views:TransportView x:Name="Transport" /></Border>
+    <Border Grid.Row="2" Background="#202B38">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+      <Grid ColumnDefinitions="*,Auto">
+        <views:TransportView x:Name="Transport" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="8">
+          <Button x:Name="SfxButton" Content="SFX を作る" />
+          <Button x:Name="ExportButton" Content="書き出し" ToolTip.Tip="Ctrl+E · WAV / OGG" />
+        </StackPanel>
+      </Grid>
+      </ScrollViewer>
+    </Border>
     <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="12,6">
       <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" />
       <Button x:Name="WarningsButton" Grid.Column="1" Content="警告 0" Margin="10,0,0,0" />

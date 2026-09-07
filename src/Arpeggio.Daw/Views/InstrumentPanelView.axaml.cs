@@ -21,6 +21,11 @@ namespace Arpeggio.Daw.Views
         private readonly Button addButton;
         private readonly Button removeButton;
         private readonly Button applyButton;
+        private readonly StackPanel sampleImportPanel;
+        private readonly TextBlock sampleSummary;
+        private readonly TextBox rootNoteInput;
+        private readonly CheckBox loopSampleInput;
+        private readonly Button importWavButton;
         private readonly Dictionary<string, Control> inputs = new Dictionary<string, Control>();
         private InstrumentPanelPresenter presenter = null!;
         private Action<Action> execute = null!;
@@ -42,7 +47,15 @@ namespace Arpeggio.Daw.Views
             addButton = RequireControl<Button>("AddButton");
             removeButton = RequireControl<Button>("RemoveButton");
             applyButton = RequireControl<Button>("ApplyButton");
+            sampleImportPanel = RequireControl<StackPanel>("SampleImportPanel");
+            sampleSummary = RequireControl<TextBlock>("SampleSummary");
+            rootNoteInput = RequireControl<TextBox>("RootNoteInput");
+            loopSampleInput = RequireControl<CheckBox>("LoopSampleInput");
+            importWavButton = RequireControl<Button>("ImportWavButton");
         }
+
+        /// <summary>ルート音名とループ指定を添えて OS ファイル選択を要求する。</summary>
+        public event Action<string, bool>? WavImportRequested;
 
         /// <summary>Program で組み立てた Presenter と例外表示境界を接続する。</summary>
         public void Bind(InstrumentPanelPresenter presenter, Action<Action> execute)
@@ -58,6 +71,7 @@ namespace Arpeggio.Daw.Views
             addButton.Click += OnAddClicked;
             removeButton.Click += OnRemoveClicked;
             applyButton.Click += OnApplyClicked;
+            importWavButton.Click += OnImportWav;
             Refresh();
         }
 
@@ -87,6 +101,9 @@ namespace Arpeggio.Daw.Views
                 nameInput.IsEnabled = current != null;
                 removeButton.IsEnabled = current != null;
                 applyButton.IsEnabled = current != null;
+                sampleImportPanel.IsVisible = kind == InstrumentKind.SnesSample;
+                importWavButton.IsEnabled = current is SnesSampleInstrument;
+                sampleSummary.Text = current is SnesSampleInstrument sample ? sample.SampleSummary : string.Empty;
                 RebuildInputs();
                 displayedInstrumentSnapshot = snapshot;
                 displayedInstrument = current;
@@ -105,6 +122,7 @@ namespace Arpeggio.Daw.Views
             addButton.Click -= OnAddClicked;
             removeButton.Click -= OnRemoveClicked;
             applyButton.Click -= OnApplyClicked;
+            importWavButton.Click -= OnImportWav;
             inputs.Clear();
             parameterPanel.Children.Clear();
             displayedInstrumentSnapshot = null;
@@ -154,6 +172,8 @@ namespace Arpeggio.Daw.Views
 
         private void OnAddClicked(object? sender, RoutedEventArgs arguments) => execute(presenter.AddInstrument);
         private void OnRemoveClicked(object? sender, RoutedEventArgs arguments) => execute(presenter.RemoveInstrument);
+        private void OnImportWav(object? sender, RoutedEventArgs arguments) =>
+            WavImportRequested?.Invoke(rootNoteInput.Text ?? string.Empty, loopSampleInput.IsChecked == true);
 
         private void OnApplyClicked(object? sender, RoutedEventArgs arguments)
         {

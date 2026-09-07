@@ -1,0 +1,9 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.AnalysisView">
+  <Grid RowDefinitions="Auto,Auto,*" Margin="12">
+    <ComboBox x:Name="TrackSelector" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+    <Button x:Name="AnalyzeButton" Grid.Row="1" Content="解析" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+    <TextBox x:Name="AnalysisText" Grid.Row="2" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+             Text="解析ボタンで音量・周波数・警告を確認できます。" />
+  </Grid>
+</UserControl>

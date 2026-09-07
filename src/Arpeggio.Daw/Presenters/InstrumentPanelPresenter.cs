@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Import;
 using Arpeggio.Core.Session;
 using Arpeggio.Daw.Editing;
 
@@ -71,6 +72,23 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>ノート追加に使う音色 ID を取得する。</summary>
         public int ResolveInstrumentId() => CurrentInstrument?.Id
             ?? throw new InvalidOperationException("このトラックに使う音色を追加してください。");
+
+        /// <summary>文書切替時にトラックごとの既定音色を忘れる。</summary>
+        public void ResetSelection() => defaultInstruments.Clear();
+
+        /// <summary>WAV を複製音色へ取り込み、成功時だけ一履歴で公開する。</summary>
+        public void ImportWav(string path, string rootNote, bool loop)
+        {
+            pianoRoll.EndDrag();
+            if (CurrentInstrument is not SnesSampleInstrument current)
+            {
+                throw new InvalidOperationException("WAV の取り込みには SNES 音色を選択してください。");
+            }
+            SnesSampleInstrument replacement = (SnesSampleInstrument)InstrumentJson.Deserialize(InstrumentJson.Serialize(current));
+            WavSampleImporter.Import(replacement, path, NoteName.Parse(rootNote), null, null, loop);
+            document.Session.Instruments.Update(replacement);
+            changed();
+        }
 
         /// <summary>表示対象の kind に実在する項目だけを返す。</summary>
         public IReadOnlyList<InstrumentParameter> GetParameters() => CurrentInstrument is Instrument instrument

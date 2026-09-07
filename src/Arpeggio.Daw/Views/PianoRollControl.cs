@@ -20,6 +20,9 @@ namespace Arpeggio.Daw.Views
         private const double ResizeHandleWidth = 7;
         private const double NoteInset = 1;
         private const int BeatsPerBar = 4;
+        private const double EffectMarkRadius = 2;
+        private const double EffectMarkInset = 4;
+        private readonly Pen effectMarkPen = new Pen(Brushes.White);
         private readonly IBrush background = new SolidColorBrush(Color.Parse("#151B24"));
         private readonly IBrush blackKeyBackground = new SolidColorBrush(Color.Parse("#11161E"));
         private readonly IBrush noteBrush = new SolidColorBrush(Color.Parse("#69C7AD"));
@@ -171,7 +174,17 @@ namespace Arpeggio.Daw.Views
                     Math.Max(1, note.DurationTicks * PixelsPerTick - NoteInset), NoteHeight - NoteInset * 2);
                 if (!rectangle.Intersects(visible)) { continue; }
                 context.DrawRectangle(isSelectedTrack && note.Tick == selectedTick ? selectedBrush : brush, null, rectangle);
+                if (note.Effects.Length > 0) { DrawEffectMark(context, rectangle); }
             }
+        }
+        private void DrawEffectMark(DrawingContext context, Rect rectangle)
+        {
+            double radius = Math.Min(EffectMarkRadius, rectangle.Width / 2);
+            double centerLeft = Math.Max(rectangle.Left + radius, rectangle.Right - EffectMarkInset);
+            double centerTop = rectangle.Top + EffectMarkInset;
+            context.DrawLine(effectMarkPen, new Point(centerLeft - radius, centerTop), new Point(centerLeft + radius, centerTop));
+            context.DrawLine(effectMarkPen, new Point(centerLeft, centerTop - radius), new Point(centerLeft, centerTop + radius));
+            context.DrawLine(effectMarkPen, new Point(centerLeft - radius, centerTop - radius), new Point(centerLeft + radius, centerTop + radius));
         }
     }
 }

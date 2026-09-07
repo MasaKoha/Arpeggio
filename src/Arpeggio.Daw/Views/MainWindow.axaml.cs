@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Threading.Tasks;
 using Arpeggio.Core.Document;
 using Arpeggio.Daw.Presenters;
 using Arpeggio.Daw.Watch;
@@ -16,6 +17,7 @@ namespace Arpeggio.Daw.Views
     public partial class MainWindow : Window, IMainWindowView, IDisposable
     {
         private const int DisplayIntervalMilliseconds = 33;
+        private const int SfxTabIndex = 2;
         private readonly PianoRollControl pianoRoll;
         private readonly KeyboardStripControl keyboard;
         private readonly TimeRulerControl ruler;
@@ -23,6 +25,13 @@ namespace Arpeggio.Daw.Views
         private readonly TrackListView tracks;
         private readonly InstrumentPanelView instruments;
         private readonly TransportView transport;
+        private readonly NotePanelView notes;
+        private readonly AnalysisView analysis;
+        private readonly SfxCreationView sfxCreation;
+        private readonly TabControl editorTabs;
+        private readonly Button sfxButton;
+        private readonly Button exportButton;
+        private readonly AudioFilePicker filePicker;
         private readonly TextBlock statusLabel;
         private readonly Button warningsButton;
         private readonly TextBox warningsText;
@@ -49,6 +58,13 @@ namespace Arpeggio.Daw.Views
             statusLabel = Require<TextBlock>("StatusLabel");
             warningsButton = Require<Button>("WarningsButton");
             warningsText = Require<TextBox>("WarningsText");
+            notes = Require<NotePanelView>("Notes");
+            analysis = Require<AnalysisView>("Analysis");
+            sfxCreation = Require<SfxCreationView>("SfxCreation");
+            editorTabs = Require<TabControl>("EditorTabs");
+            sfxButton = Require<Button>("SfxButton");
+            exportButton = Require<Button>("ExportButton");
+            filePicker = new AudioFilePicker(this);
         }
         /// <summary>Program が組み立てた Presenter と明示的に結線する。</summary>
         public void Bind(MainWindowPresenter mainPresenter, string path)
@@ -57,6 +73,12 @@ namespace Arpeggio.Daw.Views
             pollPlayback = mainPresenter.Poll;
             pianoRoll.Bind(mainPresenter.PianoRoll, mainPresenter.Execute);
             instruments.Bind(mainPresenter.Instruments, mainPresenter.Execute);
+            notes.Bind(mainPresenter.Notes, mainPresenter.Execute);
+            analysis.Bind(mainPresenter.Analysis);
+            sfxCreation.Bind(mainPresenter.SfxCreation, mainPresenter.Execute);
+            instruments.WavImportRequested += OnImportWav;
+            sfxButton.Click += OnSfx;
+            exportButton.Click += OnExport;
             tracks.TrackSelected += OnTrackSelected;
             tracks.MuteRequested += OnMuteRequested;
             transport.PlayRequested += OnPlay;
@@ -83,6 +105,8 @@ namespace Arpeggio.Daw.Views
             tracks.ShowTracks(current.Tracks, selectedTrack);
             pianoRoll.ShowSong(current, selectedTrack, selectedTick);
             instruments.Refresh();
+            notes.Refresh();
+            analysis.ShowTracks(current);
             SynchronizeViewport();
         }
         /// <summary>タイマー通知で合成せず、再生状態とカーソルだけを表示する。</summary>
@@ -108,11 +132,35 @@ namespace Arpeggio.Daw.Views
             warningsText.Text = text;
             warningsText.IsVisible = warningsVisible;
         }
+        /// <summary>解析パネルへ結果と実行状態を渡す。</summary>
+        public void ShowAnalysis(string text, bool isRunning) => analysis.ShowAnalysis(text, isRunning);
+        /// <summary>書き出し操作の二重起動を抑止する。</summary>
+        public void ShowExportStatus(string text, bool isRunning)
+        {
+            exportButton.Content = isRunning ? "書き出し中…" : "書き出し";
+            exportButton.IsEnabled = !isRunning;
+        }
+        /// <summary>旧ファイルの監視を解放して新しい正本へ切り替える。</summary>
+        public void SwitchDocument(string path)
+        {
+            watcher?.Dispose();
+            watcher = new SongFileWatcher(path, () => Dispatcher.UIThread.Post(OnExternalChange));
+            sfxCreation.ResetDestination();
+            editorTabs.SelectedIndex = 0;
+            ResetViewport();
+        }
+        /// <summary>バックグラウンドの完了通知を UI スレッドへ戻す。</summary>
+        public async Task RunOnUiThreadAsync(Action action)
+        {
+            if (isDisposed) { return; }
+            await Dispatcher.UIThread.InvokeAsync(action);
+        }
         /// <summary>タイマーとファイル通知を止めてから購読・所有物を破棄する。</summary>
         public void Dispose()
         {
             if (isDisposed) { return; }
             isDisposed = true;
+            filePicker.Dispose();
             watcher?.Dispose();
             displayTimer.Stop();
             displayTimer.Tick -= OnDisplayTick;
@@ -127,11 +175,17 @@ namespace Arpeggio.Daw.Views
             rollScroll.ScrollChanged -= OnScroll;
             SizeChanged -= OnSizeChanged;
             warningsButton.Click -= OnWarnings;
+            instruments.WavImportRequested -= OnImportWav;
+            sfxButton.Click -= OnSfx;
+            exportButton.Click -= OnExport;
             Opened -= OnOpened;
             Closed -= OnClosed;
             RemoveHandler(KeyDownEvent, OnShortcut);
             tracks.Dispose();
             instruments.Dispose();
+            notes.Dispose();
+            analysis.Dispose();
+            sfxCreation.Dispose();
             transport.Dispose();
             presenter?.Dispose();
         }
@@ -140,11 +194,15 @@ namespace Arpeggio.Daw.Views
             this.FindControl<TControl>(name) ?? throw new InvalidOperationException($"{name} がありません。");
         private void OnOpened(object? sender, EventArgs arguments)
         {
+            ResetViewport();
+            displayTimer.Start();
+            pianoRoll.Focus();
+        }
+        private void ResetViewport()
+        {
             int initialTopPitch = PianoRollPresenter.GetInitialTopPitch(MainPresenter.PianoRoll.Song);
             rollScroll.Offset = new Vector(0, (PianoRollPresenter.MaximumMidiNote - initialTopPitch) * PianoRollControl.NoteHeight);
             SynchronizeViewport();
-            displayTimer.Start();
-            pianoRoll.Focus();
         }
         private void OnClosed(object? sender, EventArgs arguments) => Dispose();
         private void OnDisplayTick(object? sender, EventArgs arguments) => MainPresenter.Execute(pollPlayback);
@@ -156,6 +214,10 @@ namespace Arpeggio.Daw.Views
         private void OnTempo(string text) => MainPresenter.Execute(() => MainPresenter.Transport.SetTempo(int.Parse(text, CultureInfo.InvariantCulture)));
         private void OnLength(string text) => MainPresenter.Execute(() => MainPresenter.Transport.SetLength(int.Parse(text, CultureInfo.InvariantCulture)));
         private void OnWarnings(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.ShowWarnings);
+        private void OnSfx(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = SfxTabIndex;
+        private async void OnExport(object? sender, RoutedEventArgs arguments) => await filePicker.ExportAsync(MainPresenter);
+        private async void OnImportWav(string rootNote, bool loop) => await filePicker.ImportAsync(MainPresenter, rootNote, loop);
+        private async void ExportWithPicker() => await filePicker.ExportAsync(MainPresenter);
         private void OnScroll(object? sender, ScrollChangedEventArgs arguments) => SynchronizeViewport();
         private void OnSizeChanged(object? sender, SizeChangedEventArgs arguments) => SynchronizeViewport();
         private void OnExternalChange()
@@ -179,9 +241,10 @@ namespace Arpeggio.Daw.Views
         {
             bool control = arguments.KeyModifiers.HasFlag(KeyModifiers.Control);
             bool shift = arguments.KeyModifiers.HasFlag(KeyModifiers.Shift);
-            bool isParameterInput = FocusManager?.GetFocusedElement() is TextBox or ComboBox;
+            bool isParameterInput = FocusManager?.GetFocusedElement() is TextBox or ComboBox or ListBox or ListBoxItem or Button;
             Action? action = null;
             if (control && arguments.Key == Key.S) { action = MainPresenter.Save; }
+            else if (control && arguments.Key == Key.E) { action = ExportWithPicker; }
             else if (isParameterInput) { return; }
             else if (control && arguments.Key == Key.Z) { action = shift ? MainPresenter.Redo : MainPresenter.Undo; }
             else if (!control) { action = GetPlainShortcut(arguments.Key); }

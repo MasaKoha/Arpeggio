@@ -31,6 +31,10 @@ namespace Arpeggio.Daw.Presenters
             PianoRoll = new PianoRollPresenter(document, Refresh, ResolveInstrument);
             Instruments = new InstrumentPanelPresenter(document, PianoRoll, Refresh);
             Transport = new TransportPresenter(document, playback, Refresh);
+            Notes = new NotePanelPresenter(document, PianoRoll, Refresh);
+            Analysis = new AnalysisPresenter(document, view, RefreshStatus);
+            Export = new ExportPresenter(document, view, RefreshStatus);
+            SfxCreation = new SfxCreationPresenter(document, PrepareDocumentSwitch, Open);
         }
         /// <summary>ノート操作の状態機械。</summary>
         public PianoRollPresenter PianoRoll { get; }
@@ -38,6 +42,16 @@ namespace Arpeggio.Daw.Presenters
         public InstrumentPanelPresenter Instruments { get; }
         /// <summary>再生と構造編集。</summary>
         public TransportPresenter Transport { get; }
+        /// <summary>選択ノートの効果編集。</summary>
+        public NotePanelPresenter Notes { get; }
+        /// <summary>非同期の音声解析。</summary>
+        public AnalysisPresenter Analysis { get; }
+        /// <summary>非同期の音声書き出し。</summary>
+        public ExportPresenter Export { get; }
+        /// <summary>効果音プリセットの新規作成。</summary>
+        public SfxCreationPresenter SfxCreation { get; }
+        /// <summary>現在の文書の保存先。</summary>
+        public string DocumentPath => document.Path;
         /// <summary>外部変更の確認待ちか。</summary>
         public bool HasPendingExternalChange { get; private set; }
         /// <summary>未保存の編集があるか。</summary>
@@ -46,10 +60,13 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>初期ファイルを読み、合成器を準備する。</summary>
         public void Open(string path)
         {
+            PianoRoll.EndDrag();
             document.Open(path);
             playback.Load(document.Song);
+            Instruments.ResetSelection();
             PianoRoll.SelectTrack(0);
             HasPendingExternalChange = false;
+            view.SwitchDocument(document.Path);
             Refresh();
         }
         /// <summary>入力エラーを非モーダルなステータスへ変換する。</summary>
@@ -127,13 +144,15 @@ namespace Arpeggio.Daw.Presenters
             if (isDisposed) { return; }
             playback.Poll();
             RefreshTransport();
-            view.ShowStatus(statusText, playback.WarningCount);
+            view.ShowStatus(statusText, TotalWarningCount);
         }
         /// <summary>警告一覧を表示する。</summary>
-        public void ShowWarnings() => view.ShowWarnings(playback.GetWarningsText());
+        public void ShowWarnings() => view.ShowWarnings(playback.GetWarningsText() +
+            (Analysis.WarningCount > 0 ? "\n\n解析:\n" + Analysis.ResultText : string.Empty));
         /// <summary>編集通知で表示内容を更新する。</summary>
         public void Refresh()
         {
+            Analysis.RefreshValidity();
             view.ShowSong(document.Song, PianoRoll.SelectedTrack, PianoRoll.SelectedTick);
             RefreshTransport();
             RefreshStatus();
@@ -143,10 +162,23 @@ namespace Arpeggio.Daw.Presenters
         {
             if (isDisposed) { return; }
             isDisposed = true;
+            Analysis.Dispose();
+            Export.Dispose();
             playback.Dispose();
             document.Dispose();
         }
         private int ResolveInstrument() => Instruments.ResolveInstrumentId();
+        private int TotalWarningCount => (int)Math.Min(int.MaxValue, (long)playback.WarningCount + Analysis.WarningCount);
+        private void PrepareDocumentSwitch()
+        {
+            PianoRoll.EndDrag();
+            if (!document.IsDirty) { return; }
+            Save();
+            if (document.IsDirty)
+            {
+                throw new InvalidOperationException("現在の編集を保存してから SFX を作成してください。");
+            }
+        }
         private void Reload()
         {
             PianoRoll.ClearSelection();
@@ -178,8 +210,8 @@ namespace Arpeggio.Daw.Presenters
         private void RefreshStatus()
         {
             string external = HasPendingExternalChange ? "  外部で変更されました。再読み込み（R）" : string.Empty;
-            statusText = $"{document.Path}  |  {document.Song.Chip}  {(document.IsDirty ? "● 未保存" : "保存済み")}{external}  {message}";
-            view.ShowStatus(statusText, playback.WarningCount);
+            statusText = $"{document.Path}  |  {document.Song.Chip}  {(document.IsDirty ? "● 未保存" : "保存済み")}{external}  {message}  {Export.StatusText}";
+            view.ShowStatus(statusText, TotalWarningCount);
         }
     }
 }

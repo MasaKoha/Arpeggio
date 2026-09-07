@@ -18,7 +18,7 @@ namespace Arpeggio.Daw.Presenters
             List<InstrumentParameter> parameters = new List<InstrumentParameter>();
             foreach (KeyValuePair<string, JsonNode?> property in source)
             {
-                if (property.Key is "id" or "name" or "kind")
+                if (property.Key is "id" or "name" or "kind" or "sampleData")
                 {
                     continue;
                 }
@@ -112,7 +112,8 @@ namespace Arpeggio.Daw.Presenters
             {
                 return JsonValue.Create(bool.Parse(text));
             }
-            if (key is "initialVolume" or "envelopeStepFrames" or "outputLevel" or "lfsrWidth")
+            if (key is "initialVolume" or "envelopeStepFrames" or "outputLevel" or "lfsrWidth" or
+                "sampleRate" or "rootMidiNote" or "loopStart" or "loopEnd")
             {
                 return JsonValue.Create(int.Parse(text, NumberStyles.Integer, CultureInfo.InvariantCulture));
             }

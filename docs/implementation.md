@@ -590,3 +590,87 @@ tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
 - 対処: エンコード本体を `Arpeggio.Codecs.Vorbis`（OggVorbisEncoder を参照する唯一のアセンブリ）へ切り出し、`Arpeggio.Codecs.IsolatedVorbisEncoder` が呼び出しごとに使い捨ての `AssemblyLoadContext` へ読み込んでリフレクションで実行する。`Resolving` イベントでは既定コンテキスト（deps.json 由来）が先に共有インスタンスを解決するため、`Load` をオーバーライドしたサブクラスで先回りして自分のディレクトリから読み込む
 - 空入力（0 フレーム）は音声パケットが無く EOS ページが出ないため、無音 1 フレームを書いて閉じる
 - 回帰テスト: `Codecs/OggWriterTests.Write_LowRateAfterHighRateDoesNotThrow`
+
+
+# M2-C 実装記録（2026-09-07）
+
+## M2-C の実装範囲と判断
+
+- **構成**: `MainWindowPresenter` が NotePanel / Analysis / Export / SfxCreation の Presenter を明示的に生成する。右ペインは「編集」「解析」「SFX」のタブとし、編集タブ内でノートパネルを音色パネルの上へ配置した。MainWindowPresenter は 300 行以内。Core / CLI / MCP / Codecs と依存バージョンは変更していない。Codecs と DAW テストの ProjectReference は既存のものを使用する。
+- **ノート効果**: 固定の一覧と共通入力欄を使い、行ごとの編集コントロールは増やさない。全五種類の kind と整数 value を追加・適用・削除する。Arpeggio は +0〜+15 の二つの半音差を上位・下位 4 bit に畳み、一覧には半音差と 16 進値を表示する。操作前にドラッグを確定し、元ノートを変更せず `NoteEditor.Update` を一度呼ぶ。Core の重複・範囲検証と次バッファへの公開経路をそのまま使う。エフェクト付きノートは右上に再利用 Pen で小さなマークを描く。
+- **SFX 作成**: `SfxPresetCatalog` の全八種類を表示し、現在の正本と同じディレクトリの `sfx-<preset>.arpeggio.json` を既定にする。現在のチップで `SfxPresetFile.Create` → `MainWindowPresenter.Open` → `DawDocument.Open` 内の `EditSession.Open` を使用する。作成画面に「未保存の編集は保存して切り替える」と明記し、既存の Save 経路で旧文書を保護してから作成する。外部変更との競合は非モーダルなステータスで拒否する。成功後は音色の既定選択を初期化し、ファイル監視・既定保存先・表示位置を切り替える。
+- **解析**: UI で開始時点の JSON を固定し、`Task.Run` 内で復元して `AudioAnalysisSource.AnalyzeSong` を呼ぶ。全トラック／番号指定のソロを選べる。テキストは `AnalysisTextRenderer` を使い、完了通知は `IMainWindowView.RunOnUiThreadAsync` → Avalonia Dispatcher を経由する。実行中表示・入力無効化・二重起動拒否・失敗後の再試行を備える。
+- **解析結果と編集状態**: Core は未変更トラックやノートの参照を保持するため、トラックリストの参照だけでは編集を検知できない。文書参照と開始時の正規 JSON を比較し、実際の編集・再読込・文書切替で結果と警告件数を無効化する。選択変更だけでは維持する。比較は編集の Refresh 時だけで、描画タイマーでは行わない。大量の埋め込みサンプルを含むソングでの編集応答時間は実測対象。
+- **警告**: 最新の有効な解析の音響警告・合成警告・保持上限超過数を、既存の再生警告件数へ加算する。表示上限は int 最大値。既存の警告展開から解析結果も参照できる。編集後は解析分だけを消す。
+- **WAV 取り込み**: SNES 音色だけにルート音名（既定 C4）・全体ループ指定・取り込みボタンを表示する。`StorageProvider.OpenFilePickerAsync` 後、選択待ち中に音色が変わっていないことを確認する。音色を `InstrumentJson` で複製して `WavSampleImporter.Import` → `InstrumentEditor.Update` の一履歴で公開する。失敗時は元音色を保持する。`SampleSummary` を表示し、動的パラメータ入力から `sampleData` を除外して Base64 の大量表示と null 入力を防ぐ。通常の音色適用でも埋め込みデータを維持する。
+- **書き出し**: トランスポート脇のボタン／Ctrl+E から OS 保存先ピッカーを開く。拡張子を大小文字非依存で WAV / OGG に振り分け、開始時のソングを `Task.Run` で `SongRenderer.RenderAll` → `WavWriter` / `OggWriter` へ渡す。設定は既存 RenderSettings の既定（44100 Hz・1 回・余白 0.5 秒）、OGG 品質は 0.5。隣接一時ファイルへ書き、成功時だけ保存先へ移動する。失敗時に既存出力を壊さず、一時ファイルを削除する。完了・失敗通知は Poll 後もステータスバーに残す。
+- **寿命**: 解析・書き出しには操作ごとの CancellationTokenSource を持ち、画面破棄時に Cancel、非同期操作終了時に Dispose する。Core の `AnalyzeSong` / `RenderAll` とエンコーダはキャンセル引数を持たないため、進行中の同期呼び出しを途中で強制停止はしない。開始前・呼び出し後・保存先への移動前にキャンセルを確認し、破棄済み画面への結果通知を抑止する。ピッカーが返すファイルとフォルダは Dispose し、すべての追加イベントを解除する。
+
+## M2-C のテストコード
+
+Avalonia・SDL を起動しない Presenter テストを 30 ケース追加した。テストコードは追加のみで、実行していない。
+
+| 対象 | ケース数 | 検証内容 |
+|---|---:|---|
+| NotePanelPresenterTests | 11 | 追加・変更・削除の各一履歴、undo、全 kind、旧スナップショット不変、不正入力・重複拒否、アルペジオ境界、次バッファ反映 |
+| SfxCreationPresenterTests | 3 | 旧編集の保存・新規セッションと監視対象の切替、既定パス、上書き拒否、外部変更競合時の保持 |
+| AnalysisPresenterTests | 8 | テキストと警告、ソロ、再生警告との合算、二重起動拒否、破棄キャンセル、編集による結果破棄、失敗後の再試行、選択変更と再オープン |
+| ExportPresenterTests | 6 | WAV / OGG シグネチャ、成功と失敗通知、失敗後の再試行、既存ファイル保護、二重起動・スナップショット隔離、終了後の通知抑止 |
+| InstrumentSamplePresenterTests | 2 | 取り込み一履歴・元レート・ルート音・ループ・短い表示・音色適用と undo による保持、失敗時の状態維持 |
+
+## M2-C の静的確認
+
+- M1-C / M2-A / M2-B の判断と M2-B のエンコーダ分離修正を確認した。
+- 使用する Core / Codecs 型の定義と namespace、Avalonia 12.1.2 のローカル NuGet XML の OpenFilePickerAsync / SaveFilePickerAsync / TryGetFolderFromPathAsync / TryGetLocalPath / Dispatcher.InvokeAsync、.NET 10 参照 XML の Task・キャンセル・テスト同期 API を照合した。
+- 追加・更新ファイルの括弧対応・doc XML・public summary の隣接、AXAML / csproj の XML 形式、XAML の名前と Require 呼び出し、追加イベントの解除対称性を静的スクリプトで確認した。
+- git 操作、dotnet build、dotnet test、コンパイル、アプリ起動は実行していない。警告ゼロ・テスト成功・音響値の実測結果としては主張しない。
+
+## M2-C 未完了
+
+実装上の残タスクはなし。以下は依頼者側での確認が必要。
+
+- `dotnet build Arpeggio.slnx` の警告ゼロ。実行禁止の指示に従い、受け入れ条件 7 は未検証。
+- `dotnet test tests/Arpeggio.Core.Tests` の全件成功。追加 30 ケースを含むコンパイル・実行を未確認。
+- Avalonia 上でのタブ・ノート選択・エフェクト入力・Ctrl+E・最小ウィンドウ幅での操作、OS ピッカーの WAV / OGG 拡張子確定と上書き確認、macOS / Windows の表示と入出力。
+- 再生中の効果変更が次バッファへ反映されること、SNES の WAV 取り込み音程・ループ・音色再編集、OGG の試聴、SFX 切替後の新規ファイル監視。
+- 長いソングの解析中／書き出し中の編集・終了、完了通知の Dispatcher 配送、キャンセル後の一時ファイル清掃。既存 Core 同期 API の呼び出し中はキャンセル完了を待つ制約がある。
+
+## M2-C 変更ファイル一覧
+
+新規:
+
+```text
+src/Arpeggio.Daw/Audio/SongFileExporter.cs
+src/Arpeggio.Daw/Presenters/NotePanelPresenter.cs
+src/Arpeggio.Daw/Presenters/AnalysisPresenter.cs
+src/Arpeggio.Daw/Presenters/ExportPresenter.cs
+src/Arpeggio.Daw/Presenters/SfxCreationPresenter.cs
+src/Arpeggio.Daw/Views/NotePanelView.axaml
+src/Arpeggio.Daw/Views/NotePanelView.axaml.cs
+src/Arpeggio.Daw/Views/AnalysisView.axaml
+src/Arpeggio.Daw/Views/AnalysisView.axaml.cs
+src/Arpeggio.Daw/Views/SfxCreationView.axaml
+src/Arpeggio.Daw/Views/SfxCreationView.axaml.cs
+src/Arpeggio.Daw/Views/AudioFilePicker.cs
+tests/Arpeggio.Core.Tests/Daw/NotePanelPresenterTests.cs
+tests/Arpeggio.Core.Tests/Daw/AnalysisPresenterTests.cs
+tests/Arpeggio.Core.Tests/Daw/ExportPresenterTests.cs
+tests/Arpeggio.Core.Tests/Daw/SfxCreationPresenterTests.cs
+tests/Arpeggio.Core.Tests/Daw/InstrumentSamplePresenterTests.cs
+```
+
+更新:
+
+```text
+src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs
+src/Arpeggio.Daw/Presenters/IMainWindowView.cs
+src/Arpeggio.Daw/Presenters/InstrumentPanelPresenter.cs
+src/Arpeggio.Daw/Presenters/InstrumentParameterEditor.cs
+src/Arpeggio.Daw/Views/MainWindow.axaml
+src/Arpeggio.Daw/Views/MainWindow.axaml.cs
+src/Arpeggio.Daw/Views/InstrumentPanelView.axaml
+src/Arpeggio.Daw/Views/InstrumentPanelView.axaml.cs
+src/Arpeggio.Daw/Views/PianoRollControl.cs
+tests/Arpeggio.Core.Tests/Daw/FakeMainWindowView.cs
+docs/implementation.md
+```
