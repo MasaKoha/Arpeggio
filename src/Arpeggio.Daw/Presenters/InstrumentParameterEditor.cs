@@ -89,6 +89,39 @@ namespace Arpeggio.Daw.Presenters
             return loopIndex < 0 ? values : $"{values}/{loopIndex}";
         }
 
+        private static JsonNode? ParseValueWithoutTemplate(string key, string text)
+        {
+            if (string.IsNullOrWhiteSpace(text) || text.Trim().Equals("null", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+            if (key == "adsrRegisters")
+            {
+                int[] registers = InstrumentMacroText.ParseValues(text);
+                if (registers.Length != 4)
+                {
+                    throw new ArgumentException("ADSR レジスタは attack,decay,sustainLevel,sustainRate の 4 値で指定してください。");
+                }
+                return new JsonObject
+                {
+                    ["attack"] = registers[0], ["decay"] = registers[1], ["sustainLevel"] = registers[2], ["sustainRate"] = registers[3]
+                };
+            }
+            if (bool.TryParse(text, out bool flag))
+            {
+                return JsonValue.Create(flag);
+            }
+            if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int integer))
+            {
+                return JsonValue.Create(integer);
+            }
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double number) && double.IsFinite(number))
+            {
+                return JsonValue.Create(number);
+            }
+            return JsonValue.Create(text);
+        }
+
         private static JsonNode? ParseValue(string key, string text, JsonNode? previous)
         {
             if (key.EndsWith("Macro", StringComparison.Ordinal))
@@ -103,7 +136,12 @@ namespace Arpeggio.Daw.Presenters
             {
                 return JsonSerializer.SerializeToNode(InstrumentMacroText.ParseValues(text));
             }
-            JsonValueKind kind = previous!.GetValueKind();
+            if (previous is null)
+            {
+                // null で保存されている任意項目（adsrRegisters 等）は型の手掛かりが無いので、キーと入力文字列から決める
+                return ParseValueWithoutTemplate(key, text);
+            }
+            JsonValueKind kind = previous.GetValueKind();
             if (kind == JsonValueKind.String)
             {
                 return JsonValue.Create(text);

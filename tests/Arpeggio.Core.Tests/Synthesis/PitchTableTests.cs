@@ -54,15 +54,15 @@ namespace Arpeggio.Core.Tests.Synthesis
             Assert.Equal(upperNote, PitchTable.ClampMidiNote(chip, channel, upperNote), precision: 9);
         }
 
-        /// <summary>SNES は一倍を 16384 とする整数比率レジスタに量子化する。</summary>
+        /// <summary>SNES は一倍を 4096 とする 14 bit ピッチレジスタに量子化する。</summary>
         [Fact]
-        public void Quantize_SnesUsesSixteenBitPitchRatio()
+        public void Quantize_SnesUsesFourteenBitPitchRatio()
         {
-            const int RootMidiNote = 60;
-            const int UnityRatioRegister = 16384;
-            const int MaximumRatioRegister = 65535;
+            const double RootFrequency = 250;
+            const int UnityRatioRegister = 4096;
+            const int MaximumRatioRegister = 16383;
             const double FractionalMidiNote = 69.25;
-            double rootFrequency = SignalAnalysis.ExpectedFrequency(RootMidiNote);
+            double rootFrequency = RootFrequency;
             double frequency = PitchTable.Quantize(ChipKind.Snes, ChannelKind.Sample, FractionalMidiNote);
             double registerValue = frequency / rootFrequency * UnityRatioRegister;
             double upperFrequency = PitchTable.Quantize(ChipKind.Snes, ChannelKind.Sample, MaximumMidiNote);

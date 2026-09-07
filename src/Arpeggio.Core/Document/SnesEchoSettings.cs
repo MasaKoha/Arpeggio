@@ -16,5 +16,9 @@ namespace Arpeggio.Core.Document
         /// <summary>出力音量（0〜1）。</summary>
         [JsonPropertyOrder(2)]
         public double Volume { get; set; }
+
+        /// <summary>8 タップ FIR の signed 8 bit 係数（各 -128〜127、128 分率）。</summary>
+        [JsonPropertyOrder(3)]
+        public int[] FirCoefficients { get; set; } = SnesEchoFirPresets.Flat;
     }
 }

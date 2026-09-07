@@ -19,22 +19,28 @@ namespace Arpeggio.Core.Tests.Synthesis.Snes
         [Fact]
         public void Render_InterpolatesAcrossLoopBoundary()
         {
-            SnesSampleInstrument instrument = CreateInstrument(new short[] { 0, short.MinValue, short.MaxValue, 0 }, 4);
-            instrument.LoopStart = 1;
-            instrument.LoopEnd = 3;
-            float[] samples = Render(instrument, 8, RootNote, 10);
-            Assert.Equal(new float[] { 0, -0.5f, -1, 0, 1, 0, -1, 0, 1, 0 }, samples);
+            short[] source = CreateSine(64);
+            Array.Clear(source, 0, 16);
+            SnesSampleInstrument instrument = CreateInstrument(source, 32000);
+            instrument.LoopStart = 19;
+            instrument.LoopEnd = 47;
+            float[] samples = Render(instrument, 32000, RootNote, 160);
+            Assert.Equal(0f, samples[4]);
+            Assert.True(SignalAnalysis.RootMeanSquare(samples.AsSpan(64)) > 0.01);
+            Assert.Equal(samples.AsSpan(80, 32).ToArray(), samples.AsSpan(112, 32).ToArray());
         }
 
         /// <summary>非ループでは末尾を補間用に保持してから停止し、先頭へ補間しない。</summary>
         [Fact]
         public void Render_OneShotStopsAtEndWithoutWrapping()
         {
-            SnesSampleInstrument instrument = CreateInstrument(new short[] { 0, short.MinValue, short.MaxValue }, 4);
+            SnesSampleInstrument instrument = CreateInstrument(CreateSine(19), 32000);
             instrument.Loop = false;
             instrument.LoopStart = -1;
             instrument.LoopEnd = int.MaxValue;
-            Assert.Equal(new float[] { 0, -0.5f, -1, 0, 1, 1, 0, 0 }, Render(instrument, 8, RootNote, 8));
+            float[] samples = Render(instrument, 32000, RootNote, 64);
+            Assert.True(SignalAnalysis.RootMeanSquare(samples.AsSpan(0, 32)) > 0.01);
+            Assert.All(samples.AsSpan(33).ToArray(), sample => Assert.Equal(0f, sample));
         }
 
         /// <summary>一サンプルループと複数周を飛び越す再生増分を扱う。</summary>
@@ -42,11 +48,15 @@ namespace Arpeggio.Core.Tests.Synthesis.Snes
         public void Render_HandlesSingleSampleLoopAndLargeSteps()
         {
             SnesSampleInstrument single = CreateInstrument(new short[] { short.MaxValue }, 32000);
-            Assert.Equal(new float[] { 1, 1, 1, 1 }, Render(single, 8000, RootNote + 12, 4));
-            SnesSampleInstrument instrument = CreateInstrument(new short[] { 0, short.MinValue, short.MaxValue, 0 }, 8);
-            instrument.LoopStart = 1;
-            instrument.LoopEnd = 3;
-            Assert.Equal(new float[] { 0, 1, 1, 1 }, Render(instrument, 2, RootNote, 4));
+            float[] singleSamples = Render(single, 8000, RootNote + 12, 64);
+            Assert.True(SignalAnalysis.RootMeanSquare(singleSamples) > 0.5);
+            Assert.Equal(singleSamples.AsSpan(16, 16).ToArray(), singleSamples.AsSpan(32, 16).ToArray());
+            SnesSampleInstrument instrument = CreateInstrument(CreateSine(64), 32000);
+            instrument.LoopStart = 16;
+            instrument.LoopEnd = 48;
+            float[] samples = Render(instrument, 2000, RootNote + 12, 64);
+            Assert.True(SignalAnalysis.RootMeanSquare(samples.AsSpan(16)) > 0.01);
+            Assert.Equal(samples.AsSpan(16, 16).ToArray(), samples.AsSpan(32, 16).ToArray());
         }
 
         /// <summary>異なる基準音・元レートでも同じサンプルのオクターブ変換を保つ。</summary>
@@ -73,33 +83,62 @@ namespace Arpeggio.Core.Tests.Synthesis.Snes
         [Fact]
         public void AdvanceFrame_UpdatesEmbeddedPitch()
         {
-            SnesSampleInstrument instrument = CreateInstrument(new short[] { 0, short.MaxValue, 0, short.MinValue }, 4);
+            SnesSampleInstrument instrument = CreateInstrument(CreateSine(128), 32000);
             instrument.RootMidiNote = 96;
             instrument.ArpeggioMacro = new Macro { Values = new[] { 0, 12 } };
-            SnesVoiceSynthesizer synthesizer = new SnesVoiceSynthesizer(4);
+            SnesVoiceSynthesizer synthesizer = new SnesVoiceSynthesizer(32000);
             synthesizer.NoteOn(96, MaximumVolume, instrument, ReadOnlySpan<NoteEffect>.Empty);
-            float[] first = new float[1];
+            float[] first = new float[6400];
             synthesizer.Render(first);
+            Assert.Equal(4096, synthesizer.PitchRegister);
             synthesizer.AdvanceFrame();
-            float[] remainder = new float[4];
+            Assert.Equal(8192, synthesizer.PitchRegister);
+            float[] remainder = new float[6400];
             synthesizer.Render(remainder);
-            Assert.Equal(new float[] { 1, -1, 1, -1 }, remainder);
+            double firstFrequency = SignalAnalysis.EstimateFrequency(first, 32000);
+            double secondFrequency = SignalAnalysis.EstimateFrequency(remainder, 32000);
+            Assert.InRange(secondFrequency / firstFrequency, 1.98, 2.02);
         }
 
-        /// <summary>埋め込みサンプルでも既存 ADSR のリリース時間を守る。</summary>
+        /// <summary>埋め込みサンプルでも DSP 固定リリースが約 8 ms で終了する。</summary>
         [Fact]
         public void NoteOff_ReleasesEmbeddedSample()
         {
-            const int SampleRate = 1000;
-            SnesSampleInstrument instrument = CreateInstrument(new short[] { short.MaxValue }, SampleRate);
+            const int SampleRate = 32000;
+            short[] source = new short[16];
+            Array.Fill(source, (short)16000);
+            SnesSampleInstrument instrument = CreateInstrument(source, SampleRate);
             instrument.Envelope = new AdsrEnvelope(0, 0, 1, 0.004);
             SnesVoiceSynthesizer synthesizer = new SnesVoiceSynthesizer(SampleRate);
             synthesizer.NoteOn(RootNote, MaximumVolume, instrument, ReadOnlySpan<NoteEffect>.Empty);
-            synthesizer.Render(new float[1]);
+            synthesizer.Render(new float[256]);
             synthesizer.NoteOff();
-            float[] samples = new float[6];
+            float[] samples = new float[320];
             synthesizer.Render(samples);
-            Assert.Equal(new float[] { 1, 0.75f, 0.5f, 0.25f, 0, 0 }, samples);
+            Assert.True(SignalAnalysis.RootMeanSquare(samples.AsSpan(0, 64)) > SignalAnalysis.RootMeanSquare(samples.AsSpan(192, 64)));
+            Assert.All(samples.AsSpan(257).ToArray(), sample => Assert.Equal(0f, sample));
+        }
+
+        /// <summary>PCM Base64 は保存したまま、埋め込みの発音結果に BRR 量子化が現れる。</summary>
+        [Fact]
+        public void Render_EmbeddedPcmUsesBrrRoundTrip()
+        {
+            const int SampleCount = 64;
+            short[] source = new short[SampleCount];
+            for (int index = 0; index < source.Length; index++)
+            {
+                source[index] = (short)(index % 2 == 0 ? 12345 : -12345);
+            }
+            SnesSampleInstrument instrument = CreateInstrument(source, 32000);
+            string? original = instrument.SampleData;
+            float[] samples = Render(instrument, 32000, RootNote, 256);
+            Assert.Equal(original, instrument.SampleData);
+            Assert.Equal(SampleCount, instrument.SampleCount);
+            Assert.True(SignalAnalysis.RootMeanSquare(samples.AsSpan(64)) > 0.01);
+            // ナイキスト付近の入力をガウス補間しただけの振幅とも差が出ることを確認する。
+            double ideal = Math.Abs(GaussianInterpolator.Interpolate(-12345.0 / 32768, 12345.0 / 32768,
+                -12345.0 / 32768, 12345.0 / 32768, 0));
+            Assert.Contains(samples.AsSpan(64).ToArray(), value => Math.Abs(Math.Abs(value) - ideal) > 1.0 / 32768);
         }
 
         /// <summary>サンプルを解除すると従来の合成波形へ戻る。</summary>
@@ -190,6 +229,16 @@ namespace Arpeggio.Core.Tests.Synthesis.Snes
                 }
                 remaining -= count;
             }
+        }
+
+        private static short[] CreateSine(int length)
+        {
+            short[] samples = new short[length];
+            for (int index = 0; index < length; index++)
+            {
+                samples[index] = (short)(16000 * Math.Sin(2 * Math.PI * index / length));
+            }
+            return samples;
         }
 
         private static SnesSampleInstrument CreateInstrument(short[] samples, int sourceRate)

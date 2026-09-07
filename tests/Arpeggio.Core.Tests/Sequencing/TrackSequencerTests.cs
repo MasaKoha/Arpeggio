@@ -130,22 +130,23 @@ namespace Arpeggio.Core.Tests.Sequencing
             Assert.True(restarted.IsNoteOn);
         }
 
-        /// <summary>ミュートでは現在のノートを停止し、解除後に現在位置から再発音する。</summary>
+        /// <summary>ミュートはミキサー段の責務なので、シーケンサはミュート中もノートを止めない（SPC700 のピッチモジュレーション源を保つため）。</summary>
         [Fact]
-        public void TryGetEvent_MutingStopsAndUnmutingResumesCurrentNote()
+        public void TryGetEvent_MutingDoesNotStopSequencing()
         {
             var note = new Note { DurationTicks = SongLengthTicks };
             var track = new Track { Notes = new List<Note> { note } };
             var sequencer = new TrackSequencer(track);
             var clock = new TickClock(TempoBpm, SampleRate);
 
-            Assert.True(sequencer.TryGetEvent(0, clock, SongLengthTicks, 0, 1, out _));
+            Assert.True(sequencer.TryGetEvent(0, clock, SongLengthTicks, 0, 1, out NoteEvent started));
+            Assert.Same(note, started.Note);
             track.Muted = true;
-            Assert.True(sequencer.TryGetEvent(1, clock, SongLengthTicks, 0, 1, out NoteEvent muted));
-            Assert.False(muted.IsNoteOn);
+            Assert.False(sequencer.TryGetEvent(1, clock, SongLengthTicks, 0, 1, out _));
+            Assert.True(sequencer.TryGetActive(1, out Note? active, out _));
+            Assert.Same(note, active);
             track.Muted = false;
-            Assert.True(sequencer.TryGetEvent(2, clock, SongLengthTicks, 0, 1, out NoteEvent resumed));
-            Assert.Same(note, resumed.Note);
+            Assert.False(sequencer.TryGetEvent(2, clock, SongLengthTicks, 0, 1, out _));
         }
     }
 }

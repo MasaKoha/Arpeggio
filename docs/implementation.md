@@ -674,3 +674,79 @@ src/Arpeggio.Daw/Views/PianoRollControl.cs
 tests/Arpeggio.Core.Tests/Daw/FakeMainWindowView.cs
 docs/implementation.md
 ```
+
+# M2-E-A 実装記録（2026-09-08）
+
+## M2-E-A の実装判断
+
+- **内部時間軸**: SNES のみ RenderMixer が全ボイスを 32000 Hz で順に進める。SongRenderer からの Render 呼び出しは全曲モードでは発音制御の経路として残し、DSP の二重進行を防ぐ。ADSR・ノイズ・ガウス補間・エコーを処理した後の左右二点を、整数のレート累積器で出力へ線形補間する。補間は過去二点を使うため一 DSP サンプル分の遅延がある。単独 SnesVoiceSynthesizer と SnesEcho にも出力レート変換を持たせた。バッファ分割・シークでは履歴とレート累積器も復元される。
+- **ピッチ**: P は 0〜16383、原速 4096、進みは P / 4096。内蔵波形は 128 サンプル周期（P=4096 で 250 Hz）へ変更し、MIDI 周波数から P を量子化する。埋め込みは保存した元レートを P の計算に含める。したがって 44.1 kHz 素材の原音程は P≒5645、32 kHz 素材は P=4096。P の上限が同じなので元レートが高い素材ほど上方向の移調範囲は狭い。従来の SongRenderer の root 基準の音域警告は変更していないため、元レートを含む厳密な警告範囲への更新は今回の変更禁止範囲との境界として残る。
+- **BRR**: 16 サンプル / 9 バイト。ブロックごとの shift 0〜12 × filter 0〜3 を復号誤差で比較する（誤差 0 なら残りの shift 探索は不要）。候補は復号済みの過去二点を引き継ぐ。ニブルは近隣候補も比較し、15 bit 正端から負端へ折り返す量子化事故を避ける。デコーダは整数予測、signed ニブル、shift 13〜15 の特殊値、16 bit 飽和後の倍化を扱う。最終ブロックの end / loop フラグを公開 API から取得できる。末尾は最終サンプルで埋める。
+- **キャッシュ**: SampleData の setter で BRR 往復し、音色所有の BrrSample に格納する。Loop / LoopStart / LoopEnd の変更時は PCM を共有するループ情報だけ更新し、JSON のプロパティ順序へ依存しない。入力 PCM 配列はキャッシュ生成後に保持せず、元の SampleCount と Base64 は維持する。内蔵波形はボイス構築時に準備する。NoteOn と Render は復号・波形生成・辞書登録を行わない。
+- **WAV 取り込み**: `import-wav` の保存形式は従来の PCM Base64 と元レートのまま。再生は必ず BRR エンコード→デコードを経由するため、取り込み結果の音は「BRR に丸めた音」になる。CLI / MCP / Codecs / インポーター自体は変更していない。ループ開始は下側、終端は上側の 16 サンプル境界へ丸める。初回のみ前奏区間を通り、ループ後の前一点もループ末尾へ接続する。
+- **ガウス補間**: 近似生成ではなく、512 エントリの実機数値表を収録した。表の照合元は [Snes9x の SPC_DSP.cpp](https://github.com/snes9xgit/snes9x/blob/master/apu/bapu/dsp/SPC_DSP.cpp)。四係数の整数和は 2047〜2049（分母 2048）。補間積和は浮動小数点で行い、DSP 出力段で 16 bit に量子化する。実機の積ごとの切り捨て・途中のオーバーフローは再現対象外。
+- **ADSR**: 11 bit 音量と共通 32 レート表。最大 attack は二サンプルで立ち上がり、最大 sustain / rate 0 は減衰しない。秒指定は attack 完了時間と指定 sustain 到達時間の最寄りレジスタへ量子化し、sustain rate は 0。明示 AdsrRegisters が優先する。release は毎 DSP サンプル 8 の固定減衰（最大音量から 256 サンプル = 8 ms）。ReleaseSeconds は JSON に保存するが再生速度へは適用しない。
+- **FIR**: 16 ms = 512 DSP サンプル。遅延読み出し→左右独立の 8 タップ FIR→wet とフィードバックの順に処理する。FIR 係数は構築時に複製し、実行中の設定配列変更から切り離す。フラット係数 127 / 128 の利得差を既存テストにも反映した。Flat / LowPass / HighPass / Wide の係数表は design.md に記載した。
+- **変調・ノイズ・音量**: 前ボイスの同じ DSP サンプルの ADSR 後・左右音量前の signed 16 bit 出力で後ボイスを変調する。ボイス 0 の変調源は 0。ミュートしても変調源は継続する。ノイズは音色別 NoiseRate を扱うためボイスごとの 15 bit LFSR とし、NoteOn で同じ seed へ戻す。左右は 127 段階、既存の八ボイス分のヘッドルームを保ち、エコー書き込みとマスターを 16 bit に飽和・量子化する。
+- **境界**: NES / GB の波形・Sequencing / SongRenderer / CLI / MCP / DAW / Codecs と JSON version は変更していない。SPC の命令・RAM、実機共有カウンターの位相、共有ノイズレジスタ、BRR ループごとの予測履歴の再デコードまでの完全エミュレーションではない。
+
+## M2-E-A のテストコード
+
+| ファイル | 確認対象 |
+|---|---|
+| BrrCodecTests | 正弦波 2048 サンプルの相対 RMS 誤差 1 %、再現性、ブロック数、end / loop、既知ニブル、フィルタ別の履歴、ループ境界 |
+| GaussianInterpolatorTests | 256 位相の四係数和、20 kHz 素材の 8 kHz 正弦波を 32 kHz 再生した際の 12 kHz 以上のイメージ成分と線形補間との FFT 比較 |
+| SnesEnvelopeTests | 最大 attack と保持、固定 release、最遅 attack の周期、秒→レジスタの単調性、sustain rate の減衰 |
+| SnesEchoTests | 512 サンプルの遅延と帰還、LowPass の 8 kHz 抑制、係数複製、0 ms 無効、リセット |
+| SnesDspIntegrationTests | ノイズの決定性・重心・停止レート、ミキサー経由の変調周波数分散、明示 ADSR 優先、22.05 / 44.1 / 48 kHz の分割不変性と全 DSP 機能有効時の GC 0 byte |
+| SnesDspSettingsTests | 新項目省略の JSON、version 1 往復、キャッシュ非保存、レジスタと FIR の入力境界、プリセット配列の独立性、14 bit ピッチ端点 |
+| 既存 SnesEmbeddedSampleTests / PitchTableTests | 線形補間・秒指定 release・16 bit ピッチの旧期待値を新仕様へ更新。各テストは維持し、埋め込み音の BRR 量子化を追加 |
+
+## M2-E-A の静的確認
+
+- 変更対象と隣接する C# 27 ファイルについて括弧対応、doc XML の構文、public summary の隣接を確認した。ガウス表は 512 点、四係数の整数和は 2047〜2049 を確認した。
+- Core 内の参照型と namespace、既存の System.Numerics / JSON / FFT / AudioAnalyzer API を定義・使用箇所から照合した。
+- 音声経路のキャッシュ取得・レート更新・補間・FIR・変調に配列生成、LINQ、ボクシングが入らないことをコードで確認した。NoteOn のレジスタ生成は値型である。GC 数値は未実測。
+- Unity lifecycle / GetComponent / AddComponent の追加はない。SnesEnvelope.Start は通常の DSP 状態初期化メソッド。
+- git 操作、Unity 起動、コンパイル、dotnet build / dotnet test は実行していない。
+
+## M2-E-A 未完了
+
+依頼者側で以下の実行確認が必要。成功は未確認であり、既存 528 件および追加テストが通ったとは報告していない。
+
+- ビルドのエラー・警告ゼロ、既存全テストと追加テストの成功。
+- BRR 相対 RMS 誤差 1 %、ガウス / FIR の FFT 比較、変調の周波数分散、ノイズのスペクトル重心の実測。
+- Render / NoteOn / 音色置換を含む GC 0 byte の実測、WAV 取り込み音・ループ継ぎ目・固定 release・エコーの試聴。
+- SongRenderer の変更許可が得られる別作業で、埋め込み音の元レートを含むピッチクランプ警告範囲を再生範囲と一致させる（再生側の 14 bit クランプは実装済み）。
+
+## M2-E-A 変更ファイル一覧
+
+```text
+src/Arpeggio.Core/Instruments/SnesSampleInstrument.cs
+src/Arpeggio.Core/Instruments/SnesAdsrRegisters.cs
+src/Arpeggio.Core/Document/SnesEchoSettings.cs
+src/Arpeggio.Core/Document/SnesEchoFirPresets.cs
+src/Arpeggio.Core/Document/InstrumentValidator.cs
+src/Arpeggio.Core/Document/SongValidator.cs
+src/Arpeggio.Core/Synthesis/PitchTable.cs
+src/Arpeggio.Core/Synthesis/Snes/BrrCodec.cs
+src/Arpeggio.Core/Synthesis/Snes/BrrSample.cs
+src/Arpeggio.Core/Synthesis/Snes/GaussianInterpolator.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesRateTable.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesEnvelope.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesNoiseGenerator.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesVoiceSynthesizer.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesEcho.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesMixer.cs
+src/Arpeggio.Core/Render/RenderMixer.cs
+tests/Arpeggio.Core.Tests/Synthesis/PitchTableTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/BrrCodecTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/GaussianInterpolatorTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesEnvelopeTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesEchoTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesEmbeddedSampleTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesDspIntegrationTests.cs
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesDspSettingsTests.cs
+docs/design.md
+docs/implementation.md
+```

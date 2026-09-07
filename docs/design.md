@@ -128,11 +128,11 @@ M1 は Codex への委譲を 3 回に分ける: **A. Core ＋テスト → B. CL
 
 | チャンネル | 数 | 特性 |
 |---|---|---|
-| Sample | 8 | サンプル再生。ADSR エンベロープ。左右音量。ピッチは 16 bit（サンプル周波数の 0〜4 倍） |
+| Sample | 8 | サンプル再生。ADSR エンベロープ。左右音量。ピッチは 14 bit（P=4096 で原速、最大 4 倍未満） |
 
 - 音色は**合成波形**から作る: `SnesWaveformKind { None = 0, Sine = 1, Square = 2, Saw = 3, Triangle = 4, Pulse = 5, Noise = 6 }`＋ループ有無＋ ADSR（attack / decay / sustain / release）＋ エコー送り量
 - エコー: ディレイ（0〜240 ms、16 ms 刻み）・フィードバック・出力音量。ソング単位の設定
-- 実機の BRR 圧縮・ガウス補間は M1 では省略（線形補間）。NSF/VGM 相当の実機互換は M3 の課題
+- M1 では省略した BRR 圧縮・ガウス補間・レート表 ADSR・FIR・ピッチ変調・ノイズを M2-E で追加する。確定した再生仕様は「M2-E の SNES DSP 再現」を参照する。
 
 ## `Arpeggio.Core` の構成
 
@@ -228,6 +228,8 @@ Song
 
 ### M1-A の境界・単位（2026-09-07 実装時確定）
 
+SNES のピッチ・ADSR・補間については後述の M2-E が本節を更新する。
+
 - ノートは同一トラック内で `[tick, tick + durationTicks)` が重なれば不正。隣接は許可し、終端は `lengthTicks` 以下。Delay は `0 <= value < durationTicks` とし、発音終了は元のノート終端のまま
 - ループ回数は最初の全曲再生を含む。2 回目以降は `[loopStartTick, lengthTicks)` を再生する。ループ開始をまたぐノートは境界で再発音する
 - `PositionSamples`・`Seek`・`Render` の戻り値はステレオのフレーム数（左右一組）。曲本体と末尾余白をそれぞれサンプル単位へ四捨五入（中間値は絶対値の大きい側）して加算する。`RenderAll` は現在位置から残りを返す。未使用バッファ領域はゼロにする
@@ -298,9 +300,29 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - `SongRenderer` は短いソングを一括レンダリングして長さ・無音でないこと・`RenderReport` の警告を検証
 - ホットパスのアロケーションは `GC.GetAllocatedBytesForCurrentThread` の差分で 0 を検証する
 
+## M2-E の SNES DSP 再現（2026-09-08）
+
+- M1-A / M2-B の SNES 再生仕様を本節で更新する。JSON は version 1 の追加のみ。PCM Base64・元レート・元サンプル単位のループ位置は保存形式として維持する。
+- 全ボイス・ADSR・ノイズ・エコーを 32000 Hz で進め、ステレオ合成後に線形補間で出力レートへ変換する。変換は過去二点を使う因果的処理で、最大一 DSP サンプルの遅延を持つ。シーケンサーと 60 Hz のマクロ更新は出力時間軸のまま。
+- ピッチは 14 bit（0〜16383）、原速は 4096、増分は P / 4096。内蔵波形は 128 サンプル周期とし、P = round(周波数 × 128 / 32000 × 4096)。埋め込みは P = round(2^((note-root)/12) × 元レート / 32000 × 4096)。範囲外はレジスタ端へクランプする。
+- 内蔵・埋め込みとも BRR のエンコード→デコードを経由する。9 byte / 16 sample、shift 0〜12 × filter 0〜3 の誤差比較。終端の不足サンプルは最終値で埋める。ループ開始は下側の 16 境界、終端は上側の 16 境界へ丸める。キャッシュとループ情報は音色の設定時に準備し、NoteOn は参照を選ぶだけ。
+- ガウス補間は 512 エントリの実機係数表を使う。4 点の係数は table[255-f], table[511-f], table[256+f], table[f]（f は 8 bit 小数部）、スケールは 2048。
+- ADSR は 11 bit 音量、32 エントリの周期表を使用する。attack は 2×A+1、decay は 2×D+16、sustain rate は直接指定。attack=15 は 2 DSP サンプルで最大、sustainLevel=7 / sustainRate=0 は最大値を保持する。release は毎 DSP サンプル 8 減少する固定動作。秒指定は attack / decay の所要時間が最も近いレジスタへ量子化し、sustain は 1/8 刻み、sustain rate は保持の 0 とする。ReleaseSeconds は保存するが固定 release を優先する。AdsrRegisters があれば秒指定より優先。
+- エコーは 16 ms = 512 DSP サンプル、0 ms は従来どおり無効。遅延読み出し→8 タップ FIR→wet 出力とフィードバックの順。係数は signed 8 bit / 128。左右履歴は独立し、フィードバック書き込みとマスター出力は 16 bit に飽和する。
+- PitchModulation はボイス 1〜7 のみ有効。同じ DSP 時刻の直前ボイスの ADSR 後・左右音量前の signed 16 bit 出力で P' = clamp(P + P×prev/32768, 0, 16383)。ミュートは聴取出力とエコー送りを消し、変調源の DSP は継続する。
+- NoiseEnabled はサンプル経路を 15 bit LFSR に置換する。NoiseRate は ADSR と共通の周期表（0 は停止）。音色ごとのレート指定を成立させるためノイズ状態はボイスごとに持ち、NoteOn で同じ seed へ戻す。
+- ノート音量は 0〜127、合成 Pan は左右 0〜127 に丸めて signed 8 bit 音量経路へ渡す。既存の八ボイス分のヘッドルームを維持する。SPC の RAM・命令・共有カウンター位相・BRR ループごとの予測履歴再デコードは対象外。
+
+| FIR プリセット | 係数（新しい履歴から順） | 用途 |
+|---|---|---|
+| Flat | 127, 0, 0, 0, 0, 0, 0, 0 | ほぼフラット |
+| LowPass | 16, 32, 32, 32, 16, 0, 0, 0 | 高域を抑えた残響 |
+| HighPass | 64, -64, 0, 0, 0, 0, 0, 0 | 差分による低域除去 |
+| Wide | 64, 0, 32, 0, 16, 0, 16, 0 | 時間方向に広がる残響 |
+
 ## 未決事項
 
-- SNES の実機互換（BRR・ガウス補間）をどこまで追うか — M3 で NSF/VGM と一緒に決める
+- SPC ファイル・RAM・命令単位までの互換性は M3 以降で決める
 - DAW での MIDI キーボード入力 — 要望が出たら
 
 ### M2-A の境界・単位（2026-09-07）
@@ -316,6 +338,10 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - SFX はテンポ 150、Jump 18 tick（150 ms）、Coin 18（150 ms）、Hit 18（150 ms）、Explosion 48（400 ms）、PowerUp 48（400 ms）、Laser 18（150 ms）、Blip 5（約 41.7 ms）、Select 12（100 ms）。Blip は個別指定の 30〜50 ms を共通目安の 0.1 秒より優先する。ノート終端を lengthTicks とし、SNES はループする内蔵 Pulse / Noise とリリース 0 秒で構成する。
 - `sfx new` / `new_sfx` は既存パスの上書きを拒否し、完成した Song を保存後にセッションを開く。既定チップは NES。既存 export の末尾余白 0.5 秒は変更しない。SFX 本体長の検証・書き出しでは CLI `--tail 0` / MCP `tail: 0` を指定する。
 
+### ミュートの意味論（2026-09-08 変更）
+
+- `Track.Muted` は**ミキサー段で出力を 0 にする**だけで、シーケンサと合成器は鳴らし続ける。SPC700 のピッチモジュレーションはボリューム前の前ボイス出力（OUTX）を参照するため、ミュートした低音を変調源として使える。NES / GB でも同じ扱い（負荷は増えるがチャンネル数が少ないので無視できる）
+
 ### M1-B の入力・出力境界（2026-09-07 実装時確定）
 
 - バッチは `kind` ごとに必須値を検証するモデルとし、任意値を nullable で表す。UpdateNote は指定した項目だけを更新し、`tick` が検索位置、`toTick` が移動先。effects の省略は保持、空配列は解除。詳細な JSON 項目は README のバッチ表を参照する。
@@ -327,6 +353,8 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - MCP は `EditSession` を DI 共有し、同じセッションのツール実行を直列化する。戻り値は文字列、エラーは error/exitCode JSON。show の既定と chip_reference は CLI と同じテキスト。`UseStructuredContent` は指定しない。
 
 ### M2-B の境界・単位（2026-09-07）
+
+SNES の保存形式は維持し、キャッシュ・補間・ピッチ・ループ再生については M2-E が本節を更新する。
 
 - JSON version は 1 のまま。SNES の `sampleData` は little-endian PCM 16 bit モノラルの Base64、null は従来の合成波形。空・奇数バイト・不正 Base64 を拒否し、上限は 2 MiB（2,097,152 byte、1,048,576 サンプル）。Base64 文字列長にも対応する上限を設ける。
 - `sampleRate` の既定は 44100 Hz、埋め込み時は正の整数。`rootMidiNote` は 0〜127、既定 60（C4）。ループは `[loopStart, loopEnd)`、単位はモノラルのサンプル数。既定は両方 0、loopEnd=0 は末尾。loop=true かつ埋め込み時だけ `0 <= start < end <= count` を検証する。合成波形では追加メタデータを再生に使わない。

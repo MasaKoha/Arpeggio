@@ -7,6 +7,7 @@ namespace Arpeggio.Core.Document
     /// <summary>保存と読み込みの境界でソングの整合性を保証する。</summary>
     public static class SongValidator
     {
+        private const int SnesFirTapCount = 8;
         private const int MaximumMidiNote = 127;
         private const int MaximumVolume = 15;
         private const int MaximumArpeggio = 255;
@@ -137,6 +138,14 @@ namespace Arpeggio.Core.Document
             Require(echo.DelayMilliseconds >= 0 && echo.DelayMilliseconds <= MaximumEchoDelay && echo.DelayMilliseconds % EchoDelayStep == 0, "エコー遅延は 0〜240 ms の 16 ms 刻みです。");
             Require(IsInRange(echo.Feedback, -1, 1) && Math.Abs(echo.Feedback) < 1, "エコーフィードバックの絶対値は 1 未満です。");
             Require(IsInRange(echo.Volume, 0, 1), "エコー音量は 0〜1 です。");
+            if (echo.FirCoefficients is null || echo.FirCoefficients.Length != SnesFirTapCount)
+            {
+                throw new SongValidationException("FIR 係数は 8 要素です。");
+            }
+            foreach (int coefficient in echo.FirCoefficients)
+            {
+                Require(coefficient >= sbyte.MinValue && coefficient <= sbyte.MaxValue, "FIR 係数は -128〜127 です。");
+            }
         }
 
         internal static bool IsInRange(double value, double minimum, double maximum)
