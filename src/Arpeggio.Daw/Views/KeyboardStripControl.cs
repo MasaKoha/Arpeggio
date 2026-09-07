@@ -1,6 +1,7 @@
 using System.Globalization;
 using Arpeggio.Core.Document;
 using Arpeggio.Daw.Presenters;
+using Arpeggio.Daw.Themes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -12,11 +13,12 @@ namespace Arpeggio.Daw.Views
     {
         private const int SemitonesPerOctave = 12;
         private const double LabelSize = 11;
-        private readonly Typeface labelTypeface = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Normal, FontStretch.Normal);
+        private readonly Typeface labelTypeface = new Typeface(ThemeResources.NumericFont, FontStyle.Normal, FontWeight.Normal, FontStretch.Normal);
         private const double LabelInset = 4;
-        private readonly IBrush whiteKey = new SolidColorBrush(Color.Parse("#BDCAD5"));
-        private readonly IBrush blackKey = new SolidColorBrush(Color.Parse("#26313D"));
-        private readonly Pen edge = new Pen(new SolidColorBrush(Color.Parse("#506070")));
+        private readonly IBrush labelBrush = ThemeResources.GetBrush("Arpeggio.Background");
+        private readonly IBrush whiteKey = ThemeResources.GetBrush("Arpeggio.TextPrimary");
+        private readonly IBrush blackKey = ThemeResources.GetBrush("Arpeggio.PanelRaised");
+        private readonly Pen edge = new Pen(ThemeResources.GetBrush("Arpeggio.Border"));
         private readonly FormattedText?[] labels = new FormattedText?[PianoRollPresenter.MaximumMidiNote + 1];
         private double verticalOffset;
         /// <summary>描画ループで文字列を生成しないよう音名を用意する。</summary>
@@ -26,7 +28,7 @@ namespace Arpeggio.Daw.Views
             for (int pitch = 0; pitch <= PianoRollPresenter.MaximumMidiNote; pitch += SemitonesPerOctave)
             {
                 labels[pitch] = new FormattedText(NoteName.Format(pitch), CultureInfo.InvariantCulture,
-                    FlowDirection.LeftToRight, labelTypeface, LabelSize, Brushes.Black);
+                    FlowDirection.LeftToRight, labelTypeface, LabelSize, labelBrush);
             }
         }
         /// <summary>スクロールに鍵盤表示を同期させる。</summary>
@@ -42,7 +44,7 @@ namespace Arpeggio.Daw.Views
                 context.DrawRectangle(IsBlackKey(pitch) ? blackKey : whiteKey, edge,
                     new Rect(0, top, Bounds.Width, PianoRollControl.NoteHeight));
                 FormattedText? label = labels[pitch];
-                if (label != null) { context.DrawText(label, new Point(LabelInset, top)); }
+                if (label != null) { context.DrawText(label, new Point(LabelInset, top + (PianoRollControl.NoteHeight - label.Height) / 2)); }
             }
         }
         /// <summary>半音位置が黒鍵に属するか。</summary>

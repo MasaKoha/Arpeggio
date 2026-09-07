@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Daw.Presenters;
+using Arpeggio.Daw.Themes;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
@@ -35,6 +37,7 @@ namespace Arpeggio.Daw.Views
         private InstrumentKind displayedKind;
         private bool isRefreshing;
         private bool isBound;
+        private string channelLabel = string.Empty;
 
         /// <summary>XAML の表示部品を解決する。</summary>
         public InstrumentPanelView()
@@ -94,7 +97,7 @@ namespace Arpeggio.Daw.Views
             try
             {
                 instruments = presenter.Instruments;
-                kindLabel.Text = kind.ToString();
+                UpdateKindLabel(kind);
                 instrumentSelector.ItemsSource = instruments.Select(instrument => $"{instrument.Id}: {instrument.Name}").ToArray();
                 instrumentSelector.SelectedIndex = FindInstrumentIndex(current?.Id);
                 nameInput.Text = current?.Name ?? string.Empty;
@@ -115,6 +118,14 @@ namespace Arpeggio.Daw.Views
             }
         }
 
+        /// <summary>選択トラックの識別記号と色を音色見出しへ反映する。</summary>
+        public void ShowChannel(Track track)
+        {
+            channelLabel = ChannelPalette.GetShortLabel(track.Channel, track.ChannelIndex);
+            kindLabel.Background = ChannelPalette.GetBrush(track.Channel, track.ChannelIndex);
+            UpdateKindLabel(presenter.RequiredKind);
+        }
+
         /// <summary>イベント購読と入力部品への参照を解除する。</summary>
         public void Dispose()
         {
@@ -130,6 +141,8 @@ namespace Arpeggio.Daw.Views
             isBound = false;
         }
 
+        private void UpdateKindLabel(InstrumentKind kind) => kindLabel.Text = $"{channelLabel} · {kind}";
+
         private void RebuildInputs()
         {
             inputs.Clear();
@@ -142,6 +155,7 @@ namespace Arpeggio.Daw.Views
                     ? new TextBox { Text = parameter.Value }
                     : new ComboBox { ItemsSource = parameter.Choices, SelectedItem = parameter.Value,
                         HorizontalAlignment = HorizontalAlignment.Stretch };
+                input.Classes.Add("numeric");
                 inputs.Add(parameter.Key, input);
                 row.Children.Add(input);
                 parameterPanel.Children.Add(row);

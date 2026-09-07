@@ -39,7 +39,7 @@ namespace Arpeggio.Daw.Views
                 using IStorageFile? file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
                 {
                     Title = "WAV / OGG を書き出す", SuggestedStartLocation = directory,
-                    SuggestedFileName = Path.GetFileNameWithoutExtension(sourcePath) + ".wav",
+                    SuggestedFileName = GetSongBaseName(sourcePath) + ".wav",
                     DefaultExtension = "wav", FileTypeChoices = new[] { wavType, oggType }, ShowOverwritePrompt = true
                 });
                 if (isDisposed || file == null) { return; }
@@ -93,5 +93,17 @@ namespace Arpeggio.Daw.Views
 
         private static string RequireLocalPath(IStorageFile file) => file.TryGetLocalPath()
             ?? throw new InvalidOperationException("ローカルファイルを選択してください。");
+
+        /// <summary>`.arpeggio.json` の二重拡張子を外して書き出しの既定名を作る。</summary>
+        private static string GetSongBaseName(string sourcePath)
+        {
+            const string SongSuffix = ".arpeggio";
+            string baseName = Path.GetFileNameWithoutExtension(sourcePath);
+            if (baseName.EndsWith(SongSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                baseName = baseName.Substring(0, baseName.Length - SongSuffix.Length);
+            }
+            return baseName;
+        }
     }
 }

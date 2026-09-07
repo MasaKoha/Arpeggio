@@ -1,6 +1,6 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Arpeggio.Daw.Views.TrackListView">
-  <StackPanel Margin="12" Spacing="10">
-    <TextBlock Text="TRACKS" FontWeight="Bold" Foreground="#94A8BA" />
-    <StackPanel x:Name="Rows" Spacing="6" />
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Arpeggio.Daw.Views.TrackListView" Background="{StaticResource Arpeggio.Panel}">
+  <StackPanel Margin="12" Spacing="8">
+    <TextBlock Text="TRACKS" Classes="heading" FontWeight="Bold" Foreground="{StaticResource Arpeggio.TextSecondary}" />
+    <StackPanel x:Name="Rows" Spacing="8" />
   </StackPanel>
 </UserControl>

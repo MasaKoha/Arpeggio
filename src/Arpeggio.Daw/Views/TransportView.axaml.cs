@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
+using Arpeggio.Daw.Themes;
 using Avalonia.Controls;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -16,6 +18,8 @@ namespace Arpeggio.Daw.Views
         private readonly TextBox tempoInput;
         private readonly TextBox lengthInput;
         private readonly TextBlock positionLabel;
+        private readonly IDataTemplate playContent;
+        private readonly IDataTemplate stopContent;
         private int displayedTempo;
         private int displayedLength;
         /// <summary>表示部品を取得して入力通知を接続する。</summary>
@@ -23,6 +27,8 @@ namespace Arpeggio.Daw.Views
         {
             AvaloniaXamlLoader.Load(this);
             playButton = Require<Button>("PlayButton");
+            playContent = ThemeResources.GetContentTemplate("Arpeggio.Content.Play");
+            stopContent = ThemeResources.GetContentTemplate("Arpeggio.Content.Stop");
             stopButton = Require<Button>("StopButton");
             loopButton = Require<Button>("LoopButton");
             tempoInput = Require<TextBox>("TempoInput");
@@ -52,6 +58,8 @@ namespace Arpeggio.Daw.Views
             displayedTempo = tempoBpm;
             displayedLength = lengthTicks;
             playButton.Content = isPlaying ? "❚❚ 停止" : "▶ 再生";
+            playButton.ContentTemplate = isPlaying ? stopContent : playContent;
+            loopButton.Classes.Set("selected", isLooping);
             loopButton.Content = isLooping ? "ループ ON" : "ループ OFF";
             if (!tempoInput.IsKeyboardFocusWithin) { tempoInput.Text = tempoBpm.ToString(CultureInfo.InvariantCulture); }
             if (!lengthInput.IsKeyboardFocusWithin) { lengthInput.Text = lengthTicks.ToString(CultureInfo.InvariantCulture); }

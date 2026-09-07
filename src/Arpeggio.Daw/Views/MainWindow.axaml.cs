@@ -31,6 +31,7 @@ namespace Arpeggio.Daw.Views
         private readonly TabControl editorTabs;
         private readonly Button sfxButton;
         private readonly Button exportButton;
+        private readonly Button revealExportButton;
         private readonly AudioFilePicker filePicker;
         private readonly TextBlock statusLabel;
         private readonly Button warningsButton;
@@ -64,6 +65,7 @@ namespace Arpeggio.Daw.Views
             editorTabs = Require<TabControl>("EditorTabs");
             sfxButton = Require<Button>("SfxButton");
             exportButton = Require<Button>("ExportButton");
+            revealExportButton = Require<Button>("RevealExportButton");
             filePicker = new AudioFilePicker(this);
         }
         /// <summary>Program が組み立てた Presenter と明示的に結線する。</summary>
@@ -79,6 +81,7 @@ namespace Arpeggio.Daw.Views
             instruments.WavImportRequested += OnImportWav;
             sfxButton.Click += OnSfx;
             exportButton.Click += OnExport;
+            revealExportButton.Click += OnRevealExport;
             tracks.TrackSelected += OnTrackSelected;
             tracks.MuteRequested += OnMuteRequested;
             transport.PlayRequested += OnPlay;
@@ -104,6 +107,7 @@ namespace Arpeggio.Daw.Views
             Title = $"Arpeggio — {current.Title}";
             tracks.ShowTracks(current.Tracks, selectedTrack);
             pianoRoll.ShowSong(current, selectedTrack, selectedTick);
+            instruments.ShowChannel(current.Tracks[selectedTrack]);
             instruments.Refresh();
             notes.Refresh();
             analysis.ShowTracks(current);
@@ -122,6 +126,7 @@ namespace Arpeggio.Daw.Views
             if (displayedWarningCount != warningCount)
             {
                 warningsButton.Content = $"警告 {warningCount}";
+                warningsButton.Classes.Set("danger", warningCount > 0);
                 displayedWarningCount = warningCount;
             }
         }
@@ -135,10 +140,12 @@ namespace Arpeggio.Daw.Views
         /// <summary>解析パネルへ結果と実行状態を渡す。</summary>
         public void ShowAnalysis(string text, bool isRunning) => analysis.ShowAnalysis(text, isRunning);
         /// <summary>書き出し操作の二重起動を抑止する。</summary>
-        public void ShowExportStatus(string text, bool isRunning)
+        public void ShowExportStatus(string text, bool isRunning, string? lastExportedPath)
         {
             exportButton.Content = isRunning ? "書き出し中…" : "書き出し";
             exportButton.IsEnabled = !isRunning;
+            revealExportButton.IsVisible = lastExportedPath != null;
+            revealExportButton.IsEnabled = !isRunning;
         }
         /// <summary>旧ファイルの監視を解放して新しい正本へ切り替える。</summary>
         public void SwitchDocument(string path)
@@ -178,6 +185,7 @@ namespace Arpeggio.Daw.Views
             instruments.WavImportRequested -= OnImportWav;
             sfxButton.Click -= OnSfx;
             exportButton.Click -= OnExport;
+            revealExportButton.Click -= OnRevealExport;
             Opened -= OnOpened;
             Closed -= OnClosed;
             RemoveHandler(KeyDownEvent, OnShortcut);
@@ -216,6 +224,7 @@ namespace Arpeggio.Daw.Views
         private void OnWarnings(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.ShowWarnings);
         private void OnSfx(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = SfxTabIndex;
         private async void OnExport(object? sender, RoutedEventArgs arguments) => await filePicker.ExportAsync(MainPresenter);
+        private void OnRevealExport(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.Export.RevealLastExport);
         private async void OnImportWav(string rootNote, bool loop) => await filePicker.ImportAsync(MainPresenter, rootNote, loop);
         private async void ExportWithPicker() => await filePicker.ExportAsync(MainPresenter);
         private void OnScroll(object? sender, ScrollChangedEventArgs arguments) => SynchronizeViewport();

@@ -44,6 +44,8 @@ namespace Arpeggio.Core.Tests.Daw
         public bool IsExporting { get; private set; }
         /// <summary>書き出し表示の更新回数。</summary>
         public int ExportDisplayCount { get; private set; }
+        /// <summary>「フォルダを開く」に渡された最後の書き出し先。</summary>
+        public string? LastExportedPath { get; private set; }
         /// <summary>ファイル監視の切替先。</summary>
         public string DocumentPath { get; private set; } = string.Empty;
         /// <summary>UI スレッド境界を経由した通知回数。</summary>
@@ -88,10 +90,11 @@ namespace Arpeggio.Core.Tests.Daw
         }
 
         /// <summary>書き出しの表示結果を記録する。</summary>
-        public void ShowExportStatus(string text, bool isRunning)
+        public void ShowExportStatus(string text, bool isRunning, string? lastExportedPath)
         {
             ExportStatus = text;
             IsExporting = isRunning;
+            LastExportedPath = lastExportedPath;
             ExportDisplayCount++;
         }
 

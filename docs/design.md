@@ -293,6 +293,47 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - ファイル監視は保存内容の正規化 JSON と保存基準を比較する。自己保存の遅延通知を時間窓では判定しない。未保存時の外部更新はステータス表示で R の確認を待ち、保存直前にも外部更新を確認する。
 - ピアノロールは可視範囲だけカスタム描画し、鍵盤・ルーラーをスクロールと同期する。ブラシ・Pen・音名・可視ルーラーラベルを描画前に用意する。音色一覧と音色参照が変わらない限り入力部品を作り直さない。
 
+### DAW のビジュアル規約（M2-D / 2026-09-08）
+
+判断順は **操作可能性 > 可読性 > 情報階層 > フィードバック > 一貫性 > アクセシビリティ > 効率 > 美観**。暗色のチップチューン・スタジオとして統一する。機能・ショートカット・文言・既存 AXAML 要素の親子関係・`x:Name`・Presenter は維持する。
+
+`Themes/ArpeggioTheme.axaml` に Color（末尾 `.Color`）と同名の SolidColorBrush、寸法、コントロールスタイルを定義する。`App.axaml` は Icons / ArpeggioTheme の ResourceDictionary を読み込み、FluentTheme の後へ `Arpeggio.Styles` を適用する。Views の色リテラルは禁止する。
+
+| ブラシトークン | 色 | 用途 |
+|---|---|---|
+| `Arpeggio.Background` | `#0E131A` | ウィンドウ・ピアノロール背景、色帯上の暗い文字 |
+| `Arpeggio.Panel` | `#161D27` | 左右ペイン・トランスポート・ルーラー |
+| `Arpeggio.PanelRaised` | `#1E2733` | 入力・ボタン・位置表示の面、黒鍵 |
+| `Arpeggio.Border` | `#2A3644` | 枠・区切り・スクロールのつまみ |
+| `Arpeggio.TextPrimary` | `#E6EDF3` | 本文・白鍵 |
+| `Arpeggio.TextSecondary` | `#8B9BAE` | 補足・非選択タブ・拍目盛り |
+| `Arpeggio.TextDisabled` | `#55637A` | 無効状態 |
+| `Arpeggio.Accent` | `#F5C451` | 主操作・フォーカス・選択ノート枠・エフェクト印 |
+| `Arpeggio.Danger` | `#FF6B7A` | 削除・ミュート中・警告あり |
+| `Arpeggio.Playhead` | `#FF4D6D` | 再生位置の 2px 線と三角 |
+| `Arpeggio.Channel.Pulse` | `#5DF2A4` | `P1` / `P2` |
+| `Arpeggio.Channel.Triangle` | `#FFB347` | `TRI` |
+| `Arpeggio.Channel.Noise` | `#FF6FD8` | `NOI` |
+| `Arpeggio.Channel.Dpcm` | `#9AA5B1` | `DPCM`（無音チャンネルは控えめ） |
+| `Arpeggio.Channel.Wave` | `#4FD1FF` | `WAV` |
+| `Arpeggio.Channel.Sample` | `#B892FF` | `S1`〜`S8` |
+| `Arpeggio.Grid.Bar` | `#4A5A6E` | 小節線 |
+| `Arpeggio.Grid.Beat` | `#2E3A48` | 拍線 |
+| `Arpeggio.Grid.Sixteenth` | `#1C2531` | 16 分線 |
+| `Arpeggio.Grid.BlackKey` | `#0A0F15` | 黒鍵に対応する行の面 |
+
+- 本文・補足は面とのコントラスト 4.5:1 以上。現在の本文の最小値は 12.76:1、補足は 5.31:1。チャンネル色上には Background 色の文字を載せ、最小 7.45:1 を確保する。無効表示は本文のコントラスト条件の対象外。
+- 色と短い記号は `ChannelPalette.GetBrush(ChannelKind)` / `GetShortLabel(ChannelKind, int)` へ集約する。番号は Core と同じ同種内の 0 始まり。トラック一覧・ピアノロール・音色見出しの三か所から同じ関数を呼ぶ。None・未定義種別・範囲外番号は例外とする。
+- パレットは UI を起動せず使える純関数とし、不変ブラシと記号を共有する。AXAML の対応色との一致を静的確認する。その他のカスタム描画色とフォントは `ThemeResources` が Application.Resources から各コントロールの初期化時に取得し、描画中にリソース検索しない。
+- 本文は Inter。BPM・位置・tick・音色の数値入力・鍵盤・ルーラー・ノートの記号は `Cascadia Mono, Menlo, Consolas, monospace`。見出し 13 / 本文 12 / 補足 11 / 位置 18。位置は Accent の文字と PanelRaised の面で区別する。
+- 余白・間隔は 4 / 8 / 12 / 16。角丸は入力・ボタン 4、カード・ToolTip 6。線幅は 1、フォーカス・選択タブ下線・選択ノート・再生線のみ 2。ノートの角丸は描画仕様として 2。
+- Button は PanelRaised と Border、primary は Accent と暗い文字、danger は Danger の枠。hover / pressed / disabled / focus-visible を明示する。ボタンのフォーカス枠は重ね描きし、キーボード移動で内容をずらさない。TextBox / ComboBox / CheckBox は PanelRaised と Border、フォーカス時 Accent。選択タブは下線、スクロールは 8px、ToolTip は PanelRaised。
+- アイコンは `Themes/Icons.axaml` の 24×24 塗りパス。`Icon.Play` / `Stop` / `Loop` / `Export` / `FolderOpen` / `Analyze`（波形と虫眼鏡）/ `Sfx` / `Mute` / `Unmute` / `Add` / `Remove` / `Save` / `Warning` / `Import` / `App`。ボタンは文字列 Content を保持したまま ContentTemplate 内の PathIcon とラベルで表示する。動的文言とツールチップを維持し、ミュートも CheckBox の入力契約を維持してテンプレートだけをボタン風にする。
+- ピアノロールは黒鍵の行を暗くし、C の行の下端だけ薄く区切る。選択トラックのノートはチャンネル色、音量 0〜15 を 45〜100% の RGB 明度へ対応させる。下端に暗い 1px 線、選択に Accent の 2px 枠、効果ありに右上の三角を描く。他トラックは各色 25% の不透明度、枠なし。記号の小さな面は音量やゴーストの重なりによらず文字のコントラストを保つ。
+- ノート内の記号は幅が足りる場合に描き、短いノートや縮小時はチャンネル記号・トラック名のツールチップを併用する。判別のためにクリック領域やノートの長さを広げない。鍵盤の行高は PianoRollControl.NoteHeight と完全に共有し、C 音のみ等幅 11 で表示する。ルーラーは小節番号と小さな拍目盛りを描く。
+- Brush / Pen / Geometry / FormattedText は描画前に用意する。音量 16 段階の不変ブラシとチャンネル記号はチャンネルが変わったときだけ再生成する。
+- アプリアイコンは `assets/icon/arpeggio.svg`（1024×1024）。角丸 180 の背景、Pulse → Triangle → Noise → Sample の上昇する四矩形、線幅 64 の一周期矩形波という六図形で構成する。外部参照なし。ヘッダーは同モチーフの Icon.App。PNG / icns / ico 変換と ApplicationIcon / Window.Icon の設定は依頼者が行う。
+
 ## テスト方針
 
 - `tests/Arpeggio.Core.Tests`（xunit）。合成器はチップごとに**周波数・デューティ・音量の期待値を数値で検証**する（ゼロクロス数から周波数を推定、矩形波の High 比率からデューティを検証、RMS から音量を検証）

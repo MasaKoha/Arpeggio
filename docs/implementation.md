@@ -833,3 +833,59 @@ docs/design.md
 docs/implementation.md
 README.md
 ```
+
+# M2-D 実装記録（2026-09-08）
+
+## M2-D の実装範囲と判断
+
+- ArpeggioTheme / Icons の二つの ResourceDictionary を App へ追加。FluentTheme を下敷きに、色・字体・寸法と各コントロールの状態を統一した。静的カラー規約とチャンネル記号は design.md の「DAW のビジュアル規約」を正本とする。
+- ボタンの ContentTemplate で PathIcon と既存ラベルを併記する。Play / Stop の既存文字列に含まれる装飾記号はテンプレート内のベクターへ置き換え、ラベルの「再生」「停止」は維持した。動的 Content の再生状態・ループ・解析中・書き出し中・警告件数も維持する。ミュートは CheckBox と IsCheckedChanged の購読を維持し、テンプレートだけを変更した。
+- ChannelPalette の不変ブラシ・記号をトラック一覧・ピアノロール・音色見出しで共有する。音色のキャッシュ早期 return で P1 → P2 / S1 → S2 の見出し更新が失われないよう、MainWindow.ShowSong から View の ShowChannel を先に呼ぶ。Presenter は変更していない。
+- ピアノロールは音量 16 段階の RGB 明度、ゴースト 25%、選択枠、効果三角、下端の暗い縁、再生線と三角を描く。文字の背面は一定輝度とし、低音量・ゴーストの重なりでも判別できるようにした。狭いノートは記号を無理に詰め込まず、記号・トラック名のツールチップを併用する。ノートの当たり判定と編集操作は既存のまま。
+- ThemeResources は各描画コントロールの初期化時だけ、MergedDictionaries を探索する TryGetResource でリソースを解決する。ブラシ・Pen・三角形 Geometry・文字はフィールドに保持し、Render 中に参照型オブジェクトを生成しない。UI 非依存の純関数を保つため ChannelPalette は固定の不変ブラシを持ち、AXAML と色が一致することを静的確認した。
+- SVG は背景 + 四ブロック + 一周期の矩形波の六図形。1024 四方、背景の角丸 180、波の線幅 64、外部参照なし。PNG / icns / ico、ApplicationIcon / Window.Icon は変更していない。
+- コードビハインドの変更は上記表示の反映に限定した。Presenters / Audio / Editing / Watch / Platform、Core / CLI / MCP / Codecs、パッケージ・プロジェクト設定は変更していない。git 操作は行っていない。
+
+## M2-D のテストコードと静的確認
+
+- ChannelPaletteTests に 27 ケースを追加。全有効種別の指定色と先頭記号、enum 網羅、P2 / S1〜S8、None / 未定義種別、範囲外番号、ブラシの再利用を検証する。アプリを起動しない純関数テスト。
+- AXAML / SVG の XML 構文、リソースキー重複・参照先、Views の色リテラル不在、チャンネル色の AXAML / C# 一致を確認した。
+- 既存 AXAML の全要素型・x:Name・親子関係を作業前コピーと照合した。ヘッダー TextBlock 内に追加した装飾 InlineUIContainer / Run を除き一致。既存要素の移動・削除はない。既存 Content / 文言は維持した。
+- 本文・補足の面に対するコントラストは最小 12.76:1 / 5.31:1、色帯上の暗い文字は最小 7.45:1。ゴースト記号も背景面を一定にしてコントラストを維持する。
+- 使用型の namespace と API を既存コード・Avalonia 12.1.2 のローカル NuGet XML / DLL のメタデータで照合した。Fluent のテンプレート内の状態リソース名もローカル DLL と照合し、内部パーツへの状態色を上書きする。ContentPresenter の既定パーツ名は維持した。
+- ビルド・コンパイル・テスト実行・アプリ起動は指示に従い実施していない。静的確認は AXAML コンパイラや実行時の検証を代替しない。
+
+## M2-D 未完了
+
+実装上の残タスクはなし。以下は依頼者側の確認・変換が必要。
+
+- コンパイルと AXAML のリソース / スタイル / テンプレートのロード確認。既存 502 件と追加 27 ケースのテスト成功は未確認。
+- 起動後の macOS / Windows の Inter・等幅フォント、hover / pressed / disabled / focus-visible、Tab / Space、ミュート、警告色、動的ボタン文言の目視と操作確認。
+- 最小ウィンドウ幅、全チップのトラック記号、P1 ↔ P2 / S1〜S8 の音色見出し、短いノートのツールチップ、音量 0 / 15、ゴーストの重なり、ズーム・スクロール・鍵盤同期・再生カーソルの目視確認。
+- SVG の 16px 表示を含む目視、rsvg-convert / iconutil による PNG / icns / ico 変換、変換後の ApplicationIcon と Window.Icon の設定。
+
+## M2-D 変更ファイル一覧
+
+- `src/Arpeggio.Daw/Views/AnalysisView.axaml`
+- `src/Arpeggio.Daw/Views/InstrumentPanelView.axaml`
+- `src/Arpeggio.Daw/Views/InstrumentPanelView.axaml.cs`
+- `src/Arpeggio.Daw/Views/KeyboardStripControl.cs`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `src/Arpeggio.Daw/Views/NotePanelView.axaml`
+- `src/Arpeggio.Daw/Views/PianoRollControl.cs`
+- `src/Arpeggio.Daw/Views/SfxCreationView.axaml`
+- `src/Arpeggio.Daw/Views/TimeRulerControl.cs`
+- `src/Arpeggio.Daw/Views/TrackListView.axaml`
+- `src/Arpeggio.Daw/Views/TrackListView.axaml.cs`
+- `src/Arpeggio.Daw/Views/TransportView.axaml`
+- `src/Arpeggio.Daw/Views/TransportView.axaml.cs`
+- `src/Arpeggio.Daw/App.axaml`
+- `src/Arpeggio.Daw/Themes/ArpeggioTheme.axaml`
+- `src/Arpeggio.Daw/Themes/ChannelPalette.cs`
+- `src/Arpeggio.Daw/Themes/Icons.axaml`
+- `src/Arpeggio.Daw/Themes/ThemeResources.cs`
+- `assets/icon/arpeggio.svg`
+- `tests/Arpeggio.Core.Tests/Daw/ChannelPaletteTests.cs`
+- `docs/design.md`
+- `docs/implementation.md`
