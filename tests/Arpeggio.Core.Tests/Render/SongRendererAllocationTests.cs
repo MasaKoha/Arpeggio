@@ -20,11 +20,16 @@ namespace Arpeggio.Core.Tests.Render
             const int StereoChannels = 2;
             const int BufferFrames = 256;
             const int SongLengthTicks = 48;
-            const int LoopCount = 4;
+            const int LoopCount = 16;
             Song song = TestSongFactory.CreateActiveSong(chip, SongLengthTicks);
             var renderer = new SongRenderer(song, new RenderSettings(SampleRate, LoopCount, 0));
             var samples = new float[BufferFrames * StereoChannels];
-            renderer.Render(samples);
+            // 静的テーブルの初回初期化や最初のノート遷移・マクロ進行を計測区間に入れないため、1 秒ぶん先に鳴らす。
+            int warmupFrames = SampleRate;
+            while (warmupFrames > 0)
+            {
+                warmupFrames -= renderer.Render(samples.AsSpan(0, Math.Min(warmupFrames, BufferFrames) * StereoChannels));
+            }
             long positionBefore = renderer.PositionSamples;
             int remainingFrames = SampleRate;
             long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();

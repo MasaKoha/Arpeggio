@@ -283,3 +283,96 @@ tests/Arpeggio.Core.Tests/Document/ChipReferenceTests.cs
 tests/Arpeggio.Core.Tests/Session/BatchOperationTests.cs
 tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
 ```
+
+
+# M1-C 実装記録（2026-09-07）
+
+## 実装範囲
+
+Avalonia 12.1.2 の DAW、カスタム描画ピアノロール、トラック選択・ミュート・ゴースト、全 8 kind の音色編集、トランスポート、SDL3 リアルタイム再生、明示保存・履歴、外部ファイル監視を追加した。Program が依存を組み立て、Views は入力通知と表示に限定する。Core / CLI / MCP は変更していない。git 操作、ビルド、テスト実行、アプリ起動は行っていない。
+
+## M1-C の実装判断
+
+- **明示保存と Core の自動保存の両立**: Core の公開 API を変更できないため、DAW 内の `DawDocument` が一時作業ファイルの `EditSession` を所有する。編集・検証・自動保存・参照交換を既存 API に任せ、Ctrl+S でのみ正本用セッションに現在の内容を渡して `Save()` する。一時ファイルは Dispose で削除する。
+- **ドラッグ履歴**: ドラッグ途中でも `NoteEditor.Update` で公開し、押下前の履歴を保持して終了時に一操作へまとめる。無効位置への移動は Core の検証で拒否し、最後の有効位置を維持する。作業ファイルへの I/O と JSON コピーは UI の編集操作に発生するため、大曲でのドラッグ性能は実測対象。
+- **音声スレッド**: `IAudioOutput` と `PlaybackEngine` を明示的に結線。SDL3 stream の get コールバックに固定 pin バッファを渡す。停止時は get コールバックを解除して進行中呼び出しの完了を待ち、stream を破棄してから pin を解放する。通常の合成は `Render` だけで、UI は `Render` / `Seek` / `RenderAll` を呼ばない。
+- **表示状態の公開**: 位置は Interlocked、警告は事前確保配列へ追記して件数を Volatile 公開する。UI はライブの RenderReport リストを列挙しない。ネイティブコールバック内の例外は境界で捕捉し、Poll で停止とステータス表示へ渡す。
+- **ループ**: Renderer の既存ループ機構に `int.MaxValue` 回を指定する。表示位置はソングのループ区間へ折り返す。ループ切替は先頭から再開する。テンポ・長さ・undo/redo は出力停止後に Reset する。
+- **音色**: チャンネルと互換のある音色だけを一覧へ出す。実際の音色 JSON に存在する項目から専用入力を作り、ADSR は項目別、GB 波形は 32 整数列で編集する。名前とパラメータは適用ボタンで一履歴にまとめる。マクロパーサは CLI 変更禁止を優先して DAW 内に同形式の小さな実装を置いた。
+- **外部変更**: colors の watcher の変更集約・置換検出・購読解除を踏襲した。正規 JSON の内容比較により自己保存・重複通知を除外する。dirty なら R の確認待ちにし、Ctrl+S 前にも再検査して通知遅延による上書きを防ぐ。OS をまたぐ同時書き込み全体のトランザクションは提供しない。
+- **描画**: ノート別コントロールは生成しない。可視範囲のグリッドとノートだけを描き、Pen/Brush と文字を再利用する。停止中は位置が変わらなければ再描画しない。音色パネルも参照が変わらない限り入力内容を維持する。
+
+SDL の確認元: [公式 binding Audio PInvoke](https://github.com/edwardgushchin/SDL3-CS/blob/main/SDL3-CS/SDL/Audio/audio/PInvoke.cs)、[get コールバック解除の同期保証](https://wiki.libsdl.org/SDL3/SDL_SetAudioStreamGetCallback)、[stream 破棄](https://wiki.libsdl.org/SDL3/SDL_DestroyAudioStream)。使用 API は SDL 3.2.0 からの範囲に限定した。指定 NuGet の実体はローカルキャッシュになく、3.4.16 のパッケージ実体との完全照合は未確認。
+
+## M1-C のテストコード
+
+`tests/Arpeggio.Core.Tests/Daw/` に Avalonia を起動しない 23 ケースを追加した。`IMainWindowView` と `IAudioOutput` はテスト用実装へ置換する。
+
+| 対象 | 検証内容 |
+|---|---|
+| MainWindowPresenter | ノート追加・移動・削除・undo/redo、Ctrl+S まで正本不変、自己保存の遅延通知、clean 外部更新の再読込、dirty 外部更新の確認待ち、通知前の保存保護、不正 JSON と重複ノートの状態保持 |
+| PianoRollPresenter | 移動途中の参照交換、一ドラッグ一履歴、無移動で redo 維持、右端 resize と次ノート長、Alt スナップ解除、ゴースト非対象、音量上下限 |
+| TransportPresenter | UI Poll では合成しない、再生・停止・先頭復帰、次バッファへのノート編集反映、テンポ変更と undo の停止・再開、完走、ループ、位置表記の境界 |
+
+## M1-C の静的確認
+
+- 設計書全文・既存実装記録・C# 規約・Colors.Viewer・avalon の記録を参照。
+- Core の編集・履歴・音色・レンダラー型と namespace、Avalonia 12.1.2 のローカル参照 XML、SDL 公式 binding を照合。
+- 新規 C# の括弧対応・public/protected summary・ブロック namespace・省略名・明示型を確認。AXAML・csproj・manifest の XML 形式を検証。
+- イベント解除、音声停止前のリソース寿命、初期化失敗時の解放、View のテキスト／ComboBox 入力とグローバルショートカットの干渉を確認。
+
+## M1-C 未完了
+
+- **テストプロジェクト参照が確認待ち**: 今回の指示が csproj 変更を DAW のみに制限しているため、`tests/Arpeggio.Core.Tests/Arpeggio.Core.Tests.csproj` は変更していない。追加済みテストをコンパイルするには、同ファイルの ProjectReference 群に次の 1 行が必要。ユーザーへ例外許可を問い合わせ済み。参照追加前はソリューションビルドを完了できない。
+
+  ```xml
+  <ProjectReference Include="..\..\src\Arpeggio.Daw\Arpeggio.Daw.csproj" />
+  ```
+
+- **実行確認は依頼者側**: `dotnet build Arpeggio.slnx` の警告ゼロ、`dotnet test tests/Arpeggio.Core.Tests` の成功、`arpeggio-daw <path.arpeggio.json>` の起動、macOS/Windows のネイティブ SDL 読み込みと音声出力、数百ノートのドラッグ／横スクロール／ズーム／鍵盤同期を未確認。
+- **音声の実測**: 次バッファでの編集反映・停止時の切断・再生カーソルと実音のバッファ遅延・ループ継ぎ目・全チップ音色・デバイスエラーを実機で確認する。表示位置は供給済みフレーム位置であり、スピーカー出力より SDL/OS のバッファ分だけ先行する。
+- **固定パッケージの照合**: NuGet restore とコンパイルで SDL3-CS 3.4.16 / SDL3-CS.Native 3.4.2 の組み合わせを確認する。ネイティブ代替は採用していない。
+
+## M1-C 変更ファイル一覧
+
+更新: `docs/design.md`、`docs/implementation.md`、DAW の Program と csproj。以下は DAW の追加・更新ファイルおよび新規テストの全一覧。
+
+```text
+src/Arpeggio.Daw/App.axaml
+src/Arpeggio.Daw/App.axaml.cs
+src/Arpeggio.Daw/Arpeggio.Daw.csproj
+src/Arpeggio.Daw/Audio/AudioCallback.cs
+src/Arpeggio.Daw/Audio/IAudioOutput.cs
+src/Arpeggio.Daw/Audio/PlaybackEngine.cs
+src/Arpeggio.Daw/Audio/SdlAudioOutput.cs
+src/Arpeggio.Daw/Editing/DawDocument.cs
+src/Arpeggio.Daw/Presenters/IMainWindowView.cs
+src/Arpeggio.Daw/Presenters/InstrumentMacroText.cs
+src/Arpeggio.Daw/Presenters/InstrumentPanelPresenter.cs
+src/Arpeggio.Daw/Presenters/InstrumentParameter.cs
+src/Arpeggio.Daw/Presenters/InstrumentParameterEditor.cs
+src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs
+src/Arpeggio.Daw/Presenters/PianoRollDragMode.cs
+src/Arpeggio.Daw/Presenters/PianoRollPresenter.cs
+src/Arpeggio.Daw/Presenters/TransportPresenter.cs
+src/Arpeggio.Daw/Program.cs
+src/Arpeggio.Daw/Views/InstrumentPanelView.axaml
+src/Arpeggio.Daw/Views/InstrumentPanelView.axaml.cs
+src/Arpeggio.Daw/Views/KeyboardStripControl.cs
+src/Arpeggio.Daw/Views/MainWindow.axaml
+src/Arpeggio.Daw/Views/MainWindow.axaml.cs
+src/Arpeggio.Daw/Views/PianoRollControl.cs
+src/Arpeggio.Daw/Views/TimeRulerControl.cs
+src/Arpeggio.Daw/Views/TrackListView.axaml
+src/Arpeggio.Daw/Views/TrackListView.axaml.cs
+src/Arpeggio.Daw/Views/TransportView.axaml
+src/Arpeggio.Daw/Views/TransportView.axaml.cs
+src/Arpeggio.Daw/Watch/SongFileWatcher.cs
+src/Arpeggio.Daw/app.manifest
+tests/Arpeggio.Core.Tests/Daw/DawPresenterFixture.cs
+tests/Arpeggio.Core.Tests/Daw/FakeAudioOutput.cs
+tests/Arpeggio.Core.Tests/Daw/FakeMainWindowView.cs
+tests/Arpeggio.Core.Tests/Daw/MainWindowPresenterTests.cs
+tests/Arpeggio.Core.Tests/Daw/PianoRollPresenterTests.cs
+tests/Arpeggio.Core.Tests/Daw/TransportPresenterTests.cs
+```

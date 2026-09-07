@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.InstrumentPanelView">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="12" Spacing="8">
+      <TextBlock Text="音色" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock x:Name="KindLabel" />
+      <ComboBox x:Name="InstrumentSelector" HorizontalAlignment="Stretch" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="AddButton" Content="追加" />
+        <Button x:Name="RemoveButton" Content="削除" />
+      </StackPanel>
+      <TextBlock Text="名前" />
+      <TextBox x:Name="NameInput" />
+      <StackPanel x:Name="ParameterPanel" Spacing="6" />
+      <TextBlock Text="マクロ：15,14,12/2（/以降は0始まりループ位置）。空欄で解除。"
+                 TextWrapping="Wrap" Opacity="0.65" />
+      <Button x:Name="ApplyButton" Content="音色を適用" HorizontalAlignment="Stretch" />
+      <TextBlock Text="編集した音色を使うすべてのノートに反映されます。"
+                 TextWrapping="Wrap" Opacity="0.65" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

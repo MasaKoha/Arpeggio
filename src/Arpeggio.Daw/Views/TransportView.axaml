@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Arpeggio.Daw.Views.TransportView">
+  <StackPanel Orientation="Horizontal" Margin="12,8" Spacing="10">
+    <Button x:Name="PlayButton" Content="▶ 再生" MinWidth="90" />
+    <Button x:Name="StopButton" Content="■ 停止" />
+    <Button x:Name="LoopButton" Content="ループ OFF" MinWidth="100" />
+    <TextBlock Text="BPM" VerticalAlignment="Center" />
+    <TextBox x:Name="TempoInput" Width="72" />
+    <TextBlock Text="長さ (tick)" VerticalAlignment="Center" />
+    <TextBox x:Name="LengthInput" Width="90" />
+    <TextBlock x:Name="PositionLabel" FontFamily="monospace" FontSize="20" VerticalAlignment="Center" Margin="16,0" />
+    <TextBlock Text="Space 再生/停止 · Ctrl+S 保存" Foreground="#94A8BA" VerticalAlignment="Center" />
+  </StackPanel>
+</UserControl>
