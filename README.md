@@ -11,7 +11,16 @@
 
 ## 状態
 
-M1 実装中（Core → CLI/MCP → DAW の順）。
+M1（Core / CLI / MCP / DAW）と M2（効果音プリセット・音声解析・OGG 書き出し・SNES への WAV 取り込み・DAW の効果音／解析パネル）を実装済み。次は M3（NSF / VGM 書き出し・MIDI 取り込み）。
+
+## AI 向けの基本手順
+
+1. `arpeggio chip-reference nes` でチップの制約（チャンネル構成・音域・音色 kind・エフェクトの単位）を読む
+2. `arpeggio new` で曲、または `arpeggio sfx new --preset jump` で効果音の雛形を作る
+3. `note add` / `instrument add` / `apply` で打ち込む。`--instrument` を省略するとトラックのチャンネルに合う音色を自動で選ぶ
+4. `show` で曲の形を目視し、`export wav` で書き出す
+5. `analyze` で音量・周波数・無音・クリップを数値で確認し、直す
+6. 人に渡すときは `arpeggio-daw <path>` で開いてもらう。DAW での保存は CLI / MCP 側からそのまま読める
 
 ## ビルド
 
@@ -95,6 +104,38 @@ arpeggio redo melody.arpeggio.json
 
 CLI 履歴は `<path>.history/state.json` に最大 50 件保存する。外部更新後は古い履歴を無効にする。履歴ファイルが破損している場合は `<path>.history` を退避して再実行する。
 
+### 効果音と解析
+
+```sh
+arpeggio sfx list
+arpeggio sfx new jump.arpeggio.json --preset jump --chip nes
+arpeggio export wav jump.arpeggio.json jump.wav --tail 0
+arpeggio analyze jump.arpeggio.json            # ソングをレンダリングして解析（--track N でソロ）
+arpeggio analyze wav jump.wav --window-ms 100  # 既存 WAV を解析
+```
+
+プリセットは `jump / coin / hit / explosion / powerup / laser / blip / select`。`analyze` は長さ・RMS・ピーク・クリップ数・無音割合・左右差・帯域比率・窓ごとの支配的周波数と音名、および警告（クリップ・小音量・先頭無音・末尾無音・左右差）と合成側の警告（音域クランプ等）を返す。`--json` で全窓を取得できる。
+
+### OGG 書き出しと WAV 取り込み
+
+```sh
+arpeggio export ogg melody.arpeggio.json melody.ogg --quality 0.5
+arpeggio instrument import-wav drums.arpeggio.json --id 1 kick.wav --root C4 --loop-start 0 --loop-end 0
+```
+
+`export ogg` のオプションは `export wav` と同じ＋ `--quality`（-0.1〜1）。`import-wav` は SNES の音色に 16 bit PCM の WAV を埋め込む（ステレオはモノラルへミックス）。`--no-loop` でワンショット。
+
+## DAW
+
+```sh
+arpeggio-daw melody.arpeggio.json
+```
+
+- 左: トラック一覧（選択・ミュート）。中央: ピアノロール（クリックで追加、ドラッグで移動、右端ドラッグで長さ、Delete で削除、上下キーで音量、Alt でスナップ解除、Ctrl＋ホイールでズーム）。右: 「編集」（ノートのエフェクト・音色）「解析」「SFX」タブ。下: 再生 / 停止 / ループ / BPM / 長さ / 書き出し
+- Space 再生・停止、Ctrl+S 保存、Ctrl+Z / Ctrl+Shift+Z、Ctrl+E 書き出し（拡張子で WAV / OGG）
+- AI が CLI / MCP で保存すると自動で再読み込みする。未保存の編集がある場合はステータスバーで確認を待つ
+- 音声出力は SDL3（macOS / Windows）
+
 ## MCP
 
 復元・ビルド済みの `arpeggio-mcp` 実行ファイルを MCP クライアントの stdio サーバーとして登録する。
@@ -110,7 +151,7 @@ CLI 履歴は `<path>.history/state.json` に最大 50 件保存する。外部�
 }
 ```
 
-ツールは `new_song` / `open_song` / `save_song` / `song_info` / `show_song` / `add_note` / `remove_note` / `update_note` / `apply_operations` / `add_instrument` / `update_instrument` / `remove_instrument` / `export_wav` / `undo` / `redo` / `chip_reference`。
+ツールは `new_song` / `open_song` / `save_song` / `song_info` / `show_song` / `add_note` / `remove_note` / `update_note` / `apply_operations` / `add_instrument` / `update_instrument` / `remove_instrument` / `export_wav` / `export_ogg` / `undo` / `redo` / `chip_reference` / `analyze_song` / `analyze_wav` / `new_sfx` / `sfx_presets` / `import_wav_sample`。
 
 `new_song` と編集ツールは成功時に自動保存する。`open_song` は現在の曲とセッション履歴を差し替える。MCP の履歴はセッション内に保持し、CLI の履歴とは共有しない。`add_instrument` / `update_instrument` の `instrument` と `apply_operations` の `operations` は JSON **文字列**で渡す。音色更新はオブジェクト全体の置き換え。ノートの `effects` も JSON 配列文字列、省略で既存値を保持し `[]` で解除する。
 
