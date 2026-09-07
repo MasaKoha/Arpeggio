@@ -18,7 +18,7 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>解析結果と操作可否を表示する。</summary>
         void ShowAnalysis(string text, bool isRunning);
         /// <summary>書き出し通知と操作可否を表示する。</summary>
-        void ShowExportStatus(string text, bool isRunning);
+        void ShowExportStatus(string text, bool isRunning, string? lastExportedPath);
         /// <summary>ファイル監視と保存先入力を新しい文書へ切り替える。</summary>
         void SwitchDocument(string path);
         /// <summary>非同期処理の通知を UI スレッドで実行し、完了を待つ。</summary>
