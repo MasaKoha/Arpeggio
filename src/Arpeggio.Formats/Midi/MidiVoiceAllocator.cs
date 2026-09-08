@@ -259,7 +259,7 @@ namespace Arpeggio.Formats.Midi
             };
         }
 
-        private static int CompareNotes(MidiVoiceNote left, MidiVoiceNote right)
+        internal static int CompareNotes(MidiVoiceNote left, MidiVoiceNote right)
         {
             int comparison = left.Timing.StartTick.CompareTo(right.Timing.StartTick);
             if (comparison != 0)

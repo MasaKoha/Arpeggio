@@ -1678,6 +1678,82 @@ D1／D2 の予定実装とテストコードは追加済み。受け入れ条件
 - `tests/Arpeggio.Core.Tests/Formats/IndependentVgmParserTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/ParsedVgm.cs`
 - `tests/Arpeggio.Core.Tests/Formats/VgmTestStream.cs`
+# M3-E5 / E6 実装記録（2026-09-08）
+
+## M3-E5 / E6 設計との差
+
+- 設計書は変更しない。E5 の入口を `MidiInstrumentMapper.Map`（分類・実時間 gate・量子化）と `CreateInstruments`（採用順の音色生成）に分ける。ID の同 tick 順は E4 の割り当て比較順を共用する。NES / GB はチャンネル種別、Noise は分類、SNES は preset 名で共有する。
+- E2 の申し送りどおり、打楽器の固定 gate 内の CC7 / CC11 / CC121 の実効変更を E5 で診断する。元 Off との比較は量子化前の実時間で行い、CC120 適用後の gate を比較対象とする。
+- SNES の既存 Preset setter は内部で再生用サンプルを準備する。Core の変更禁止と既存プリセット利用を優先してこの既存経路を使用する。Formats / テストから PCM 配列・レンダリングを作らず、ドキュメントの設定値を検証する。
+- E6 の保存 API は `MidiSongFile.Write(result, path, dryRun, cancellationToken, sourcePath)` とし、`MidiSongFileResult` で Written / DestinationExists / Report を返す。入力パスを保持できるフロントエンドは sourcePath を渡す。Stream の Import は入力名を SourceName で受ける既存仕様を維持する。I/O・保存競合・キャンセルは例外を伝播し、変換 report を I/O の失敗で汚さない。
+- MidiImportResult は検証済み JSON を不変文字列として保持し、Song は編集用に独立した候補とする。候補の後編集はこの結果の保存内容へ反映しない。strict 警告時も候補と予定サイズを返すが保存を拒否し、変換エラー時は候補を返さない。
+
+## M3-E5 / E6 未完了
+
+- E5 / E6 の予定実装とテストコードは追加済み。受け入れ条件の実行確認は未完了で、依頼者側に残る。
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ、既存 1363 件と今回の追加 75 ケースの全成功。静的集計では合計 1438 件見込みだが、ランナーの検出件数・成功は未確認。
+- 実ファイルの保存往復、同時新規保存の競合、一時ファイル清掃、部分 Stream の I/O 失敗とキャンセルのテスト実行。コード読解とテスト作成を実行確認済みとは扱わない。
+- CLI / MCP / DAW への接続は設計の F2 / F3 / G2 に残る。ファイル入力を扱う側は保存 API の sourcePath に実入力パスを渡す。PCM 再生・VGM / NSF との全体統合回帰は後続ランの対象。
+
+## M3-E5 実装・静的確認
+
+- GM 全 128 program、既定 NES / GB 音色、SNES の preset 推奨値・エコー無効、全ドラム表と未知番号のフォールバック、固定 gate・CC120・Noise 減衰マクロを実装した。
+- 音色 ID は採用ノートを E4 と同じ順で走査して 1 から採番し、未採用音色を生成しない。ProgramApproximated は採用した channel / program ごとに一件。打楽器の音量 CC 警告は量子化前の固定 gate で判定する。
+- MidiInstrumentMapperTests / MidiDrumMappingTests と専用 fixture を追加。全 program、音色共有、ID 決定性、全表・未知ドラム、同時優先・後発打撃・両 polyphony、元 Off / sustain / CC120 / CC123、固定 gate 内の CC を対象とする。
+- E5 のコード・テストコード・型と namespace の照合・括弧対応・境界値の静的確認を終えて E6 に進む。コンパイル・テスト成功は未確認。
+
+## M3-E6 実装・静的確認
+
+- `MidiImporter.Import(Stream, options)` から reader → collector → tempo → 音色分類・固定 gate・量子化 → allocator → 採用音色 → SongSerializer / SongValidator を接続した。全固定トラック、空トラック、明示 InstrumentId、Muted=false / Pan=0 / DefaultInstrumentId=null / LoopStartTick=0 を保持する。
+- 曲長は入力 EOT・採用後ノート終端・最小 48 tick の最大値とし、固定 gate と短音延長後にも 1800 秒上限を検証する。曲名の優先順位、version 1、SNES エコー無効、既存統計と生成音色一覧の統計をまとめ、UTF-8 BOM なしの予定サイズを算定する。
+- strict は診断収集・有効 Song・JSON の確定を止めず、保存だけを拒否する。変換エラー時は Song / Json とも null。元 MIDI byte、options の候補配列、他の取り込み結果を変更しない。
+- `MidiSongFile` は確定 JSON を隣接一時ファイルに CreateNew で書き、flush・キャンセル確認後に上書きなしの File.Move で確定する。既存ファイル、存在確認後の競合、入力同一パスを保護し、失敗時は自分が作った一時ファイルを清掃する。履歴・現在セッションには触れない。
+- dry-run は Import で確定した全診断・予定サイズを保持し、保存先の存在を DestinationExists で返す。Stream 書き込みは Seek を要求せず、leaveOpen=true で所有権を維持する。I/O 失敗・キャンセルによる部分 Stream は巻き戻せない。
+
+## M3-E5 / E6 テストコード
+
+`tests/Arpeggio.Core.Tests/Formats/` に 4 クラス・35 メソッド・75 ケースと fixture 1 型を追加した。ケース数は属性の静的集計。PCM レンダリング・外部エミュレーター・アロケーション計測は追加していない。
+
+| ファイル | 検証内容 |
+|---|---|
+| MidiInstrumentMapperTests | 全 128 program の対応と三チップでの実生成、推奨値・エコー無効、音色共有、未採用音色の除外、同 tick / 異なる出力トラックの時系列採番、独立インスタンス、channel / program ごとの警告 |
+| MidiDrumMappingTests | 全ドラム表・未知番号、Noise selection と減衰マクロの全値、SNES 原速、固定 gate・元 Off との実時間比較、CC120 / CC123 / sustain / 音量 CC、同時分類優先、後発打撃の両モード、SNES 6＋2 / 8 声 |
+| MidiImporterTests | 三チップ・format 0 / 1 の正規 JSON 往復、全トラックと音色互換、先頭無音と tempo 積分、タイトル優先・Latin-1、strict と制限のみの成功、4096 明細上限後の全警告数、空・不正入力と設定、固定 gate / 短音延長後の資源超過、元データ保持、入力 Stream 所有権 |
+| MidiSongFileTests | 三チップの BOM なし保存・サイズ・再読込、dry-run と DestinationExists、strict / 変換失敗時の無書き込み、既存パスと同時保存競合、入力同一パス拒否、候補後編集からの確定 JSON の隔離、キャンセル、保存先 I/O 失敗、部分 Stream と非所有契約 |
+
+## M3-E5 / E6 静的確認と未実行の確認事項
+
+- 自前型の定義・namespace・公開範囲、.NET 10 の File / FileStream / StreamWriter / CancellationToken と xUnit 2.9.2 の API を照合した。テストの Core internal 型参照は独立した型対応の検証へ直し、Core の可視性を変更していない。
+- 変更 C# の構造上の括弧対応、日本語 summary XML と public メンバーへの隣接、一ファイル一型、ブロック namespace、末尾空白、禁止省略名・Unity lifecycle・PCM Render 呼び出しの不使用を確認した。`Assert.Single(collection, predicate)` を使用し、Where を渡す書き方を追加していない。
+- 開始時の SHA-256 と比較し、既存コードの変更は MidiVoiceAllocator の比較メソッドを internal にした点と MidiImportOptions の古い summary 更新だけ。Core・設計書二つ・既存テスト・プロジェクト定義は不変。Formats の依存は Core と BCL のみで、NuGet の追加はない。
+- git 操作、Unity / アプリ起動、コンパイル、`dotnet build` / `dotnet test`、PCM・実 JSON 出力の生成は実施していない。指定作業ディレクトリ外への書き込みはない。30 分以内に実装・テストコード・記録をまとめた。
+
+## M3-E5 / E6 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/Midi/MidiVoiceAllocator.cs`
+- `src/Arpeggio.Formats/Midi/MidiImportOptions.cs`
+- `docs/implementation.md`
+
+新規（Formats）:
+
+- `src/Arpeggio.Formats/Midi/MidiInstrumentMapper.cs`
+- `src/Arpeggio.Formats/Midi/MidiInstrumentMap.cs`
+- `src/Arpeggio.Formats/Midi/MidiDrumDefinition.cs`
+- `src/Arpeggio.Formats/Midi/MidiDrumControllerDiagnostics.cs`
+- `src/Arpeggio.Formats/Midi/MidiImporter.cs`
+- `src/Arpeggio.Formats/Midi/MidiImportResult.cs`
+- `src/Arpeggio.Formats/Midi/MidiSongFile.cs`
+- `src/Arpeggio.Formats/Midi/MidiSongFileResult.cs`
+
+新規（Tests）:
+
+- `tests/Arpeggio.Core.Tests/Formats/MidiMappingFixture.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiInstrumentMapperTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiDrumMappingTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiImporterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiSongFileTests.cs`
 
 # M3-D3 / D4 実装記録（2026-09-08）
 
