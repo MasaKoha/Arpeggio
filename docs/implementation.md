@@ -1238,6 +1238,55 @@ A1 / A2 の予定コードとテストコードは追加済み。受け入れ条
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterDiagnosticsTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/RegisterTimelineTests.cs`
 
+# M3-C2 実装記録（2026-09-08）
+
+## M3-C2 設計との差
+
+- API と失敗時の契約は B1 と同じ `GameBoyRegisterCompiler.Compile(ControlTimeline, ConversionReport)` → 不変の `RegisterTimeline?` とする。エラーまたは strict 警告時は null とし、部分列を公開しない。
+- 分割表に従い Noise と時間経過による Pulse envelope の増減は C3 へ残す。C2 の Pulse は `E=InitialVolume` を保持する。共通制御 V による音量変更には設計どおり DAC off／再 trigger を使う。この段階的制限は API と limitations にも明記する。
+- Wave の On は routing 解除後に規定の RAM／DAC／trigger 順を実行し、trigger 後に routing を復元する。継続更新の high は trigger=0、Wave On の high は新周期と trigger を一度に書く。Pulse は low → high（trigger=0）で新周期を先に設定してから一定音量と trigger を書く。Wave の段階音量 0 は NR32=0 を維持し、DAC を止めるのは Off と RAM 更新時とする。
+- パン診断は発音する各元ノートの On で一度記録する。Pulse／Wave の音量量子化と音域制限は各制御値を診断し、既存レポートで元ノートへ集約する。終端は対応三声の Off に続き、設計にある全体停止列を明示する（NR42=0 は Noise の発音実装を意味しない）。
+
+## M3-C2 実装範囲と判断
+
+- `GameBoyRegisterCompiler` は呼び出しごとに独立した三声の直前値と NR51 shadow を持つ。初期化は NR52=0 → NR52=$80 → NR50=$77 → NR51=0 → NR10=0 とし、以後 NR52 を書かない。length enable はリセット値 0 を保持し、全 frequency high／trigger 書き込みでも bit 6 を立てない。
+- 周期は既存 `PitchTable.ClampMidiNote` の連続音域へ制限し、Pulse=131072、Wave=65536 の分子で ToEven の整数周期を求め、1〜2048 から register=2048−period へ写す。継続時の low／high は独立に比較し、trigger bit は shadow の周期値に混ぜない。
+- Pulse の四種 duty は NR11／NR21 の上位 2 bit へ写す。最終音量は共通 V と初期 envelope 音量の積を AwayFromZero で整数化し、hardware envelope pace=0 とする。正の目標音量の変更では自声 routing 解除 → DAC off → 必要な周期差分 → 一定音量 → trigger → routing 復元とする。0 音量では DAC と routing を落とし、同じ 0 の継続では再書き込みしない。
+- Wave On は同じ波形でも必ず全 16 byte を DAC off 中にロードし、偶数サンプルを上位ニブルへ詰める。NR32／NR33 → DAC on → NR34 trigger → routing 復元の順序を保つ。音量段階の境界を明示し、中点では小さい段階を選ぶ。継続の音量変更で RAM と trigger を更新しない。
+- NR51 は左／右／両側の固定量子化とし、自声の二つのビットだけを置換する。個別 Off と Pulse 再トリガーで他声のパンを維持し、NR50 に声別音量の補償を持ち込まない。有限終端に NR51=0、NR12／NR22／NR42=0、NR30=0 を明示する。
+- `PitchClamped`、`VolumeQuantized`、`WaveVolumeQuantized`、`PanReduced`、`EnvelopeRetriggered` を記録する。数値近似の最大誤差は順に半音、0〜15 レベル、0〜1 振幅、-1〜1 パンの単位。Pulse 音量の差は設計どおり 1e-9 以下を警告から除外し、通常の周期量子化は恒常的制限だけにする。
+- `GameBoyRegisters` は実機アドレスとビット、`GameBoyRegisterChannel` は声の配置と直前値、`GameBoyRegisterValues` は量子化と元ノート診断を担当する。書き込みは 4000000 件を超える前にエラーとし、strict でも各制御値の診断を集めた後に列の公開を拒否する。
+
+## M3-C2 テストコード
+
+3 テストクラス、30 メソッド／86 ケースと共有テストデータを追加した。PCM を作らず、レジスタ列とドキュメントモデルを直接検証する。生成コードの定数はテストへ流用せず、固定アドレス・値を独立に置いた。
+
+| ファイル | 検証内容 |
+|---|---|
+| GameBoyRegisterCompilerTests | 初期化・先頭無音・順序番号、両 Pulse の A4=1750 と四種 duty、Wave A4=1899 と全 RAM packing／起動順、NR32 全段階と三つの中点、Wave VolumeSlide、三声それぞれのパン ±1／±0.5001／±0.5／0 と元位置診断 |
+| GameBoyRegisterTransitionTests | 三声の low／high 差分、high 単独変更、vibrato と同音 On の強制 trigger、音量／周期同時変更、0 音量保持と復帰、0 音量 On、全 Off → 全 On、各 Wave On の RAM 全ロードと DAC 状態の逐次観測、個別 Off の他声維持、length enable 無効、空曲／発音曲の終端、非ゼロ loopStartTick の有限二周 |
+| GameBoyRegisterDiagnosticsTests | 三声の音域両端、通常周期量子化の警告抑制、変調中の最大誤差集約、初期 envelope との音量積と半整数丸め、C3 に残す時間 envelope、明細保持ゼロの strict 拒否、ミュート、Noise の段階的無視、元 Song／Wave 配列／レポート／次回変換からの隔離、読み取り専用列、先行エラーとチップ不一致 |
+| GameBoyRegisterTestData | 150 BPM・1 フレーム=2 tick=735 sample の短い曲と、時刻ごとの書き込み観測を共用する |
+
+## M3-C2 静的確認
+
+- 設計書全文、M3-A／B1 の実装記録と既存 Formats／テスト、C# 規約を参照した。自前型の定義・namespace、.NET 10 の参照 XML、xUnit 2.9.2 の API を照合した。
+- 追加 C# の括弧対応、summary XML、ブロック namespace、一ファイル一型、末尾空白を検査した。A4・オクターブ変更・high 単独変更の固定値は生成コードを実行せず独立した算術で照合した。
+- 作業開始時のハッシュと比較し、既存ファイルの変更は `docs/implementation.md` だけであることを確認した。Core、両設計書、既存テスト、プロジェクト／依存定義は不変。Formats の依存は Core と BCL のままで、JSON version 1 の変更はない。
+- 追加実装に Render／ReadSample／NoiseOscillator／PCM 生成、ファイル保存、Unity lifecycle の呼び出しはない。git 操作、Unity 起動、コンパイル、`dotnet build`／`dotnet test` は実施していない。アロケーション計測テストも追加していない。
+
+## M3-C2 未完了
+
+C2 の予定実装とテストコードは追加済み。受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` のエラー・警告ゼロ。
+- 既存 812 件と追加 86 ケースの成功。予定総数 898 件で、実際の検出件数は未確認。
+- 外部プレイヤー・実機での聴取と副作用は未検証。C3 の Noise・時間経過によるソフトウェア envelope・VGM 接続は本ランの対象外であり未実装。
+
+## M3-C2 変更ファイル一覧
+
+更新:
+
 # M3-B2 実装記録（2026-09-08）
 
 ## M3-B2 設計との差
@@ -1297,6 +1346,14 @@ B1 のテストは、暫定の Noise／DPCM 無視ケースを DPCM エラーへ
 
 新規:
 
+- `src/Arpeggio.Formats/Export/GameBoyRegisterCompiler.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisters.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisterChannel.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisterValues.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyRegisterCompilerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyRegisterTransitionTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyRegisterDiagnosticsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyRegisterTestData.cs`
 - `src/Arpeggio.Formats/Export/NesConversionDiagnostics.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesNoiseRegisterTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesConversionDiagnosticsTests.cs`
