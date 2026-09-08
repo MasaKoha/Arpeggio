@@ -42,6 +42,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Arpeggio.Codecs\Arpeggio.Codecs.csproj" />
     <ProjectReference Include="..\Arpeggio.Core\Arpeggio.Core.csproj" />
+    <ProjectReference Include="..\Arpeggio.Formats\Arpeggio.Formats.csproj" />
   </ItemGroup>
 
   <!-- SDL3-CS 3.4.16 のソースジェネレーターは SDK 10.0.300 の Roslyn より新しいコンパイラを要求するため除外する。バインディング本体は lib の DLL に含まれる -->

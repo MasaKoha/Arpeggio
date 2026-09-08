@@ -2033,3 +2033,87 @@ H1→H2 の順で予定した実装・テストコード作成と静的確認を
 - `GameBoyRegisterTraceChipTests.cs`
 - `GameBoyRegisterResynthesisTests.cs`
 - `GameBoyRegisterRetriggerTests.cs`
+
+# M3-F3 / G1 実装記録（2026-09-08）
+
+## M3-F3 設計との差
+
+- 新三ツールだけに共通の MCP 変換応答を設け、既存 Invoke のセッションロック内で実行する。成功は既存 MCP と同じく error を省略し、path / written / dryRun / destinationExists / exitCode / report を返す。失敗は code / error / exitCode を加え、I/O 失敗で確定済み report を変更しない。
+- channelMap の文字列境界は CLI の map と同じ厳密なキー・配列検証を MCP 内で行う。CLI のファイル読み取りや側車履歴に依存させず、MCP import は MidiSongFile だけで新規 JSON を保存する。既存 MCP と同じく側車履歴は操作しない。
+
+## M3-F3 実装・静的確認
+
+- ArpeggioTools に export_nsf / export_vgm / import_midi を追加。既存 23 ツールのメソッド・引数・処理は変更していない。登録名の既存契約テストは 26 名へ拡張した。
+- export は共有ロック内で現在の Song を Prepare し、session.Path を入力保護へ渡す。import は未オープンでも実行でき、SourceName・基準テンポ・量子化・polyphony・JSON 文字列 map・title・strict を既存 Formats へ接続する。
+- ConversionToolsTests に引数既定値、現在曲と共通サービスの byte / report 一致、三チップ import、dry-run、strict、0 / 1 / 2 / 3、既存出力・入力保護、共有 Song / Path / undo / redo 不変、不正 map / MIDI を追加した。
+- 自前型の定義・namespace、既存 SessionOutput / Invoke の JSON とロック、保存 API の所有権・例外分類を照合した。F3 のコード・テスト作成と静的確認を先に完了して G1 へ進む。
+
+## M3-F3 未完了
+
+- コードの予定範囲は追加済み。dotnet build / dotnet test は依頼に従い未実行。警告・エラーゼロ、既存全件と新規契約テストの成功は依頼者側の確認待ち。
+- MCP ホストからの呼び出し、実ファイル保存、外部プレイヤー／実機確認は未実施。
+
+## M3-G1 設計との差
+
+- 設定・診断は既存右ペインへ「書き出し」タブを追加して表示する。ExportPresenter が選択先・設定の有効性・診断済み plan を保持し、保存時に再変換しない。設定変更は plan を破棄するが、診断後の通常の曲編集は開始時スナップショットを維持する。
+- Prepare に CancellationToken がないため、Task.Run の開始前・変換終了後にキャンセルを確認する。終了・文書切替では結果を破棄して保存と View 通知を抑止する。保存は既存 Write のキャンセルと一時ファイル清掃へ委ねる。
+- OS ピッカーの ShowOverwritePrompt を有効にし、選択確定時に存在した出力だけ上書き許可を渡す。新規候補が診断中に作られた場合は Write の新規移動で拒否する。入力パスは選択時に固定し、手入力した拡張子も Presenter と Formats の双方で検証する。
+
+## M3-G1 実装・静的確認
+
+- ExportFileTypes のチップ別拡張子候補を OS ピッカーと手入力の検証で共用する。NES は WAV / OGG / NSF / VGM、GB は WAV / OGG / VGM、SNES は WAV / OGG。既存の WAV / OGG の設定と SongFileExporter は変更していない。
+- ChipExportView を右ペインへ追加。loops / author / NSF 専用 copyright / strict、形式選択時の制限、診断と保存を非モーダルに表示する。末尾余白・sample rate は追加していない。低いウィンドウでも入力と診断をスクロールできる。
+- ExportPresenter が選択時の入力パス・上書き許可・診断済み plan を保持する。Prepare は開始時の独立 Song、Save は同一 plan と確定パスを使用し、成功後だけ LastExportedPath を更新する。失敗時は同じ plan で再試行できる。設定変更・文書切替・終了では候補を破棄する。
+- 既存の Task.Run / IsRunning / CancellationTokenSource / UI ディスパッチの流儀に合わせ、音声・診断・保存を相互に二重開始不可とした。文書の Opened 購読は Dispose で解除する。終了後・キャンセル後はキュー済み通知も公開せず、View が終了通知を破棄しても実行状態を解放する。
+- ChipExportPresenterTests に候補の大小文字・適合性、同じ plan の保存、長さ／予定サイズ／位置付き警告、strict と恒常的制限の区別、設定変更、既存出力・診断中の新規競合・入力保護、I/O 再試行、文書切替を追加。ChipExportLifetimeTests に準備／保存中の二重開始、編集からの隔離、終了キャンセル、キュー済み結果抑止、終了通知破棄、変換中の文書切替を追加した。
+
+## M3-F3 / G1 最終静的確認
+
+- 新規テストは 3 クラス・21 メソッド・51 ケース（属性からの静的集計）。MCP の既存ツール列挙テストを 26 名へ拡張し、FakeMainWindowView に任意の遅延ディスパッチ境界を追加した。既存テストの削除・期待値の緩和はない。アロケーション計測テストは追加していない。
+- Core / Formats の型定義と namespace、Avalonia 12.1.2 のローカル参照 XML（TextChangedEventArgs / IsCheckedChanged / FilePickerSaveOptions）、.NET 10.0.8 の Task / TaskCompletionSource / File / Path / Array、xUnit 2.9.2 の Assert API を照合した。
+- 変更 C# の字句上の括弧対応・ブロック namespace・summary XML・末尾空白、XAML と csproj の XML を静的確認した。View に Presenter というプロパティは追加していない。Assert.Single に Where の結果を渡していない。
+- 開始時 SHA-256 と比較して Core / Formats / CLI / 両設計書は不変。MCP と DAW に Formats の ProjectReference だけを追加し、NuGet と JSON version 1 は変更していない。
+- git 操作、作業ディレクトリ外への書き込み、アプリ／Unity 起動、コンパイル、dotnet build / dotnet test は行っていない。README に新三ツールの引数・report と DAW の診断／保存手順を追記した。
+
+## M3-G1 未完了
+
+コードの予定範囲とテストコードは追加済み。受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。C# / XAML のコンパイルと xUnit アナライザを含む。
+- 既存全件と追加 51 ケースの成功・実際の検出件数。既存 WAV / OGG、MCP の全ツール、保存競合・キャンセル・一時ファイル清掃・同一 plan の保存を含む。
+- DAW 実画面のレイアウト、NSF / VGM の OS ピッカーの候補と手入力・上書き確定、Ctrl+E、設定変更・strict・保存・終了時の表示。MCP stdio ホスト経由の呼び出し。
+- NSF / VGM の外部プレイヤー／実機・聴取確認。今回の静的確認と未実行テストコードを実機検証済みとは扱わない。
+
+## M3-F3 / G1 変更ファイル一覧
+
+更新（12 ファイル）:
+
+- `README.md`
+- `docs/implementation.md`
+- `src/Arpeggio.Mcp/Arpeggio.Mcp.csproj`
+- `src/Arpeggio.Mcp/ArpeggioTools.cs`
+- `src/Arpeggio.Daw/Arpeggio.Daw.csproj`
+- `src/Arpeggio.Daw/Presenters/ExportPresenter.cs`
+- `src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs`
+- `src/Arpeggio.Daw/Views/AudioFilePicker.cs`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs`
+- `tests/Arpeggio.Core.Tests/Daw/FakeMainWindowView.cs`
+
+新規（9 ファイル）:
+
+- `src/Arpeggio.Mcp/McpConversionExecution.cs`
+- `src/Arpeggio.Mcp/McpMidiChannelMap.cs`
+- `src/Arpeggio.Daw/Presenters/ExportFileTypes.cs`
+- `src/Arpeggio.Daw/Presenters/ChipExportReportText.cs`
+- `src/Arpeggio.Daw/Views/ChipExportView.axaml`
+- `src/Arpeggio.Daw/Views/ChipExportView.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Mcp/ConversionToolsTests.cs`
+- `tests/Arpeggio.Core.Tests/Daw/ChipExportPresenterTests.cs`
+- `tests/Arpeggio.Core.Tests/Daw/ChipExportLifetimeTests.cs`
+
+
+## 提案
+
+- channelMap の JSON 解析を Formats に共通化する。CLI / MCP と今後の G2 で重複キー・数値境界の検証がずれるのを防ぐ。見積もり: 1 ラン。本ランでは実装しない。

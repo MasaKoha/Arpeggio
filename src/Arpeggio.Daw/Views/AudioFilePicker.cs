@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Formats;
 using Arpeggio.Daw.Presenters;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -22,6 +23,14 @@ namespace Arpeggio.Daw.Views
         {
             Patterns = new[] { "*.ogg" }, MimeTypes = new[] { "audio/ogg" }
         };
+        private readonly FilePickerFileType nsfType = new FilePickerFileType("NSF v1 — NES")
+        {
+            Patterns = new[] { "*.nsf" }
+        };
+        private readonly FilePickerFileType vgmType = new FilePickerFileType("VGM v1.71 — NES / GB")
+        {
+            Patterns = new[] { "*.vgm" }
+        };
         private bool isPicking;
         private bool isDisposed;
 
@@ -38,16 +47,25 @@ namespace Arpeggio.Daw.Views
                 if (isDisposed) { return; }
                 using IStorageFile? file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
                 {
-                    Title = "WAV / OGG を書き出す", SuggestedStartLocation = directory,
+                    Title = "曲を書き出す", SuggestedStartLocation = directory,
                     SuggestedFileName = GetSongBaseName(sourcePath) + ".wav",
-                    DefaultExtension = "wav", FileTypeChoices = new[] { wavType, oggType }, ShowOverwritePrompt = true
+                    DefaultExtension = "wav", FileTypeChoices = GetExportTypes(presenter), ShowOverwritePrompt = true
                 });
                 if (isDisposed || file == null) { return; }
                 if (sourcePath != presenter.DocumentPath)
                 {
                     throw new InvalidOperationException("文書が切り替わりました。書き出し先を選び直してください。");
                 }
-                await presenter.Export.RunAsync(RequireLocalPath(file));
+                string path = RequireLocalPath(file);
+                ExportFileTypes.Validate(path, presenter.PianoRoll.Song.Chip);
+                if (ExportFileTypes.GetChipFormat(path) != ConversionFormat.None)
+                {
+                    presenter.Export.SelectChipDestination(path, overwrite: File.Exists(path));
+                }
+                else
+                {
+                    await presenter.Export.RunAsync(path);
+                }
             }
             catch (Exception exception)
             {
@@ -90,6 +108,23 @@ namespace Arpeggio.Daw.Views
 
         /// <summary>閉じた画面への選択結果の適用を抑止する。</summary>
         public void Dispose() => isDisposed = true;
+
+        private IReadOnlyList<FilePickerFileType> GetExportTypes(MainWindowPresenter presenter)
+        {
+            var choices = new List<FilePickerFileType>();
+            foreach (string extension in ExportFileTypes.GetExtensions(presenter.PianoRoll.Song.Chip))
+            {
+                choices.Add(extension switch
+                {
+                    ".wav" => wavType,
+                    ".ogg" => oggType,
+                    ".nsf" => nsfType,
+                    ".vgm" => vgmType,
+                    _ => throw new InvalidOperationException("未知の書き出し候補です。")
+                });
+            }
+            return choices;
+        }
 
         private static string RequireLocalPath(IStorageFile file) => file.TryGetLocalPath()
             ?? throw new InvalidOperationException("ローカルファイルを選択してください。");
