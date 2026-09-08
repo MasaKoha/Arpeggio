@@ -40,7 +40,7 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.Equal(expected, result.Writes.Where(write => write.Address == 0x4003).Select(write => write.Frame));
             double expectedMaximum = source.Timeline.Events.Where(control => control.TrackIndex == 0 && control.Note is not null)
                 .Max(control => Math.Abs(Math.Round(control.PositionSamples * 1000000.0 / (44100 * 16639.0), MidpointRounding.AwayFromZero) * 16639 - control.PositionSamples * 1000000.0 / 44100));
-            ConversionDiagnostic warning = Assert.Single(source.Report.Warnings.Where(diagnostic => diagnostic.Code == "NsfTimingQuantized" && diagnostic.SourceEvent == 0));
+            ConversionDiagnostic warning = Assert.Single(source.Report.Warnings, diagnostic => diagnostic.Code == "NsfTimingQuantized" && diagnostic.SourceEvent == 0);
             Assert.NotNull(warning.MaximumError);
             Assert.InRange(warning.MaximumError.Value, 0, 8319.5);
             Assert.Equal(expectedMaximum, warning.MaximumError.Value, 6);
@@ -96,8 +96,8 @@ namespace Arpeggio.Core.Tests.Formats
             NsfFrameTimeline? result = NsfFrameCompiler.Compile(source.Timeline, source.Report);
             Assert.NotNull(result);
             Assert.Equal(new byte[] { 0xBA }, result.Writes.Where(write => write.Frame == 1 && write.Address == 0x4000).Select(write => write.Value));
-            Assert.Single(result.Writes.Where(write => write.Address == 0x4003));
-            ConversionDiagnostic warning = Assert.Single(source.Report.Warnings.Where(diagnostic => diagnostic.Code == "ControlUpdateCoalesced"));
+            Assert.Single(result.Writes, write => write.Address == 0x4003);
+            ConversionDiagnostic warning = Assert.Single(source.Report.Warnings, diagnostic => diagnostic.Code == "ControlUpdateCoalesced");
             Assert.Equal(1L, warning.SourceTick);
             Assert.Equal(1L, warning.OccurrenceCount);
             Assert.Equal(15, source.Timeline.Events.First(control => control.Kind == ControlEventKind.NoteOn).Volume * 15);
