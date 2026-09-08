@@ -7,7 +7,7 @@
       <TextBlock Text="エフェクト（kind / value）" />
       <ListBox x:Name="EffectList" MinHeight="48" MaxHeight="140" />
       <ComboBox x:Name="KindSelector" HorizontalAlignment="Stretch" />
-      <TextBox x:Name="ValueInput" Classes="numeric" Text="0" Watermark="整数 value" />
+      <TextBox x:Name="ValueInput" Classes="numeric" Text="0" PlaceholderText="整数 value" />
       <StackPanel x:Name="ArpeggioInputs" Spacing="4" IsVisible="False">
         <TextBlock Text="第2音 / 第3音の半音差（各 +0〜+15）" FontSize="11" />
         <Grid ColumnDefinitions="*,*">

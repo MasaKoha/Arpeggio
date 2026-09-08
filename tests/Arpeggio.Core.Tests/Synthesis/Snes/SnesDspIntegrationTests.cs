@@ -4,11 +4,13 @@ using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Synthesis.Snes;
+using Arpeggio.Core.Tests.Analysis;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Synthesis.Snes
 {
     /// <summary>ノイズ・ピッチ変調と内部 DSP 時間軸を実際のレンダラー経由で検証する。</summary>
+    [Collection(AllocationCollection.Name)]
     public sealed class SnesDspIntegrationTests
     {
         private const int SampleRate = 32000;

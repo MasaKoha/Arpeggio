@@ -7,6 +7,7 @@ using Xunit;
 namespace Arpeggio.Core.Tests.Render
 {
     /// <summary>実際の発音・マクロ・ループ境界を通るコールバックの割り当てを検証する。</summary>
+    [Collection(AllocationCollection.Name)]
     public sealed class SongRendererAllocationTests
     {
         /// <summary>全チップでウォームアップ後の 1 秒間に管理ヒープを割り当てない。</summary>
