@@ -285,6 +285,14 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - 配布はランタイム同梱の macOS `.app`／Windows ZIP。`tools/build_app.sh` で生成し、macOS の Bundle ID は `dev.pisuke.arpeggio`。Developer ID 署名・公証は行わず、ローカル実行用の ad-hoc 署名だけを付ける。
 - 引数なしでは既存の SNES デモをユーザーデータ領域へ初回コピーして開く。macOS の関連付け／Dock ドロップは `App` が受信し、CLI と同じ Presenter／文書読み込み経路へ渡す。一文書を維持し、複数ファイルの一括要求と未保存時の別文書への切り替えは拒否する。同一パスの通知は前面化のみ。
 
+### Avalon による GUI 観測（2026-09-08）
+
+- Debug かつ隣接 `../Avalon/src/Avalon/Avalon.csproj` が存在する場合だけ参照と `AVALON` 定数を有効にする。Release の配布物へ操作サーバーを含めない。Avalon がない環境で単独ビルドできる構成を維持する。
+- Program の AppBuilder に組み込み、`onStarted` で状態取得関数を登録する。画面生成前でも登録できるよう Presenter / View は取得時に解決する。編集・再生の状態は Presenter の読み取り専用プロパティ、座標は View の現在のレイアウトから取得する。
+- 文書の読み込み・明示保存の成功通知と、書き出しの既存表示通知を診断ログへ接続する。終了時に購読・状態登録・ホストを解放する。
+- 座標はウィンドウ内 DIP とし、可視領域の原点・縦横スクロール・tick 幅・半音高を公開する。詳細なキー・座標式・操作 JSON は [avalon.md](avalon.md) を正本とする。
+- この worktree の現行編集は単一選択。FL 式の複数選択・コピペ・音量レーン・スナップ選択は未反映であり、Avalon 統合を理由に編集挙動は変更しない。
+
 ### M1-C の編集・再生境界（2026-09-07）
 
 - DAW は `DawDocument` が一時作業ファイル上の `EditSession` を所有する。Core の自動保存・検証・参照交換・`SongHistory` をそのまま利用し、正本への書き込みは Ctrl+S で正本用 `EditSession.Save()` を呼ぶ。Core / CLI / MCP の自動保存仕様は変えない。

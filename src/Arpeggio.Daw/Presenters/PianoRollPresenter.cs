@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Daw.Editing;
@@ -42,6 +43,13 @@ namespace Arpeggio.Daw.Presenters
         public PianoRollDragMode DragMode { get; private set; }
         /// <summary>選択中のノート。</summary>
         public Note? SelectedNote => document.Song.Tracks[SelectedTrack].Notes.Find(note => note.Tick == SelectedTick);
+
+        /// <summary>現在の選択に対応する実在ノート数。現行の単一選択では 0 または 1。</summary>
+        public int SelectedNoteCount => SelectedNote is null ? 0 : 1;
+        /// <summary>選択中ノートの開始 tick。未選択または削除済みなら空文字。</summary>
+        public string SelectedTicks => SelectedNote?.Tick.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        /// <summary>通常編集時のスナップ解像度。Alt による一時解除は含めない。</summary>
+        public int SnapTicks => GridTicks;
 
         /// <summary>トラック切替時に前の操作を確定する。</summary>
         public void SelectTrack(int trackIndex)

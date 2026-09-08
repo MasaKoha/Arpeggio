@@ -21,6 +21,11 @@ namespace Arpeggio.Daw.Presenters
             this.playback = playback;
             this.changed = changed;
         }
+        /// <summary>音声出力の現在の再生状態。ポーリングや合成は行わない。</summary>
+        public bool IsPlaying => playback.IsPlaying;
+        /// <summary>音声出力へ供給済みの再生位置。取得による再生の進行はない。</summary>
+        public double PositionTick => playback.PositionTick;
+
         /// <summary>再生と停止を切り替える。</summary>
         public void TogglePlayback()
         {
