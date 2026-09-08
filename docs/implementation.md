@@ -991,3 +991,91 @@ README.md
 - `README.md`
 - `docs/design.md`
 - `docs/implementation.md`
+
+# M3-A1 / A2 実装記録（2026-09-08）
+
+## M3-A 設計との差
+
+- 設計書の変更は行わない。未指定の制御列 API は `ControlTimeline.Create(Song, ChipExportOptions)` とし、列（失敗時 null）と共通レポートを `ControlTimelineResult` で返す。ファイル用の Prepare / Write は後続ランに残す。
+- 制御イベントには不変の元ノート情報・適用後の音程／正規化音量／デューティ・発音後の制御フレーム数を保持する。音色の固定パラメーターとトラック情報も不変コピーにし、可変な Song / Note / Instrument を外へ返さない。GB エンベロープ等の最終整数化は後続のレジスタ変換が担当する。
+- 診断の全体件数・code 別件数は occurrenceCount の合計。保持明細だけを元位置と code で集約し、保持上限後の未保持発生数を別計数する。最大誤差は `MaximumError`（診断ごとの単位）、original / converted は文字列表現として補完する。strict は保持明細数に依存させない。
+- VoiceModulation は別アセンブリの Formats から計算を共用するため public とする。既存の internal メンバーだけを公開し、明示 public コンストラクターと日本語 summary を追加する。InternalsVisibleTo・計算式変更・合成側の呼び出し変更は行わない。
+
+## M3-A 実装範囲と判断
+
+- **A1**: `Arpeggio.Formats` をソリューションへ登録し、参照は Core のみとした。共通 report / diagnostic / limits、ChipExportOptions、MidiImportOptions と必要 enum を追加した。MIDI の解析・音色変換・割り当ては E 系列で実装する。
+- **診断**: warnings / errors は各 4096 明細まで。元ノートの同じ原因は発生数と最大誤差へ集約し、上限後の未保持数と code 別全数も残す。strict は WarningCount 全体で CanWrite を拒否し、limitations は除外する。明細保持上限はテキスト表示用途に規定値以下へ下げられる。
+- **上限**: 有限 loops、展開後 1800 秒、元ノート 250000 件、メタデータの UTF-16 長・NUL・形式適合を制御列作成前に検査する。レジスタ数・VGM サイズ・NSF ROM／曲データ・MIDI 入力資源も共通の事前検証 API にした。ファイルや Stream への書き込み API はこのランでは追加していない。
+- **A2**: SongValidator 成功後、JSON 往復で独立スナップショットを作る。SNES は複製前に拒否し、プリセット PCM / BRR の生成経路にも入らない。公開する列はイベント値・不変な元ノート／効果・トラック／音色情報だけとした。
+- **走査**: 各トラックの元開始・Delay 後開始・元終端・周回開始の遅延列挙を、FrameClock の次境界と統合する。全境界の事前展開や毎サンプル走査をしない。使用中の列挙子は構築側の finally で破棄する。イベント数は元ノート数×最大周回数と演奏長×60 Hz×固定トラック数により有限に制限される。
+- **更新順**: 既存 TrackSequencer の遷移を使い、グローバルフレーム更新後に交代を適用する。旧ノートの同時刻更新値は捨て、全トラックの Off → トラック順の On／継続更新とする。再発音のスライド期間は SongRenderer と同じ、丸めた残り tick のサンプル数から求める。
+- **終端・衝突**: 曲本体の終端で空／ミュートを含む全チャンネルに停止を出す。正の発音期間が 0 サンプルへ潰れる場合は ControlEventCollision とし、部分列を返さない。曲全体が 0 サンプルへ丸められる場合も検査する。ミュートの制御列は終端停止だけとする。
+- **後続への境界**: NES / GB の周期・最終整数音量・レジスタ副作用・DPCM 拒否は B / C、NSF の PLAY 時刻への量子化は D で扱う。共通 Volume はチップ固有 envelope / Wave 出力レベル適用前の V とし、GB 計算用の発音後フレーム数と固定音色設定を保持する。
+
+## M3-A テストコードと既存出力の保持
+
+`tests/Arpeggio.Core.Tests/Formats/` に 5 クラス、34 メソッド／59 ケースを追加した。アロケーション計測テストは追加していない。
+
+| ファイル | 検証内容 |
+|---|---|
+| ConversionReportTests | strict と制限の区別、各 4096 明細の境界、明細保持 0 でも警告／エラーによる拒否、元ノート集約・最大誤差・全数／code 別数、読み取り専用ビュー |
+| ConversionLimitsTests | options の既定値、loops 1/16、展開後 1800 秒、ミュート込み元ノート数、レジスタ数・VGM / NSF / MIDI サイズの両端、メタデータ・チップ適合 |
+| ControlTimelineTests | Delay・残り期間・半サンプル丸め、フレーム途中 On、短音、同時二声の Off → On、有限二周と Delay 中の周回、既存シーケンサーの全サンプル観測との照合、ゼロサンプル衝突、ミュート・全停止、空一秒曲の 61 境界 |
+| ControlModulationTests | 空マクロ・再発音、マクロ終端／LoopIndex・複合効果の固定値、GB envelope との分離、Triangle / Noise / Wave の配線 |
+| ControlIsolationTests | 元 Song・Note・効果・マクロ・Wave 配列変更からの隔離、公開コレクションの不変性、三チップの変換前後の PCM 全ビット・JSON 全バイト・RenderReport 一致、アセンブリ依存方向 |
+
+既存 PCM・JSON の保持は、依頼で許可された **既存レンダリング／JSON テストを変更せず通す方法**を採用した。既存 `SongRendererTests` の分割／一括／Seek 一致、各合成器テスト、`SongSerializerTests.RoundTripPreservesCanonicalUtf8Bytes` 等を維持し、上記の変換前後比較を加えた。ビルド・テスト実行が禁止されているため、M3 前 PCM の新規ハッシュ採取はしていない。新テストの前後比較は変換の非干渉を検証するもので、過去リビジョンの固定ハッシュとの比較ではない。
+
+## M3-A 静的確認
+
+- 自前型の定義・namespace と .NET 10 / xunit 2.9.2 のローカル参照 XML を照合した。C# の括弧対応、日本語 summary の隣接と XML、ブロック namespace、プロジェクト／ソリューション XML を検査した。
+- 開始時のファイルハッシュと照合し、Core の既存変更は VoiceModulation だけ、既存テストコードはすべて不変であることを確認した。VoiceModulation の可視性・追加 summary・空の明示コンストラクターを取り除いた内容の SHA-256 は開始時と完全一致した。
+- 設計書 2 ファイル、CLI / MCP / DAW / Codecs 群、Core の csproj・合成・シーケンサー・レンダラー・JSON 実装は開始時と同じバイト列。Formats の ProjectReference は Core だけ、PackageReference と InternalsVisibleTo の追加なし。
+- Formats には Render / ReadSample / NoiseOscillator / PCM 配列／ファイル書き込みの呼び出しがないことを検索と呼び出し経路で確認した。Unity lifecycle / GetComponent / AddComponent の追加なし。VoiceModulation.Start は通常の状態初期化メソッド。
+- git 操作、コンパイル、dotnet build / dotnet test、音声生成・アプリ起動は実施していない。
+
+## M3-A 未完了
+
+A1 / A2 の予定コードとテストコードは追加済み。受け入れ条件の実行確認は未完了で、依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` のエラー・警告ゼロ。
+- `dotnet test tests/Arpeggio.Core.Tests` の既存 676 件と今回の追加 59 ケースの成功。追加後の実際の検出件数も依頼者側で確認する。
+- 既存レンダリング／JSON テストと今回の三チップ非干渉テストによる PCM・JSON・RenderReport の一致。依頼者が別途採取した M3 前の出力がある場合は、それとのバイト比較。
+- 既存 4 クラスの AllocationCollection を含む、Render / NoteOn / 音色交換の GC 回帰確認。新たなアロケーション計測ケースは増やしていない。
+
+## M3-A 変更ファイル一覧
+
+更新:
+
+- `Arpeggio.slnx`
+- `src/Arpeggio.Core/Synthesis/VoiceModulation.cs`
+- `tests/Arpeggio.Core.Tests/Arpeggio.Core.Tests.csproj`
+- `docs/implementation.md`
+
+新規:
+
+- `src/Arpeggio.Formats/Arpeggio.Formats.csproj`
+- `src/Arpeggio.Formats/ConversionFormat.cs`
+- `src/Arpeggio.Formats/ConversionDiagnostic.cs`
+- `src/Arpeggio.Formats/ConversionDiagnosticKey.cs`
+- `src/Arpeggio.Formats/ConversionDiagnosticCollection.cs`
+- `src/Arpeggio.Formats/ConversionReport.cs`
+- `src/Arpeggio.Formats/ConversionLimits.cs`
+- `src/Arpeggio.Formats/Export/ChipExportOptions.cs`
+- `src/Arpeggio.Formats/Export/ControlEventKind.cs`
+- `src/Arpeggio.Formats/Export/ControlEvent.cs`
+- `src/Arpeggio.Formats/Export/ControlNote.cs`
+- `src/Arpeggio.Formats/Export/ControlTrack.cs`
+- `src/Arpeggio.Formats/Export/ControlInstrument.cs`
+- `src/Arpeggio.Formats/Export/ControlTimeline.cs`
+- `src/Arpeggio.Formats/Export/ControlTimelineResult.cs`
+- `src/Arpeggio.Formats/Export/ControlTimelineBuilder.cs`
+- `src/Arpeggio.Formats/Export/ControlTrackCursor.cs`
+- `src/Arpeggio.Formats/Export/ControlBoundaries.cs`
+- `src/Arpeggio.Formats/Midi/MidiImportOptions.cs`
+- `src/Arpeggio.Formats/Midi/MidiPolyphonyMode.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ConversionReportTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ConversionLimitsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ControlTimelineTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ControlModulationTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ControlIsolationTests.cs`
