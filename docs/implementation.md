@@ -1361,3 +1361,104 @@ B1 のテストは、暫定の Noise／DPCM 無視ケースを DPCM エラーへ
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterTerminationTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterGateModel.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesEffectRegisterTests.cs`
+
+# M3-D1 / D2 実装記録（2026-09-08）
+
+## M3-D1 / D2 設計との差
+
+- 未指定の API は `NsfFrameCompiler.Compile(ControlTimeline, ConversionReport)` → `NsfFrameTimeline?`、`NsfDataEncoder.Encode(NsfFrameTimeline, ConversionReport)` → `NsfEncodedData?` とする。PLAY 単位の書き込みは `NsfRegisterWrite` でサンプル単位と区別する。既存 NES 変換へ渡す内部列だけ、PLAY 時刻に最も近い整数サンプルで表す。この代表サンプルの再量子化は必ず元 PLAY 番号へ戻り、誤差診断は代表サンプルを介さず元サンプル対 PLAY 時刻で計算する。
+- 同フレームの On 後の更新は最終制御値を持つ On 一つへ集約し、Off 前の継続更新は停止で置き換える。削除した制御値ごとに `ControlUpdateCoalesced` を記録する。通常の 60 Hz 更新間隔は PLAY より長いため、更新同士だけの衝突は通常入力では発生しないが、同じ集約規則で扱う。On／Off 衝突は集約前に拒否する。
+- ドライバーの独立 CPU 実行器は設計の分割表どおり D3、NSF ヘッダー・ROM 配置とファイルの受理／予算拒否の統合は D4 に残す。D2 では命令列・ラベル・生成コードに基づく保守的な静的上限を提供する。
+
+## M3-D1 実装範囲とテストコード
+
+- `NsfTiming` は checked 整数式で絶対時刻を量子化する。`NsfFrameCompiler` は元ノート位置付きの時刻誤差（µs）・衝突・集約診断を返し、全 Off → トラック順 On／更新を維持して既存 NES コンパイラーへ渡す。元の制御列・Song・レジスタ変換規則は変更しない。
+- `NsfDataEncoder` は時刻順・許可アドレス・1800 秒相当の終端を検証し、サイズ算定と上限確認後にだけデータ配列を確保する。WAIT は 1〜65535、END は一つ。同値書き込みも順序どおり保持する。予定サイズはヘッダー＋固定 bank＋4 KiB 整列データ bank、データ型は不変コピーとする。
+- `NsfFrameCompilerTests` は絶対時刻・半 PLAY 境界・三周の誤差・短音拒否・二重 On・隣接 Off／On・On 後のマクロ集約・Off 前の更新抑止・strict／明細ゼロ・元 Song 保持を検証する。
+- `NsfDataEncoderTests` は WAIT 0／1／65535／65536、先頭無音・終端・同値書き込み、4 KiB 境界・ROM 上限、実現可能なデータ上限直前／直後、禁止アドレス・不正時刻・逆順・strict・不変性を固定値で検証する。データ長は 3n+1 なので、曲データ容量 1044480 に対する直前／直後は 1044478／1044481 byte となる。
+
+## M3-D2 実装範囲と命令列
+
+- `NsfDriverBuilder` は 123 命令と許可アドレス表 24 byte、合計 **290 byte** を生成する。残り 3806 byte をゼロ埋めして bank 0 を 4096 byte とする。INIT=`$8000`、PLAY=`$8064`、ReadByte=`$80E5`、許可表=`$810A`。コードは曲内容に依存しない。
+- `NsfCodeBuilder` は限定命令のラベルを解決し、未定義ラベル・相対分岐の範囲外・固定 bank 超過を生成エラーにする。長距離の条件分岐は「逆条件で直後の JMP を飛ばす」命令列とし、相対分岐の暗黙の切り詰めは行わない。`NsfDriverImage` は実バイト・実アドレス・解決済み命令列・ラベルを不変ビューで公開する。
+- 使用 opcode は `05 18 20 38 4C 60 85 8D 90 9D A0 A5 A9 AA B1 BD C6 C9 D0 E6 F0`。`NsfOpcode.None=0` は生成不可で、BRK として扱わない。IRQ／DMA／PPU／SP 変更／ROM 自己書き換えは生成しない。命令長・サイクルの参照は設計の [NESdev 命令仕様](https://www.nesdev.org/wiki/Instruction_reference) と [6502 命令表](https://www.nesdev.org/obelisk-6502-guide/reference.html)。この環境から本文の直接取得は 403 だったため、検索可能な記載と命令表の固定値を照合した。独立 CPU での実行照合は D3 に残る。
+
+作業 RAM は `$00/$01`=データポインター、`$02`=bank、`$03/$04`=残り PLAY 間隔、`$05`=終端状態。INIT は予約分を含む `$00–$1F` をゼロにし、APU 初期化後にポインター `$9000` と bank 1 を明示設定する。SP は操作せず、ReadByte の JSR は成功・失敗とも RTS で対になって戻る。
+
+| 経路 | 命令列の要点 |
+|---|---|
+| 再 INIT | `LDA #0; STA $00 … STA $1F` → `$4015/$4010/$4011=0`、sweep=`08`、frame counter=`C0` → `$01=90; $02=1; $5FF9=1; RTS` |
+| PLAY 入口 | `$05 != 0` なら RTS。待機が正なら、low=0 のとき high を DEC してから low を DEC。16 bit 全体が 0 になった呼び出しでだけ NextCommand へ進む |
+| WRITE | ReadByte → offset が `$18` 未満かつ許可表で 1 か確認 → X に offset → ReadByte → `STA $4000,X` → NextCommand |
+| WAIT | ReadByte を二回使い `$03/$04` へ little-endian で格納。0 は Fail、正ならそのまま RTS。WAIT=1 の次の PLAY が次群を実行する |
+| END | `$05=1; RTS`。以後の PLAY はデータを読まず RTS。正常 END では直前の停止済み APU 状態を保持する |
+| Fail | `$4015=0` → END と同じ停止状態を設定。未知データ命令、不正アドレス、WAIT=0、bank 255 越えを防御的に停止する |
+| ReadByte | 読み出し前にポインター high=`A0` を検査。bank=`FF` なら SEC／RTS。それ以外は bank を増やして `$5FF9` だけへ書き、high=`90`。`LDY #0; LDA ($00),Y; INC $00`、桁上がり時だけ `INC $01`、CLC／RTS |
+
+読み出し後に bank を変更しないため、命令／オペランド途中の `$9FFF` 越えも次 byte から新 bank となる。bank 255 の最終 END は high が `A0` になっても正常に返り、次のデータ読み出しを行わず終了する。ReadByte は読み出した A とオフセット X をカーソル更新で壊さず、Y=0 と carry による成功／失敗を呼び出し契約に使う。
+
+## M3-D2 静的サイクル上限
+
+`NsfCycleAnalyzer` が解決済み命令グラフを走査する。各条件分岐は常に 4 cycles、間接 Y 読み出しは 6 cycles、絶対 X 読み出しは 5 cycles として、成立しない同時ページ越えも許した保守的上限を取る。JSR／RTS を含め、境界以外の循環は生成エラーにする。
+
+| 項目 | 上限 cycles |
+|---|---:|
+| INIT／再 INIT | **146** |
+| ReadByte（JSR 自体を除く） | 65 |
+| PLAY 入口／待機減算 | 53 |
+| WRITE 一回（dispatch・3 byte 読み出し・bank 越え・末尾 JMP 込み） | 257 |
+| 最後の WAIT／END／防御停止 | 270 |
+| PLAY 全体 | **323 + 257 × 最大同一 PLAY 書き込み数** |
+
+通常の四声同時 On＋初期化の 23 書き込みは **6234 cycles**。29 書き込みは **7776 cycles** で受理し、30 書き込みは **8033 cycles** で `NsfCpuBudgetExceeded` とする。INIT 20000／PLAY 8000 の両方を生成時に検証し、レポートの `maximumInitCycles`／`maximumPlayCycles` へ返す。D4 のファイル保存経路はこの受理結果を利用する。これらは命令グラフの上限であり、実行器で測定した値ではない。
+
+`NsfDriverBuilderTests` は実 byte 列の限定 opcode／長さ／最大 cycles、全ラベルと命令境界、固定 bank・ゼロ埋め、再 INIT・待機借り下がり・終端・byte 読み出し・許可表の固定バイト列、静的予算境界、再生成の決定性・不変性・strict を検証する。
+
+## M3-D1 / D2 静的確認
+
+- 指定設計書全文、M3-A／B1／B2／C2 記録、既存制御列・レジスタ列・NES／GB コンパイラーと規約を参照した。自前型の定義・namespace、.NET 10 のローカル参照 XML（ArgumentNullException／Array／Dictionary）、既存 xUnit の API を照合した。
+- 変更 C# 18 ファイルの括弧対応・日本語 summary XML と public メンバーへの隣接・一ファイル一型・ブロック namespace・末尾空白を検査した。禁止省略名、Unity lifecycle／コンポーネント API、Render／ReadSample／NoiseOscillator／Subscribe の追加はない。
+- C# の命令生成記述を静的に展開して、全ラベルのアドレスと相対分岐範囲、命令長、上限式を別の算術集計で照合した。使用量 290 byte、123 命令、INIT 146／ReadByte 65／入口 53／WRITE 257／終端 270 cycles と一致した。C# のコンパイル・生成プログラムの実行・CPU 実行テストを行ったという意味ではない。
+- テストは **3 クラス、25 メソッド／51 ケース**を追加した。四声の制御列→量子化→データ符号化→ドライバー生成の接続、Delay・ミュート・DPCM 拒否も含む。既存 963 件を基準とした予定総数は **1014 件**で、検出件数と成功は未確認。新規テストは PCM を生成せず、アロケーション計測も追加していない。
+- 作業開始時のハッシュと比較し、既存ファイルの変更は `ControlTimeline.cs` の内部コピー用コンストラクター追加と本記録だけ。Core、設計書二つ、既存テスト、プロジェクト依存とフロントエンドは不変。Formats の依存は Core と BCL のみ、JSON version 1 は維持した。
+- git 操作、Unity／アプリ起動、コンパイル、`dotnet build`／`dotnet test`、PCM／NSF ファイル生成は実施していない。指定作業ディレクトリ外への書き込みはない。
+
+## M3-D1 / D2 未完了
+
+D1／D2 の予定実装とテストコードは追加済み。受け入れ条件のうち次の実行確認は依頼者側に残る。実行済み・全受け入れ済みとは扱わない。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 963 件と追加 51 ケースの全件成功、および実際の検出件数の確認。
+- D3: 独立した限定 6502 実行器による flags／stack／分岐／cycles の検証、生成 INIT／PLAY の実行トレースと再 INIT・待機・終端の確認。
+- D4: `NsfWriter`・ヘッダー・bank 配置・独立ロードと保存可否の統合。命令／オペランド／WAIT 途中の 4 KiB 越え、bank 255 最終 END と越境停止、実サイクル数が静的上限以下であることの実行確認。
+- 実機・外部プレイヤーでの互換性・聴取確認は未実施。
+
+## M3-D1 / D2 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/Export/ControlTimeline.cs`
+- `docs/implementation.md`
+
+新規（Formats）:
+
+- `src/Arpeggio.Formats/Export/NsfTiming.cs`
+- `src/Arpeggio.Formats/Export/NsfRegisterWrite.cs`
+- `src/Arpeggio.Formats/Export/NsfFrameTimeline.cs`
+- `src/Arpeggio.Formats/Export/NsfFrameCompiler.cs`
+- `src/Arpeggio.Formats/Export/NsfDataFormat.cs`
+- `src/Arpeggio.Formats/Export/NsfEncodedData.cs`
+- `src/Arpeggio.Formats/Export/NsfDataEncoder.cs`
+- `src/Arpeggio.Formats/Export/NsfOpcode.cs`
+- `src/Arpeggio.Formats/Export/NsfInstructionSet.cs`
+- `src/Arpeggio.Formats/Export/NsfDriverInstruction.cs`
+- `src/Arpeggio.Formats/Export/NsfCodeBuilder.cs`
+- `src/Arpeggio.Formats/Export/NsfCycleAnalyzer.cs`
+- `src/Arpeggio.Formats/Export/NsfDriverImage.cs`
+- `src/Arpeggio.Formats/Export/NsfDriverBuilder.cs`
+
+新規（Tests）:
+
+- `tests/Arpeggio.Core.Tests/Formats/NsfFrameCompilerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfDataEncoderTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfDriverBuilderTests.cs`
