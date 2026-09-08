@@ -10,6 +10,14 @@ namespace Arpeggio.Formats.Export
     {
         private const double PulseClock = 131072;
         private const double WaveClock = 65536;
+        private const double NoiseClock = 262144;
+        private const int MaximumNoiseSelection = 127;
+        private const int NoiseDivisorMask = 7;
+        private const int NoiseSelectionsPerShift = 8;
+        private const int MaximumNoiseShift = 13;
+        private const int NoiseShiftBase = 2;
+        private const double ZeroCodeDivisor = 0.5;
+        private const int ShortNoiseWidth = 7;
         private const int MinimumPeriod = 1;
         private const int MaximumPeriod = 2048;
         private const int MaximumVolume = 15;
@@ -50,14 +58,65 @@ namespace Arpeggio.Formats.Export
 
         internal int CalculatePulseVolume(ControlEvent control, ControlInstrument instrument)
         {
-            // 時間経過による E の増減は C3 で接続する。C2 では初期値と共通制御 V を使う。
-            double target = control.Volume * instrument.InitialVolume;
+            long steps = instrument.EnvelopeStepFrames == 0 ? 0 : control.Frame / instrument.EnvelopeStepFrames;
+            long envelope = instrument.InitialVolume + (instrument.EnvelopeIncreasing ? steps : -steps);
+            double target = control.Volume * Math.Clamp(envelope, 0, MaximumVolume);
+            return QuantizeVolume(control, target);
+        }
+
+        internal int CalculateNoiseVolume(ControlEvent control)
+        {
+            return QuantizeVolume(control, control.Volume * MaximumVolume);
+        }
+
+        private int QuantizeVolume(ControlEvent control, double target)
+        {
             int volume = (int)Math.Clamp(Math.Round(target, MidpointRounding.AwayFromZero), 0, MaximumVolume);
             if (Math.Abs(target - volume) > VolumeTolerance)
             {
-                AddWarning(control, "VolumeQuantized", "Pulse の目標音量を 0〜15 の整数へ量子化しました。", target, volume);
+                AddWarning(control, "VolumeQuantized", "目標音量を 0〜15 の整数へ量子化しました。", target, volume);
             }
             return volume;
+        }
+
+        internal int CalculateNoiseRegister(ControlEvent control, ControlInstrument instrument)
+        {
+            int selection = (int)Math.Round(Math.Clamp(control.MidiNote, 0, MaximumNoiseSelection), MidpointRounding.ToEven);
+            int shift = (MaximumNoiseSelection - selection) / NoiseSelectionsPerShift;
+            double target = NoiseClock / (((selection & NoiseDivisorMask) + 1) * Math.Pow(NoiseShiftBase, shift));
+            int register = FindNearestNoiseRegister(target);
+            double converted = GetNoiseRate(register >> GameBoyRegisters.NoiseClockShift, register & NoiseDivisorMask);
+            if (target != converted)
+            {
+                AddWarning(control, "NoiseRateQuantized", "Noise のクロックを動作可能な NR43 の最寄り値へ量子化しました。", target, converted);
+            }
+            return register | (instrument.LfsrWidth == ShortNoiseWidth ? GameBoyRegisters.NoiseWidthFlag : 0);
+        }
+
+        private static int FindNearestNoiseRegister(double target)
+        {
+            double nearestError = double.PositiveInfinity;
+            int nearestRegister = 0;
+            // NR43 の昇順で同点を更新せず、小さいレジスタ値を選ぶ。
+            for (int shift = 0; shift <= MaximumNoiseShift; shift++)
+            {
+                for (int divisorCode = 0; divisorCode <= NoiseDivisorMask; divisorCode++)
+                {
+                    double error = Math.Abs(Math.Log(GetNoiseRate(shift, divisorCode) / target));
+                    if (error < nearestError)
+                    {
+                        nearestError = error;
+                        nearestRegister = (shift << GameBoyRegisters.NoiseClockShift) | divisorCode;
+                    }
+                }
+            }
+            return nearestRegister;
+        }
+
+        private static double GetNoiseRate(int shift, int divisorCode)
+        {
+            double divisor = divisorCode == 0 ? ZeroCodeDivisor : divisorCode;
+            return NoiseClock / (divisor * Math.Pow(NoiseShiftBase, shift));
         }
 
         internal int CalculateWaveVolume(ControlEvent control, ControlInstrument instrument)
@@ -124,10 +183,13 @@ namespace Arpeggio.Formats.Export
             AddWarning(control, "PanReduced", "連続パンを GB の左 / 両側 / 右 routing へ量子化しました。", pan, converted);
         }
 
-        internal void ReportRetrigger(ControlEvent control)
+        internal void ReportRetrigger(ControlEvent control, ChannelKind channel)
         {
             ControlNote note = control.Note!;
-            _report.AddWarning(new ConversionDiagnostic("EnvelopeRetriggered", "Pulse の継続音量変更で DAC を停止して再トリガーしました。DAC pop と実機の再起動副作用が生じます。")
+            string message = channel == ChannelKind.Noise
+                ? "Noise の継続音量変更で DAC を停止して再トリガーしました。DAC pop と LFSR の再初期化が生じます。"
+                : "Pulse の継続音量変更で DAC を停止して再トリガーしました。DAC pop と実機の再起動副作用が生じます。";
+            _report.AddWarning(new ConversionDiagnostic("EnvelopeRetriggered", message)
             {
                 SourceTrack = control.TrackIndex, SourceEvent = note.SourceEvent, SourceTick = note.Tick,
                 OutputTrack = control.TrackIndex

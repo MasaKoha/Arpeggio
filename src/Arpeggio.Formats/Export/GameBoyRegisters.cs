@@ -17,7 +17,10 @@ namespace Arpeggio.Formats.Export
         internal const ushort WaveVolume = 0xFF1C;
         internal const ushort WaveFrequencyLow = 0xFF1D;
         internal const ushort WaveFrequencyHigh = 0xFF1E;
+        internal const ushort NoiseLength = 0xFF20;
         internal const ushort NoiseEnvelope = 0xFF21;
+        internal const ushort NoiseFrequency = 0xFF22;
+        internal const ushort NoiseTrigger = 0xFF23;
         internal const ushort MasterVolume = 0xFF24;
         internal const ushort Routing = 0xFF25;
         internal const ushort Power = 0xFF26;
@@ -29,6 +32,9 @@ namespace Arpeggio.Formats.Export
         internal const byte PulseOneRouting = 0x11;
         internal const byte PulseTwoRouting = 0x22;
         internal const byte WaveRouting = 0x44;
+        internal const byte NoiseRouting = 0x88;
+        internal const int NoiseWidthFlag = 0x08;
+        internal const int NoiseClockShift = 4;
         internal const byte LeftRoutingMask = 0xF0;
         internal const byte RightRoutingMask = 0x0F;
         internal const int DutyShift = 6;

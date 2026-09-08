@@ -1678,3 +1678,64 @@ D1／D2 の予定実装とテストコードは追加済み。受け入れ条件
 - `tests/Arpeggio.Core.Tests/Formats/IndependentVgmParserTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/ParsedVgm.cs`
 - `tests/Arpeggio.Core.Tests/Formats/VgmTestStream.cs`
+
+# M3-C3 実装記録（2026-09-08）
+
+## M3-C3 設計との差
+
+- 設計書は変更しない。NoiseRateQuantized の original／converted と MaximumError の単位は未指定のため Hz とし、選択自体は規定の対数比で行う。元ノートへの集約と strict の拒否は既存の診断契約に従う。
+- C1 の VgmWriter は既に GB のクロック・B3・Wave RAM・GD3 を符号化できるため、その API へ四声の完成したレジスタ列を渡す。形式 writer の重複実装や新しい公開入口は追加しない。
+- C2 の「時間 envelope／Noise は次ラン」の暫定期待値だけを完成仕様の検証へ更新する。その他の既存テストは保持する。
+
+## M3-C3 実装範囲と判断
+
+- `GameBoyRegisterCompiler` に第四声の Noise を接続した。NR43 は変調後 selection を 0〜127 に制限して ToEven で選び、Core と同じ目標クロックへ divisor code 0〜7／shift 0〜13 の対数比が最小の組を総当たりする。同点は小さい NR43、7 bit 幅は bit 3 とし、停止する shift 14／15 は候補へ入れない。
+- Pulse の E は不変な音色設定と `ControlEvent.Frame` から計算する。step=0 は初期値保持、増減は整数除算の後に 0〜15 へ制限し、共通音量 V と掛けて AwayFromZero で最終整数化する。グローバルな 60 Hz 更新、Delay 後開始、隣接 On と周回再発音でのフレームリセットは既存制御列をそのまま利用する。
+- Pulse と Noise の音量ゲートは同じ処理へまとめた。正音量の開始／変更では自声 routing 解除 → DAC off → 必要な周期設定 → 一定音量 → trigger → routing 復元とする。Noise は NR43 だけを周期として更新し、NR44 の trigger は `$80`、length enable=0。継続ピッチだけでは trigger を出さない。
+- 音量 0 は DAC と routing を停止し、同じ整数音量の継続では再起動しない。ゼロから正音量への復帰を含む継続再起動に `EnvelopeRetriggered` を付け、Noise の説明には LFSR 再初期化を含めた。NR51 shadow は他三声の左右ビットを保ち、開始後の NR52 リセットは行わない。
+- `NoiseRateQuantized`／`VolumeQuantized`／`EnvelopeRetriggered` は既存レポートへ元ノート単位で集約する。strict は明細保持ゼロでも全発生数で拒否する。書き込み上限と有限終端の全停止を維持し、C2 の段階的な未対応 limitation を削除した。
+- C1 の既存 writer へ GB 四声の列を渡せる状態とした。B3・クロック 4194304・Wave RAM の 20〜2F offset・GD3・待機／END の符号化は変更不要。C3 は Formats の Stream 書き出しまでで、ChipExportService／パス保存／CLI は設計どおり F1 に残る。
+
+## M3-C3 テストコード
+
+3 クラスに **22 メソッド／56 ケース**を追加した。既存 C2 の暫定 2 メソッド／3 ケースを完成仕様へ更新し、削除・緩和はしていない。依頼の既存 1363 件に対して **1419 件見込み**で、属性の静的集計による値であり実際の検出件数ではない。PCM・音声合成・外部エミュレーターを使わず、レジスタ列・バイト列・ドキュメントモデルを直接検証する。
+
+| ファイル | 検証内容 |
+|---|---|
+| GameBoyNoiseRegisterTests | 全 128 selection×両 LFSR 幅について整数比の交差積による独立した最短距離／同点順／shift 上限検証、低速端と通常域の固定 NR43、変調後の ToEven／範囲制限、周期差分だけの更新、幅交換・同値 On の強制 trigger、元位置と Hz 誤差集約、strict／明細ゼロ、ミュート、Noise の左右パン境界 |
+| GameBoyEnvelopeRegisterTests | 両 Pulse の増減／step=0／任意整数間隔／0・15 保持、開始音量 0 からの復帰、V×マクロ×VolumeSlide×E の最終丸め、同じ整数音量の更新抑止、時間 envelope 再起動時の他三声維持、Noise の周期・音量同時変更とゼロ保持／復帰、四声それぞれの個別 Off、Delay／global frame／隣接 On／有限二周での E リセット、strict、元音色編集からの隔離 |
+| GameBoyVgmTests | 空曲の全 256 byte header・全命令列・386 byte 全長の固定値、四声の時刻／アドレス／値／全順序番号の完全往復、先頭無音・同時 Off→On・Noise 復帰・時間 envelope・有限二周、日本語 GD3 全 11 欄、Wave RAM 両端の B3 offset、長待機分割、全停止直後の END、決定性・元 JSON 不変・Stream 所有権・strict 拒否、writer を使わない手書き GB ファイルによるパーサー自身の照合 |
+| GameBoyRegisterDiagnosticsTests（更新） | 暫定だった時間 envelope 初期値保持を各フレームの増減へ、Noise 無視を NR42／NR43／NR44／routing の On／Off 固定列へ更新 |
+
+## M3-C3 静的確認
+
+- 設計書全文、既存 Formats・M3 各節の判断と申し送り、C# 規約を参照した。Core／Formats の型定義と namespace、.NET 10 の Math／Array／Stream と xUnit 2.9.2 の参照定義を照合した。
+- 変更・新規 C# 7 ファイルの括弧対応、summary XML と public 宣言への隣接、ブロック namespace、末尾空白、未使用定数、禁止省略名、`Assert.Single(...Where(...))` と Unity lifecycle／コンポーネント API の不使用を確認した。
+- 低速端・同点・上端の NR43 固定値、空 GB VGM の command 46 byte／GD3 84 byte／全長 386 byte、長待機の開始時刻は独立した有理数の算術で照合した。C# のコンパイル・テストコードや writer の実行を行ったという意味ではない。
+- 開始時の SHA-256 と比較し、既存変更は GB 実装 3 ファイル・C2 診断テスト・本記録だけであることを確認した。Core、両設計書、既存 VgmWriter／独立パーサー、他の既存テスト、プロジェクト依存とフロントエンドは不変。Formats の依存は Core と BCL のみ、JSON version 1 を維持した。
+- git 操作、Unity／アプリ起動、コンパイル、`dotnet build`／`dotnet test`、PCM・実 VGM ファイル生成は実施していない。作業ディレクトリ外への書き込みとアロケーション計測テストの追加もない。
+
+## M3-C3 未完了
+
+予定した実装・テストコードと静的確認は完了。次の受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 1363 件と追加 56 ケースの全成功、および実際の検出件数。
+- 独立パーサーを通した GB 四声 VGM の完全往復、Noise の全 selection、ソフトウェア envelope／再 trigger／他声維持のテスト実行。
+- 外部プレイヤー・実機の動作と聴取は未検証。GB の独立レジスタ再合成は設計済み H2、パス保存・CLI 接続は F1 の範囲に残る。
+
+## M3-C3 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/Export/GameBoyRegisterCompiler.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisterValues.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisters.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyRegisterDiagnosticsTests.cs`
+- `docs/implementation.md`
+
+新規:
+
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyNoiseRegisterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyEnvelopeRegisterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyVgmTests.cs`
