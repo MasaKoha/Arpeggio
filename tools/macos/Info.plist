@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>Arpeggio</string>
+  <key>CFBundleDisplayName</key>
+  <string>Arpeggio</string>
+  <key>CFBundleIdentifier</key>
+  <string>dev.pisuke.arpeggio</string>
+  <key>CFBundleExecutable</key>
+  <string>arpeggio-daw</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@BUILD_NUMBER@</string>
+  <key>CFBundleIconFile</key>
+  <string>arpeggio.icns</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.0</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Arpeggio Song</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array><string>dev.pisuke.arpeggio.song</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>arpeggio.json</string></array>
+      <key>CFBundleTypeIconFile</key>
+      <string>arpeggio.icns</string>
+    </dict>
+    <dict>
+      <!-- 複合拡張子を JSON と判定する Finder でもドロップと「このアプリで開く」を受け付ける。 -->
+      <key>CFBundleTypeName</key>
+      <string>Arpeggio Song (JSON)</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array><string>public.json</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>json</string></array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>dev.pisuke.arpeggio.song</string>
+      <key>UTTypeDescription</key>
+      <string>Arpeggio Song</string>
+      <key>UTTypeConformsTo</key>
+      <array><string>public.json</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array><string>arpeggio.json</string></array>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>

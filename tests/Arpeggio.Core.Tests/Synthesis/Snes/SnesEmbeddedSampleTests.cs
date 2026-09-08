@@ -10,6 +10,7 @@ using Xunit;
 namespace Arpeggio.Core.Tests.Synthesis.Snes
 {
     /// <summary>サンプル再生の補間・音程・ループ・リアルタイムキャッシュを検証する。</summary>
+    [Collection(AllocationCollection.Name)]
     public sealed class SnesEmbeddedSampleTests
     {
         private const int MaximumVolume = 15;
