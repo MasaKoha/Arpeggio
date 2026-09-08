@@ -130,7 +130,7 @@ namespace Arpeggio.Formats
             }
         }
 
-        private static void ValidateMetadata(string value, string name, ConversionReport report)
+        internal static void ValidateMetadata(string value, string name, ConversionReport report)
         {
             if (value is null || value.Length > MaximumMetadataLength || value.IndexOf('\0') >= 0)
             {

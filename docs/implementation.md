@@ -1238,6 +1238,94 @@ A1 / A2 の予定コードとテストコードは追加済み。受け入れ条
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterDiagnosticsTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/RegisterTimelineTests.cs`
 
+# M3-E1 / E2 実装記録（2026-09-08）
+
+## M3-E 設計との差
+
+- 設計書は変更しない。未指定の中間 API は `MidiReader.Read(Stream, ConversionReport)` → 不変 `MidiFile`（入力エラー時 null）、`MidiNoteCollector.Collect(MidiFile, ConversionReport)` → 不変ノート列とする。診断は同じ MIDI レポートへ追記する。strict は保存可否を拒否するが、中間解析は警告後も継続し、後続の全診断を収集できるようにする。既存エラーがある場合は部分結果を返さない。
+- E1 の実時間上限を E3 待ちにしないため、安定整列した Tempo と EOT に対する checked 整数分子の時間積算だけを E1 で実装する。出力 BPM・量子化・テンポ診断・任意時刻照会は E3 に残す。
+- 「既知固定長 meta」は Sequence Number=2、Channel Prefix=1、MIDI Port=1、EOT=0、Tempo=3、SMPTE Offset=5、Time Signature=4、Key Signature=2 byte と補完する。未使用 payload は長さ検証後に読み捨て、全イベントの元番号と資源計数には含める。
+- 音量 0 の On も FIFO 対応用に保持し、完成ノートの公開時に省略する。sustain 中にキーを離した旋律も入力終端まで鳴っていれば `UnclosedNote` の対象とする。打楽器は元 Off の有無と CC120 の上限 tick を別に保持し、固定実時間 gate の確定は E5 に残す。
+
+- E2 の補完判断: 打楽器の同 tick On / Off は「元 gate を音長に使わない」専用規則を優先して保持する。同 tick CC120 は最終 gate も 0 になるため破棄する。`ControllerDuringNoteIgnored` は E2 では完成済みの旋律区間に対して確定し、同 tick 終端・ゼロ長・音量 0 を除く。打楽器は元 Off 後も固定 gate が鳴るため、固定 gate が確定する E5 で元 MIDI の CC7 / CC11 / CC121 と照合する必要がある（本ランでドラム表・実時間 gate を先行実装しない）。
+
+## M3-E1 実装・静的確認
+
+- SMF format 0 / 1、PPQN、MThd 拡張、MTrk 宣言数、未知 chunk、全 channel message 長、トラック独立 running status、SysEx / meta 後の status リセット、4 byte VLQ、既知固定長 meta、必須 EOT / 後続禁止、port 0 制約を実装した。
+- 入力はシーク不要。総 byte とチャンク残量を検証し、未使用 payload は固定 4096 byte バッファで読み捨てる。入力 32 MiB・イベント 1000000 件・正 velocity の On 250000 件・実時間 1800 秒を拒否境界にした。Stream は閉じず、I/O 例外を伝播する。
+- channel message / Tempo / EOT を不変の元位置付きイベントとして安定整列する。スキップしたイベントも資源数・元イベント番号に含める。track 0 の最初の非空名を strict UTF-8 / Latin-1 で復号する。
+- 正常・不正入力・資源上限のテストコードを追加。全 byte 切断、短い読み取り、読み取り失敗、最大許容量、同 tick の別トラック Tempo、32 bit 超の tick を含む。1800 秒の固定 VLQ は独立計算で E9 BC 00 と照合した。
+- E1 のコード・テスト作成と静的読解を先に終えてから E2 に着手した。コンパイル・テスト成功を確認済みとは扱わない。
+
+## M3-E2 実装・判断
+
+- `MidiNoteCollector` は reader の確定順を変更せず処理する。全 MTrk に共有される 16 channel の Program / CC7 / CC11 / sustain と、pitch ごとの FIFO を持つ。完成列は On の元順序で返し、次段の量子化・声割り当てに必要な出自を保つ。
+- velocity 0 は Off。同音再打鍵、別 MTrk の Off、pedal 中の解放音と押下キーを区別する。CC120 は pedal を無視して当該 channel を即停止、CC123 は全キーの Off、CC121 は CC7=100 / CC11=127 / sustain off とし Program・押下キーを維持する。
+- 旋律の未終了音は曲入力終端で閉じ、不明 Off と元ゼロ長も診断する。音量 0 の On を FIFO の途中から消さないため、後の Off が別の有音 On を停止することを防ぐ。
+- On 時点の Program / CC7 / CC11 / velocity、4 bit 化前の実効音量と整数 Volume を不変コピーする。実効音量は整数積を作ってから共通分母で割り、同じ積の発音の優先順位が浮動小数点演算順で変わることを防ぐ。
+- 発音中の CC7 / CC11 / CC121 の音量変更は次の On から適用する。完成旋律区間と CC 列を線形走査し、同 tick 終端・元ゼロ長・無音・別 channel を `ControllerDuringNoteIgnored` に誤算入しない。pan、非零 bank、中央以外の bend、非零圧力／CC1、その他の非対応 CC を規定コードで診断する。
+- 打楽器の元 Off と CC120 上限を分離し、元 Off 後に届く CC120 も最初の一回だけ保持する。元 gate の欠落に旋律用の不明 Off／未終了警告を付けない。ドラム表・音色・実時間固定 gate・DrumGateReplaced は E5 に接続する。
+- FIFO の On は一度だけ取り出す。pedal 解放・全キー Off・全音停止は対象の発音だけを処理し、全履歴を CC ごとに再走査しない。公開コレクションは独立配列の読み取り専用ビューとした。
+
+## M3-E テストコード
+
+7 テストクラス、56 メソッド／164 ケースと、入力作成・シーク不能 Stream の補助 2 型を追加した。ケース数は属性から静的集計した値であり、テストランナーの検出件数ではない。
+
+| ファイル | 検証内容 |
+|---|---|
+| MidiReaderTests | format 0 / 1、PPQN 1 / 480 / 32767、全 channel message と running status、16 channel、元イベント番号、MTrk 安定統合、拡張 header／未知 chunk、最大 VLQ・32 bit 超 tick、固定長 meta、Track Name 復号、Stream 所有権・I/O・不変性 |
+| MidiReaderInvalidInputTests | 非対応 header／division／system status、track count、5 byte VLQ、データ MSB、running status の境界、meta 長、EOT、port 非零、過大長、全 byte 切断、重複／過不足 chunk、先行エラー |
+| MidiReaderLimitsTests | 256 MTrk、32 MiB と 1 byte 超過、全 meta 込み 1000000 イベント、250000 On、1800 秒の両側、checked 実時間分子の overflow、別トラック・同 tick Tempo |
+| MidiNoteCollectorTests | 同音 FIFO、MTrk 横断、channel 独立、velocity 0、最遅 EOT、不明 Off と元位置、元ゼロ長・同 tick 順、strict の全診断、収集間の状態分離・不変性 |
+| MidiSustainTests | pedal 閾値・再打鍵・押下キーの維持、別 MTrk・最遅 EOT、CC120 他声維持、CC123、CC121 の既定値復元と Program 維持、同 tick pedal 順 |
+| MidiControllerTests | velocity 1 / 64 / 127、CC7×CC11、最低 1、無音 On の FIFO、同 tick Program／CC、完成区間に基づく警告、sustain 中 CC、pan／bank／bend／圧力／RPN 等、同音量積の完全一致 |
+| MidiDrumCollectionTests | 不明 Off／未終了の警告除外、元ゼロ gate の保持、sustain／CC123、元 Off 後の CC120 上限、同 tick 即停止 |
+
+PCM、レジスタ再合成、外部エミュレータ、ファイル保存を新規テストの経路に入れていない。アロケーション計測テストは追加していない。
+
+## M3-E 静的確認
+
+- 追加型の定義・namespace、使用する BCL の .NET 10 ローカル参照 XML、既存の xUnit 呼び出しを照合した。C# の括弧対応、summary XML、公開メンバーへの summary 隣接、ブロック namespace、末尾空白を検査した。
+- 開始時の SHA-256 と比較し、既存ファイルの変更は `docs/implementation.md` だけ。Core・設計書 2 ファイル・既存 Formats・既存テスト・プロジェクト参照を変更していない。Formats の依存は Core と BCL のまま。
+- git 操作、Unity 起動、コンパイル、`dotnet build` / `dotnet test`、PCM 生成は行っていない。開始から 30 分以内で作業を終了した。
+
+## M3-E 未完了
+
+- E1 / E2 の予定実装と上記テストコードは追加済み。受け入れの実行確認は依頼者側に残る。`dotnet build Arpeggio.slnx` のエラー・警告ゼロ、既存 812 件と追加 164 ケース（静的集計）の全成功・実際の検出件数は未確認。
+- 打楽器の固定実時間 gate 内の `ControllerDuringNoteIgnored` は E5 で確定する。E2 では元イベント・On 設定・元 Off・CC120 を保持した。上記「設計との差」に記した分担判断は依頼者の確認対象。
+- E3 の任意 tick 実時間照会・出力 BPM・テンポ診断・量子化、E4 の声割り当て、E5 の音色／ドラム固定 gate、E6 の Importer・Song 検証・JSON 保存は本ランの対象外。
+
+## M3-E 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規実装:
+
+- `src/Arpeggio.Formats/Midi/MidiReader.cs`
+- `src/Arpeggio.Formats/Midi/MidiBinaryInput.cs`
+- `src/Arpeggio.Formats/Midi/MidiReadException.cs`
+- `src/Arpeggio.Formats/Midi/MidiDurationValidator.cs`
+- `src/Arpeggio.Formats/Midi/MidiMessageKind.cs`
+- `src/Arpeggio.Formats/Midi/MidiEvent.cs`
+- `src/Arpeggio.Formats/Midi/MidiFile.cs`
+- `src/Arpeggio.Formats/Midi/MidiNoteCollector.cs`
+- `src/Arpeggio.Formats/Midi/MidiChannelState.cs`
+- `src/Arpeggio.Formats/Midi/MidiPendingNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiNote.cs`
+
+新規テスト・補助型:
+
+- `tests/Arpeggio.Core.Tests/Formats/MidiReaderTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiReaderInvalidInputTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiReaderLimitsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiNoteCollectorTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiSustainTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiControllerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiDrumCollectionTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiFileFixture.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiFragmentedStream.cs`
 # M3-C2 実装記録（2026-09-08）
 
 ## M3-C2 設計との差
@@ -1462,3 +1550,131 @@ D1／D2 の予定実装とテストコードは追加済み。受け入れ条件
 - `tests/Arpeggio.Core.Tests/Formats/NsfFrameCompilerTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NsfDataEncoderTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NsfDriverBuilderTests.cs`
+# M3-E3 / E4 実装記録（2026-09-08）
+
+## M3-E3 / E4 設計との差
+
+- 設計書は変更しない。未指定の中間 API は `MidiTempoMap.Create`、`MidiTickQuantizer.Create` と単音の量子化、不変 `MidiQuantizedNote` とする。実時間は PPQN を分母とする checked 64 bit 整数分子で渡し、固定実時間 gate を E5 から指定できるようにする。最終グリッドへの除算だけ decimal を使用し、区間ごとの丸めを避ける。
+- `PitchTable.GetRange` は private のため、Core を変更せず公開 `ClampMidiNote` の MIDI 0 / 127 に対する結果から整数音域を得る。SNES は別途 sampleRate / root を含む未クランプのレジスタ値で音域を判定する。
+- E4 は音色 ID 採番前の不変割り当て結果を返す。全 ChipLayout トラックと元ノートを保持し、音色生成・ID 採番・Song 構築は E5 / E6 に残す。SNES のドラム予約は明示除外前の有効な入力 On の有無で決める（除外は候補だけを上書きする）。
+
+## M3-E3 / E4 未完了
+
+- E3 / E4 の予定実装とテストコードは追加済み。実行を含む受け入れ確認は未完了。依頼者側で `dotnet build Arpeggio.slnx` のエラー・警告ゼロと、既存 1127 件＋追加テストの全成功を確認する必要がある。今回の追加は静的集計で 6 テストクラス・48 メソッド・113 ケースであり、ランナーの検出件数は未確認。
+- E5 は `MidiVoiceNote` に変換音程／Noise selection・`MidiDrumPriority`・選択サンプルの `MidiPitchRange` を渡す。打楽器終端は `map.GetTimeNumerator(OnTick) + gateMicroseconds × map.TicksPerQuarterNote` と CC120 の早い方を量子化器へ渡す。ドラム表・音色生成・固定 gate 内の CC 警告・採用順の音色 ID 採番は今回の対象外。
+- E6 は不変 `MidiVoiceTrack` 全列から Song を構築し、Muted=false・Pan=0・DefaultInstrumentId=null・全 Note の InstrumentId・LoopStartTick=0 を設定する。曲長には割り当て後の全 `EndTick` を `GetLengthTicks` へ渡す。最終曲長の資源検証、SongValidator、JSON version 1 保存・往復は E6 に残す。量子化／短音延長による終端移動は保持し、上限付近を無断で切り詰めない。
+
+## M3-E3 実装・静的確認
+
+- `MidiTempoMap` は同 tick の最後の Tempo を選び、非 conductor・競合・実効変化・基準 BPM 整数化を診断する。既定 500000 µs、明示 BPM 1〜1000、checked 64 bit 共通分子、二分探索による任意 tick 照会を実装した。E1 の入力上限検証は維持した。
+- `MidiTickQuantizer` は 48 の約数 grid を検証し、開始／終了／入力 EOT を独立して絶対量子化する。正の短音だけを延長し、最大誤差を出力 tick 単位で元発音へ集約する。曲長は割り当て後終端列と EOT・最小 48 から計算する。打楽器は E5 の確定実時間終端を受け、元 Off を誤って量子化しない。
+- E3 の実装とテストコード作成、名前空間・API・括弧対応・境界式の静的読解を終えてから E4 に着手した。0/48/144、端数 BPM、同 tick 競合、先頭無音、1800 秒、10000 音の端数区間、全グリッド、短音・元ゼロ長・EOT・固定実時間 gate のテストを追加した。コンパイル／実行成功は未確認。
+
+## M3-E4 実装・静的確認
+
+- `MidiChannelCandidates` はチップ別の自動候補を作り、指定 ch だけを明示 map で上書きする。候補配列はコピーして昇順化し、重複・範囲外・DPCM・NES / GB の旋律／Noise 相互指定を未使用 ch も含めて拒否する。複数 ch の候補共有と空配列の明示除外を扱う。
+- `MidiVoiceAllocator` は確定した gate を開始 tick、ドラム優先／分類、実効音量、旋律 pitch、ch、元 MTrk／event の規定順で配置する。終了済み候補を先に使い、steal-oldest / drop-new と同時 On 保護を実装した。打ち切りは不変結果を置き換えて反映し、元ノートは変更・再開しない。
+- `MidiPitchRange` は NES Pulse=33〜126、Triangle=21〜114、GB Pulse=36〜127、Wave=24〜127 の整数端点を使う。SNES は未クランプ pitch の四捨五入結果が 1〜16383 となる音を調べ、root=60 の 32 kHz=0〜83、16 kHz=0〜95、24 kHz=0〜88 等を固定テストにした。Noise selection はクランプしない。Triangle だけ Volume=15 を反映して診断する。
+- 全 ChipLayout トラックを音色 ID 採番前の不変列で保持し、採用数・破棄数・打ち切り数・明示除外 ch／ノート数・実際の ch→出力トラック別件数を report に残す。全音消失は `NoPlayableNotes` として部分結果を返さない。strict 警告だけでは残りの割り当て診断を止めない。
+- NES 四和音、GB 全候補、SNES 6＋2／8 声、量子化で同時になった On、同分類ドラムの順序、後発打撃、候補共有・除外、全チップ／両モードの 160 音列の正の長さ・昇順・非重複・再実行決定性をテストコードで検証対象にした。E5 のドラム表は実装せず、分類値をテストから直接与えている。
+
+## M3-E3 / E4 静的確認と未実行の確認事項
+
+- 既存の型定義・namespace と BCL の .NET 10 ローカル参照 XML を照合した。公開宣言の summary 隣接、日本語 XML コメントの整形式、括弧対応、ブロック namespace、末尾空白を静的に検査した。音域端点と MIDI 時間の固定値は独立した式でも照合した。
+- 開始時の SHA-256 と比較し、既存ファイルの変更は `docs/implementation.md` だけ。設計書 2 ファイル・Core・既存 Formats／テスト・プロジェクト参照・JSON version は変更していない。Formats の依存は Core と BCL のまま。
+- git 操作、Unity 起動、コンパイル、`dotnet build` / `dotnet test`、PCM 生成は実施していない。テスト成功・警告ゼロは未確認。30 分以内で実装・記録を終えた。
+
+## M3-E3 / E4 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規実装:
+
+- `src/Arpeggio.Formats/Midi/MidiTempoSegment.cs`
+- `src/Arpeggio.Formats/Midi/MidiTempoMap.cs`
+- `src/Arpeggio.Formats/Midi/MidiTickQuantizer.cs`
+- `src/Arpeggio.Formats/Midi/MidiQuantizedNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiPitchRange.cs`
+- `src/Arpeggio.Formats/Midi/MidiDrumPriority.cs`
+- `src/Arpeggio.Formats/Midi/MidiVoiceNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiAllocatedNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiVoiceTrack.cs`
+- `src/Arpeggio.Formats/Midi/MidiChannelCandidates.cs`
+- `src/Arpeggio.Formats/Midi/MidiVoiceAllocator.cs`
+
+新規テスト・補助型:
+
+- `tests/Arpeggio.Core.Tests/Formats/MidiTempoMapTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiTickQuantizerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiVoiceAllocatorTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiPolyphonyTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiChannelMapTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiPitchRangeTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiVoiceFixture.cs`
+# M3-C1 実装記録（2026-09-08）
+
+## M3-C1 設計との差
+
+- 未指定の writer API は `VgmWriter.CalculateSize(RegisterTimeline, title, author, ConversionReport)` と `VgmWriter.Write(Stream, RegisterTimeline, title, author, ConversionReport)` で補完する。前者は保存前の全サイズ検証と予定サイズの返却（拒否時 null）、後者は同じ事前検証後の書き込み（拒否時 false）を担う。チップが異なるレポートは引数例外とし、I/O 例外は呼び出し元へ伝える。曲名はスナップショットの `ControlTimeline.Title` を渡す。copyright を受け取る入口は設けない。
+- Stream の現在位置から一つの完全な VGM を追記し、相対オフセットはその開始位置を基準にする。Seek／Length／Position を要求せず、呼び出し側の Stream は閉じない。パス単位の隣接一時ファイル・上書き保護・ChipExportService は設計の M3-F1 に残す。
+- GD3 の不正な単独サロゲートの扱いは未指定。文字を無断で置換しないため `InvalidMetadata` として書き込み前に拒否する。既定の NUL／1024 UTF-16 コード単位検証は既存 `ConversionLimits` を internal で共用する。
+- writer の形式符号化は設計どおり NES／GB の二種を扱う。今回の全往復検証は NES を対象とし、GB の Noise／時間 envelope／四声を通した VGM 接続は M3-C3 に残す。レジスタ列の時刻・順序・停止は既存の不変列とコンパイラーが保証し、writer は並べ替え・同値除去・停止の再生成を行わない。
+
+## M3-C1 実装範囲と判断
+
+- `VgmWriter` は 256 byte ヘッダー、BCD version `0x171`、EOF／GD3／data の相対オフセット、44100 Hz の総待機数、単一チップのクロック欄を出す。未使用欄・loop offset／samples・rate はゼロ。NES は `B4` と `$4000` 基準、GB は `B3` と `$FF10` 基準でアドレスを符号化する。
+- 入力列の絶対時刻差から正の `61 ll hh` だけを生成する。65536 は 65535＋1、131070 は 65535＋65535、131071 は 65535＋65535＋1。ゼロ待機・短縮命令・データブロックを出さず、同時刻の同値書き込みも全順序を保持する。既存の終端停止列の後に `66`、直後に GD3 を配置する。
+- `Gd3Tag` は GD3 v1.00 の 11 個の NUL 終端 UTF-16LE 文字列を作る。曲名は原語欄に保存し、ASCII の場合だけ英語欄へも複写する。system 英語欄と変換者 Arpeggio、指定された author 原語欄以外は空。BOM・実行日・パス・推測した翻訳は入れない。補助平面の文字はサロゲートペアのまま保存する。
+- 書き込み前にメタデータと全コマンド／GD3 の予定サイズを算定し、既存 `ValidateExportSize` でレジスタ数／VGM 容量を検証する。`OutputBytes` と `DurationSeconds` を予定値へ設定する。先行エラー・strict 警告時は Stream に一切書かない。I/O 失敗時の `OutputBytes` は実際に保存できた長さではなく予定値のままとする。
+- `BinaryWriter` は using と `leaveOpen: true` で管理する。ヘッダーの後戻り修正もファイル全体の中間バイト配列も不要。呼び出し側は FileStream を渡して NES VGM を保存できる。パス単位の安全保存 API はこの writer の責務へ混ぜない。
+- 既存変更は `ConversionLimits.ValidateMetadata` の private → internal と、この実装記録の追記のみ。Formats の参照は Core と BCL のまま。Core・設計書・JSON version・プロジェクト定義・フロントエンドは変更していない。
+
+## M3-C1 テストコード
+
+4 テストクラスに **25 メソッド／72 ケース**と、独立パーサー・解析結果型・故障注入 Stream を追加した。依頼の 963 件に対して **1035 件見込み**。件数は属性の静的集計であり、検出・実行結果ではない。PCM・音声合成器・外部エミュレーター・ネットワークを使用せず、アロケーション計測テストも追加していない。
+
+| ファイル | 検証内容 |
+|---|---|
+| VgmWriterTests | 空曲の全 256 byte ヘッダー／全コマンド／410 byte 全長の固定値、待機 1／65535／65536／131070／131071 の正確な byte 列、735→736 の 1 サンプル差、先頭無音、NES 四声の同時 Off→On と同値再トリガー、非ゼロ loopStartTick の有限二周、全停止直後の END／GD3、1800 秒上限、時刻・アドレス・値・全順序番号の完全往復と決定性 |
+| VgmMetadataTests | 日本語・補助平面文字の固定 UTF-16LE byte 列と 116 byte ペイロード、全 11 欄、スナップショットの曲名、ASCII の英語欄条件、ASCII author の原語欄限定、1024 コード単位の両端、NUL／null／単独サロゲート／上限超過の保存前拒否 |
+| VgmWriterContractTests | FileStream の実保存・閉じた後の再読込、Seek 不可、既存 prefix を持つ Stream の相対位置、予定サイズの一致、明細保持ゼロでの先行エラー／strict 拒否、制限だけの場合の成功、ヘッダー／命令／GD3 途中の I/O 失敗、Stream 非所有、チップ不一致・形式不一致・書き込み不可の拒否。GB は空曲による単一クロック・B3・system 名の形式選択だけを確認 |
+| IndependentVgmParserTests | writer を使わない手書き 300 byte ファイルによる既知の二書き込み／待機／GD3、待機の上位 byte、magic／BCD version／全相対 offset／総待機／loop／rate／未使用欄／チップ／未知命令／ゼロ待機／END／GD3 長・終端の破損検出、全 byte 境界の切断と末尾余剰の拒否 |
+
+パーサーと `ParsedVgm` は Formats／Core の型・定数を参照しない。ヘッダーを手動の little-endian 読み取りで解析し、命令の待機をヘッダーとは独立に合計して `(sample,address,value,order)` を再構築する。生成した配列をそのまま期待値にせず、空曲ヘッダー・初期化・待機・日本語・手書きパーサー入力の固定値も併用する。
+
+## M3-C1 静的確認
+
+- 指定の設計書全文、M3-A／B1／B2／C2 の実装記録、既存 Formats／テストと C# 規約を読んだ。Core／Formats の使用型・namespace と .NET 10 の BinaryWriter／BinaryPrimitives／UnicodeEncoding／Stream／File API、xUnit 2.9.2 の参照定義を照合した。
+- 新規・変更 C# の括弧対応、summary の XML と public／protected メンバーへの隣接、ブロック namespace、一ファイル一型、末尾空白、禁止省略名、Unity lifecycle／コンポーネント API の不使用を確認した。固定サンプル時刻は有理数の独立算術で照合した。
+- 作業開始時のハッシュから、既存ファイルの変更が `ConversionLimits.cs` と `docs/implementation.md` のみであることを確認した。Core・両設計書・既存テスト・依存定義は不変。独立パーサーには Formats の参照・生成定数の共用がない。
+- git 操作、コンパイル、`dotnet build`／`dotnet test`、アプリ起動、PCM・実 VGM ファイル生成は実施していない。FileStream の保存も今回作成した未実行テストに含む。作業ディレクトリ外への書き込みは行っていない。
+
+## M3-C1 未完了
+
+予定した実装・テストコードと静的確認は完了。受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 963 件と追加 72 ケースの全件成功、および実際の検出件数の確認。
+- FileStream による実ファイル保存、独立パーサーによる全往復、I/O 失敗・所有権契約のテスト実行。
+- 外部プレイヤー・実機での再生は未検証。M3-C3 の GB 四声 VGM 接続、M3-F1 の ChipExportService／パス単位の安全保存／CLI は設計の後続ランに残る。
+
+## M3-C1 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/ConversionLimits.cs`
+- `docs/implementation.md`
+
+新規:
+
+- `src/Arpeggio.Formats/Export/VgmWriter.cs`
+- `src/Arpeggio.Formats/Export/Gd3Tag.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmWriterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmMetadataTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmWriterContractTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/IndependentVgmParser.cs`
+- `tests/Arpeggio.Core.Tests/Formats/IndependentVgmParserTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ParsedVgm.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmTestStream.cs`
