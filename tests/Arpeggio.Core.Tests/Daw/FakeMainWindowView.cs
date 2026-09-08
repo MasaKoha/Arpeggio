@@ -51,6 +51,9 @@ namespace Arpeggio.Core.Tests.Daw
         /// <summary>UI スレッド境界を経由した通知回数。</summary>
         public int DispatchCount { get; private set; }
 
+        /// <summary>終了直前の通知待ちを検証する任意の UI ディスパッチ境界。</summary>
+        internal Func<Action, Task>? Dispatch { get; set; }
+
         /// <summary>編集表示を記録する。</summary>
         public void ShowSong(Song song, int selectedTrack, int? selectedTick)
         {
@@ -105,6 +108,7 @@ namespace Arpeggio.Core.Tests.Daw
         public Task RunOnUiThreadAsync(Action action)
         {
             DispatchCount++;
+            if (Dispatch is { } dispatch) { return dispatch(action); }
             action();
             return Task.CompletedTask;
         }

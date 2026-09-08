@@ -49,7 +49,7 @@ namespace Arpeggio.Daw.Presenters
         public NotePanelPresenter Notes { get; }
         /// <summary>非同期の音声解析。</summary>
         public AnalysisPresenter Analysis { get; }
-        /// <summary>非同期の音声書き出し。</summary>
+        /// <summary>非同期の音声書き出しとチップ変換の診断・保存。</summary>
         public ExportPresenter Export { get; }
         /// <summary>効果音プリセットの新規作成。</summary>
         public SfxCreationPresenter SfxCreation { get; }

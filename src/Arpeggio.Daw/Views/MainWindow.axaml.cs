@@ -18,6 +18,7 @@ namespace Arpeggio.Daw.Views
     {
         private const int DisplayIntervalMilliseconds = 33;
         private const int SfxTabIndex = 2;
+        private const int ExportTabIndex = 3;
         private const int SemitonesPerOctave = 12;
         private readonly PianoRollControl pianoRoll;
         private readonly PianoRollToolbarView pianoRollToolbar;
@@ -30,6 +31,7 @@ namespace Arpeggio.Daw.Views
         private readonly TransportView transport;
         private readonly NotePanelView notes;
         private readonly AnalysisView analysis;
+        private readonly ChipExportView chipExport;
         private readonly SfxCreationView sfxCreation;
         private readonly TabControl editorTabs;
         private readonly Button sfxButton;
@@ -69,6 +71,7 @@ namespace Arpeggio.Daw.Views
             warningsText = Require<TextBox>("WarningsText");
             notes = Require<NotePanelView>("Notes");
             analysis = Require<AnalysisView>("Analysis");
+            chipExport = Require<ChipExportView>("ChipExport");
             sfxCreation = Require<SfxCreationView>("SfxCreation");
             editorTabs = Require<TabControl>("EditorTabs");
             sfxButton = Require<Button>("SfxButton");
@@ -103,6 +106,7 @@ namespace Arpeggio.Daw.Views
             instruments.Bind(mainPresenter.Instruments, mainPresenter.Execute);
             notes.Bind(mainPresenter.Notes, mainPresenter.Execute);
             analysis.Bind(mainPresenter.Analysis);
+            chipExport.Bind(mainPresenter.Export);
             sfxCreation.Bind(mainPresenter.SfxCreation, mainPresenter.Execute);
             snesEcho.Bind(mainPresenter.SnesEcho, mainPresenter.Execute);
             instruments.WavImportRequested += OnImportWav;
@@ -180,6 +184,7 @@ namespace Arpeggio.Daw.Views
             exportButton.IsEnabled = !isRunning;
             revealExportButton.IsVisible = lastExportedPath != null;
             revealExportButton.IsEnabled = !isRunning;
+            chipExport.Refresh();
             ExportStatusChanged?.Invoke(text);
         }
         /// <summary>旧ファイルの監視を解放して新しい正本へ切り替える。</summary>
@@ -231,6 +236,7 @@ namespace Arpeggio.Daw.Views
             snesEcho.Dispose();
             notes.Dispose();
             analysis.Dispose();
+            chipExport.Dispose();
             sfxCreation.Dispose();
             transport.Dispose();
             presenter?.Dispose();
@@ -261,10 +267,18 @@ namespace Arpeggio.Daw.Views
         private void OnLength(string text) => MainPresenter.Execute(() => MainPresenter.Transport.SetLength(int.Parse(text, CultureInfo.InvariantCulture)));
         private void OnWarnings(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.ShowWarnings);
         private void OnSfx(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = SfxTabIndex;
-        private async void OnExport(object? sender, RoutedEventArgs arguments) => await filePicker.ExportAsync(MainPresenter);
+        private async void OnExport(object? sender, RoutedEventArgs arguments) => await ExportWithPickerAsync();
         private void OnRevealExport(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.Export.RevealLastExport);
         private async void OnImportWav(string rootNote, bool loop) => await filePicker.ImportAsync(MainPresenter, rootNote, loop);
-        private async void ExportWithPicker() => await filePicker.ExportAsync(MainPresenter);
+        private async void ExportWithPicker() => await ExportWithPickerAsync();
+        private async Task ExportWithPickerAsync()
+        {
+            await filePicker.ExportAsync(MainPresenter);
+            if (!isDisposed && MainPresenter.Export.ChipDestinationPath != null)
+            {
+                editorTabs.SelectedIndex = ExportTabIndex;
+            }
+        }
         private void OnScroll(object? sender, ScrollChangedEventArgs arguments) => SynchronizeViewport();
         private void OnSizeChanged(object? sender, SizeChangedEventArgs arguments) => SynchronizeViewport();
         private void OnExternalChange()

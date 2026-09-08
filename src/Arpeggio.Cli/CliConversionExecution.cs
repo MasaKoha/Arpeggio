@@ -97,7 +97,7 @@ namespace Arpeggio.Cli
             {
                 return false;
             }
-            return option.Errors.Count > 0 || option.GetValueOrDefault<bool>();
+            return option.Errors.Count() > 0 || option.GetValueOrDefault<bool>();
         }
 
         private int Complete(int exitCode, string? code = null, string? error = null)

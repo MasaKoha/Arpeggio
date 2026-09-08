@@ -11,6 +11,9 @@ using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Formats;
+using Arpeggio.Formats.Export;
+using Arpeggio.Formats.Midi;
 using ModelContextProtocol.Server;
 
 namespace Arpeggio.Mcp
@@ -23,6 +26,7 @@ namespace Arpeggio.Mcp
         private const int DefaultLengthBeats = 16;
         private const int DefaultVolume = 15;
         private const int DefaultLoopCount = 1;
+        private const int DefaultQuantizeTicks = 1;
         private const int DefaultSampleRate = 44100;
         private const int DefaultAnalysisWindowMilliseconds = 100;
         private const double DefaultTailSeconds = 0.5;
@@ -316,6 +320,87 @@ namespace Arpeggio.Mcp
             });
         }
 
+        /// <summary>開いている曲を NSF として診断し、指定時だけ安全に保存する。</summary>
+        [McpServerTool(Name = "export_nsf", ReadOnly = false, Destructive = true)]
+        [Description("開いている NES 曲を NSF v1 へ変換する。dryRun は保存せず全診断、strict は警告時に保存拒否。上書きは明示指定だけ。")]
+        public string ExportNsf(
+            [Description("出力 NSF パス")] string path,
+            [Description("有限再生回数 1〜16")] int loops = DefaultLoopCount,
+            [Description("著作者")] string author = "",
+            [Description("権利表記")] string copyright = "",
+            [Description("変換警告時に保存拒否")] bool strict = false,
+            [Description("全変換を診断して保存しない")] bool dryRun = false,
+            [Description("既存出力の置換を許可")] bool overwrite = false)
+        {
+            return ExportChip(path, new ChipExportOptions
+            {
+                Format = ConversionFormat.Nsf, Loops = loops, Author = author, Copyright = copyright, Strict = strict
+            }, dryRun, overwrite);
+        }
+
+        /// <summary>開いている曲を VGM として診断し、指定時だけ安全に保存する。</summary>
+        [McpServerTool(Name = "export_vgm", ReadOnly = false, Destructive = true)]
+        [Description("開いている NES / GB 曲を VGM v1.71 へ変換する。dryRun は保存せず全診断、strict は警告時に保存拒否。上書きは明示指定だけ。")]
+        public string ExportVgm(
+            [Description("出力 VGM パス")] string path,
+            [Description("有限再生回数 1〜16")] int loops = DefaultLoopCount,
+            [Description("著作者")] string author = "",
+            [Description("変換警告時に保存拒否")] bool strict = false,
+            [Description("全変換を診断して保存しない")] bool dryRun = false,
+            [Description("既存出力の置換を許可")] bool overwrite = false)
+        {
+            return ExportChip(path, new ChipExportOptions
+            {
+                Format = ConversionFormat.Vgm, Loops = loops, Author = author, Strict = strict
+            }, dryRun, overwrite);
+        }
+
+        /// <summary>SMF を新規 JSON へ取り込み、現在の曲・保存先・履歴は維持する。</summary>
+        [McpServerTool(Name = "import_midi", ReadOnly = false, Destructive = false)]
+        [Description("SMF format 0 / 1 を新規ソングへ保存する。曲を開かず利用でき、現在のセッションは変更しない。切り替えは別途 open_song を呼ぶ。")]
+        public string ImportMidi(
+            [Description("入力 MIDI パス")] string midiPath,
+            [Description("新規 .arpeggio.json パス。上書き不可")] string path,
+            [Description("nes / gameboy / snes")] string chip,
+            [Description("基準 BPM 1〜1000。省略時 MIDI 基準")] int? tempo = null,
+            [Description("48 の正の約数")] int quantizeTicks = DefaultQuantizeTicks,
+            [Description("steal-oldest / drop-new")] string polyphony = "steal-oldest",
+            [Description("MIDI ch 1〜16 → 出力トラック候補の JSON 文字列。例: {\"1\":[0,1]}")] string? channelMap = null,
+            [Description("曲名。省略時 MIDI 名またはファイル名")] string? title = null,
+            [Description("変換警告時に保存拒否")] bool strict = false,
+            [Description("全変換を診断して保存しない")] bool dryRun = false)
+        {
+            return Invoke(() =>
+            {
+                var execution = new McpConversionExecution(ConversionFormat.Midi, path, strict, dryRun);
+                return execution.Run(() =>
+                {
+                    ChipKind selectedChip = ChipReference.ParseChip(chip);
+                    execution.Report = new ConversionReport(ConversionFormat.Midi, selectedChip, strict);
+                    var options = new MidiImportOptions
+                    {
+                        Chip = selectedChip, Tempo = tempo, QuantizeTicks = quantizeTicks,
+                        Polyphony = polyphony switch
+                        {
+                            "steal-oldest" => MidiPolyphonyMode.StealOldest,
+                            "drop-new" => MidiPolyphonyMode.DropNew,
+                            _ => MidiPolyphonyMode.None
+                        },
+                        ChannelMap = McpMidiChannelMap.Parse(channelMap, execution.Report),
+                        Title = title, SourceName = midiPath, Strict = strict
+                    };
+                    if (execution.Report.ErrorCount != 0) { return; }
+                    MidiImportResult imported;
+                    using (FileStream stream = File.OpenRead(midiPath))
+                    {
+                        imported = MidiImporter.Import(stream, options);
+                    }
+                    execution.Report = imported.Report;
+                    execution.Written = MidiSongFile.Write(imported, path, dryRun, sourcePath: midiPath).Written;
+                });
+            });
+        }
+
         /// <summary>履歴を一操作戻して保存する。</summary>
         [McpServerTool(Name = "undo", ReadOnly = false, Destructive = false)]
         [Description("セッションの編集履歴を一操作戻して保存する。履歴がなければ changed=false。")]
@@ -386,6 +471,26 @@ namespace Arpeggio.Mcp
         public string SfxPresets()
         {
             return Invoke(() => SfxPresetCatalog.GetAll());
+        }
+
+        private string ExportChip(string path, ChipExportOptions options, bool dryRun, bool overwrite)
+        {
+            return Invoke(() =>
+            {
+                var execution = new McpConversionExecution(options.Format, path, options.Strict, dryRun);
+                return execution.Run(() =>
+                {
+                    Song song = GetSong();
+                    execution.Report = new ConversionReport(options.Format, song.Chip, options.Strict);
+                    ChipExportPlan plan = ChipExportService.Prepare(song, options);
+                    execution.Report = plan.Report;
+                    execution.ValidateDestination(session.Path);
+                    if (!dryRun)
+                    {
+                        execution.Written = ChipExportService.Write(plan, path, overwrite, sourcePath: session.Path);
+                    }
+                });
+            });
         }
 
         private Song GetSong()
