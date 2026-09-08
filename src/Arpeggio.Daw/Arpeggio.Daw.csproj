@@ -11,6 +11,19 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <AvalonProjectPath>$(MSBuildThisFileDirectory)../../../Avalon/src/Avalon/Avalon.csproj</AvalonProjectPath>
+  </PropertyGroup>
+
+  <!-- 配布物へ操作サーバーを含めず、隣接リポジトリがない環境でも通常のビルドを維持する。 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' And Exists('$(AvalonProjectPath)')">
+    <DefineConstants>$(DefineConstants);AVALON</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug' And Exists('$(AvalonProjectPath)')">
+    <ProjectReference Include="$(AvalonProjectPath)" />
+  </ItemGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <Content Include="..\..\examples\snes-demo.arpeggio.json" Link="Examples\snes-demo.arpeggio.json"

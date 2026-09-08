@@ -69,16 +69,16 @@ namespace Arpeggio.Daw.Views
                 content.Children.Add(trackName);
                 channelLabels.Add(channelLabel);
                 trackNames.Add(trackName);
-                Button button = new Button { Tag = trackIndex, Width = TrackNameWidth, Content = content,
+                Button button = new Button { Name = $"TrackSelect{trackIndex}", Tag = trackIndex, Width = TrackNameWidth, Content = content,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch };
-                CheckBox muteBox = new CheckBox { Tag = trackIndex, Content = "M" };
+                CheckBox muteBox = new CheckBox { Name = $"TrackMute{trackIndex}", Tag = trackIndex, Content = "M" };
                 muteBox.Classes.Add("mute");
                 ToolTip.SetTip(muteBox, "ミュート");
                 button.Click += OnSelected;
                 muteBox.IsCheckedChanged += OnMuteChanged;
                 buttons.Add(button);
                 muteBoxes.Add(muteBox);
-                StackPanel row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = RowSpacing };
+                StackPanel row = new StackPanel { Name = $"TrackRow{trackIndex}", Orientation = Orientation.Horizontal, Spacing = RowSpacing };
                 row.Children.Add(button);
                 row.Children.Add(muteBox);
                 rows.Children.Add(row);

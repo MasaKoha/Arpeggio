@@ -229,6 +229,8 @@ arpeggio instrument import-wav drums.arpeggio.json --id 1 kick.wav --root C4 --l
 
 ## DAW
 
+AI による GUI の操作・観測は [Avalon 統合の手順・状態キー・座標計算](docs/avalon.md) を参照。Debug 限定で、隣接 Avalon がある場合に有効化できる。
+
 ```sh
 arpeggio-daw melody.arpeggio.json
 ```

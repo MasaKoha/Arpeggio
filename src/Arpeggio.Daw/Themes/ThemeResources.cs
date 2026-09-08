@@ -8,6 +8,7 @@ namespace Arpeggio.Daw.Themes
     /// <summary>カスタム描画の初期化時に AXAML のテーマリソースを解決する。</summary>
     internal static class ThemeResources
     {
+        internal static double GetDouble(string name) => Get<double>(name);
         internal static IBrush GetBrush(string name) => Get<IBrush>(name);
         internal static IDataTemplate GetContentTemplate(string name) => Get<IDataTemplate>(name);
         internal static FontFamily NumericFont => Get<FontFamily>("Arpeggio.Font.Numeric");

@@ -99,6 +99,8 @@ namespace Arpeggio.Daw.Presenters
             document.Save();
             Refresh();
         }
+        /// <summary>現在の再生カーソルへノートを貼り付ける。</summary>
+        public void PasteNotesAtCursor() => PianoRoll.Paste(playback.PositionTick);
         /// <summary>一操作戻す。</summary>
         public void Undo()
         {
@@ -213,7 +215,8 @@ namespace Arpeggio.Daw.Presenters
         private void RefreshStatus()
         {
             string external = HasPendingExternalChange ? "  外部で変更されました。再読み込み（R）" : string.Empty;
-            statusText = $"{document.Path}  |  {document.Song.Chip}  {(document.IsDirty ? "● 未保存" : "保存済み")}{external}  {message}  {Export.StatusText}";
+            string selection = PianoRoll.Selection.Count > 0 ? $"  {PianoRoll.Selection.Count} 音選択" : string.Empty;
+            statusText = $"{document.Path}  |  {document.Song.Chip}  {(document.IsDirty ? "● 未保存" : "保存済み")}{external}{selection}  {message}  {PianoRoll.StatusText}  {Export.StatusText}";
             view.ShowStatus(statusText, TotalWarningCount);
         }
     }

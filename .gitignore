@@ -24,3 +24,4 @@ Thumbs.db
 
 # CLI の undo 履歴
 *.history/
+DebugOutput/

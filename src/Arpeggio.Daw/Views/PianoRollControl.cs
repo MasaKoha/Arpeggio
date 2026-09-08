@@ -60,7 +60,7 @@ namespace Arpeggio.Daw.Views
         private Action<Action>? execute;
         private Song? song;
         private int selectedTrack;
-        private int? selectedTick;
+        private NoteSelection? selection;
         private double positionTick;
         private Rect viewport;
 
@@ -82,7 +82,7 @@ namespace Arpeggio.Daw.Views
             PrepareChannelVisuals(current);
             song = current;
             selectedTrack = trackIndex;
-            selectedTick = tick;
+            selection = presenter?.Selection;
             hoveredTrack = -1;
             ToolTip.SetTip(this, trackToolTips[trackIndex]);
             Width = current.LengthTicks * PixelsPerTick;
@@ -108,6 +108,7 @@ namespace Arpeggio.Daw.Views
                 if (trackIndex != selectedTrack) { DrawNotes(context, trackIndex, visible, false); }
             }
             DrawNotes(context, selectedTrack, visible, true);
+            DrawSelectionRectangle(context);
             double cursorPosition = positionTick * PixelsPerTick;
             context.DrawLine(cursorPen, new Point(cursorPosition, visible.Top), new Point(cursorPosition, visible.Bottom));
             using (context.PushTransform(Matrix.CreateTranslation(cursorPosition, visible.Top)))
@@ -126,11 +127,15 @@ namespace Arpeggio.Daw.Views
             bool bypassSnap = arguments.KeyModifiers.HasFlag(KeyModifiers.Alt);
             if (arguments.GetCurrentPoint(this).Properties.IsRightButtonPressed)
             {
-                execute(() => presenter.DeleteAt(position.X / PixelsPerTick, pitch));
+                execute(() => presenter.BeginErase(position.X / PixelsPerTick, pitch));
+                arguments.Pointer.Capture(this);
             }
             else if (arguments.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             {
-                execute(() => presenter.Press(position.X / PixelsPerTick, pitch, ResizeHandleWidth / PixelsPerTick, bypassSnap));
+                NotePointerModifiers modifiers = NotePointerModifiers.None;
+                if (arguments.KeyModifiers.HasFlag(KeyModifiers.Control)) { modifiers |= NotePointerModifiers.Control; }
+                if (arguments.KeyModifiers.HasFlag(KeyModifiers.Shift)) { modifiers |= NotePointerModifiers.Shift; }
+                execute(() => presenter.Press(position.X / PixelsPerTick, pitch, ResizeHandleWidth / PixelsPerTick, bypassSnap, modifiers));
                 arguments.Pointer.Capture(this);
             }
             arguments.Handled = true;
@@ -149,14 +154,16 @@ namespace Arpeggio.Daw.Views
         protected override void OnPointerReleased(PointerReleasedEventArgs arguments)
         {
             base.OnPointerReleased(arguments);
-            presenter?.EndDrag();
+            if (presenter != null && execute != null) { execute(presenter.EndDrag); }
+            InvalidateVisual();
             arguments.Pointer.Capture(null);
         }
         /// <summary>OS 側でキャプチャを失っても操作を残さない。</summary>
         protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs arguments)
         {
             base.OnPointerCaptureLost(arguments);
-            presenter?.EndDrag();
+            if (presenter != null && execute != null) { execute(presenter.EndDrag); }
+            InvalidateVisual();
         }
         /// <summary>Ctrl ホイールで横方向の拡大率を変更する。</summary>
         protected override void OnPointerWheelChanged(PointerWheelEventArgs arguments)
@@ -171,6 +178,17 @@ namespace Arpeggio.Daw.Views
             arguments.Handled = true;
         }
         private static int GetPitch(double verticalPosition) => Math.Clamp(PianoRollPresenter.MaximumMidiNote - (int)Math.Floor(verticalPosition / NoteHeight), 0, PianoRollPresenter.MaximumMidiNote);
+        private void DrawSelectionRectangle(DrawingContext context)
+        {
+            if (presenter?.SelectionRectangle is not NoteSelectionRectangle selectionRectangle) { return; }
+            const double SelectionOpacity = 0.2;
+            Rect rectangle = new Rect(selectionRectangle.Left * PixelsPerTick,
+                (PianoRollPresenter.MaximumMidiNote - selectionRectangle.TopPitch) * NoteHeight,
+                (selectionRectangle.Right - selectionRectangle.Left) * PixelsPerTick,
+                (selectionRectangle.TopPitch - selectionRectangle.BottomPitch + 1) * NoteHeight);
+            using (context.PushOpacity(SelectionOpacity)) { context.DrawRectangle(accent, null, rectangle); }
+            context.DrawRectangle(null, selectedPen, rectangle);
+        }
         private void DrawPitchRows(DrawingContext context, Rect visible)
         {
             int firstRow = Math.Max(0, (int)(visible.Top / NoteHeight));
@@ -190,9 +208,10 @@ namespace Arpeggio.Daw.Views
         }
         private void DrawTickLines(DrawingContext context, Rect visible)
         {
-            int firstTick = (int)(visible.Left / PixelsPerTick / PianoRollPresenter.GridTicks) * PianoRollPresenter.GridTicks;
+            int gridTicks = presenter?.SnapTicks ?? PianoRollPresenter.GridTicks;
+            int firstTick = (int)(visible.Left / PixelsPerTick / gridTicks) * gridTicks;
             double lastTick = Math.Min(song!.LengthTicks, visible.Right / PixelsPerTick);
-            for (long tick = firstTick; tick <= lastTick; tick += PianoRollPresenter.GridTicks)
+            for (long tick = firstTick; tick <= lastTick; tick += gridTicks)
             {
                 Pen pen = gridPen;
                 if (tick % (Song.FixedTicksPerBeat * BeatsPerBar) == 0) { pen = barPen; }
@@ -299,7 +318,7 @@ namespace Arpeggio.Daw.Views
                     new Point(rectangle.Right - edgeInset, rectangle.Bottom - NoteInset));
                 DrawChannelLabel(context, trackIndex, rectangle);
                 if (note.Effects.Length > 0) { DrawEffectMark(context, rectangle); }
-                if (note.Tick == selectedTick)
+                if (selection != null && selection.Contains(note.Tick))
                 {
                     context.DrawRectangle(null, selectedPen, rectangle, NoteCornerRadius, NoteCornerRadius);
                 }

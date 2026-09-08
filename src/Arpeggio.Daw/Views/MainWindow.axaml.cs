@@ -18,7 +18,10 @@ namespace Arpeggio.Daw.Views
     {
         private const int DisplayIntervalMilliseconds = 33;
         private const int SfxTabIndex = 2;
+        private const int SemitonesPerOctave = 12;
         private readonly PianoRollControl pianoRoll;
+        private readonly PianoRollToolbarView pianoRollToolbar;
+        private readonly VelocityLaneControl velocityLane;
         private readonly KeyboardStripControl keyboard;
         private readonly TimeRulerControl ruler;
         private readonly ScrollViewer rollScroll;
@@ -53,6 +56,8 @@ namespace Arpeggio.Daw.Views
         {
             AvaloniaXamlLoader.Load(this);
             pianoRoll = Require<PianoRollControl>("PianoRoll");
+            pianoRollToolbar = Require<PianoRollToolbarView>("PianoRollToolbar");
+            velocityLane = Require<VelocityLaneControl>("VelocityLane");
             keyboard = Require<KeyboardStripControl>("Keyboard");
             ruler = Require<TimeRulerControl>("Ruler");
             rollScroll = Require<ScrollViewer>("RollScroll");
@@ -76,12 +81,25 @@ namespace Arpeggio.Daw.Views
             revealExportButton = Require<Button>("RevealExportButton");
             filePicker = new AudioFilePicker(this);
         }
+        /// <summary>ピアノロール可視領域の左上。ウィンドウ内 DIP 座標で、未接続なら null。</summary>
+        public Point? PianoRollOrigin => pianoRoll.TranslatePoint(new Point(rollScroll.Offset.X, rollScroll.Offset.Y), this);
+        /// <summary>ピアノロールのスクロール量。単位は DIP。</summary>
+        public Vector PianoRollScrollOffset => rollScroll.Offset;
+        /// <summary>スクロールバーを除いたピアノロールの可視領域の大きさ。</summary>
+        public Size PianoRollViewportSize => rollScroll.Viewport;
+        /// <summary>ズームを反映した 1 tick の DIP 幅。</summary>
+        public double PianoRollPixelsPerTick => pianoRoll.PixelsPerTick;
+        /// <summary>書き出しの既存表示通知を診断ログへ渡す。</summary>
+        public event Action<string>? ExportStatusChanged;
+
         /// <summary>Program が組み立てた Presenter と明示的に結線する。</summary>
         public void Bind(MainWindowPresenter mainPresenter, string path)
         {
             presenter = mainPresenter;
             pollPlayback = mainPresenter.Poll;
             pianoRoll.Bind(mainPresenter.PianoRoll, mainPresenter.Execute);
+            velocityLane.Bind(mainPresenter.PianoRoll, mainPresenter.Execute);
+            pianoRollToolbar.SnapChanged += OnSnapChanged;
             instruments.Bind(mainPresenter.Instruments, mainPresenter.Execute);
             notes.Bind(mainPresenter.Notes, mainPresenter.Execute);
             analysis.Bind(mainPresenter.Analysis);
@@ -116,6 +134,7 @@ namespace Arpeggio.Daw.Views
             Title = $"Arpeggio — {current.Title}";
             tracks.ShowTracks(current.Tracks, selectedTrack);
             pianoRoll.ShowSong(current, selectedTrack, selectedTick);
+            velocityLane.Refresh();
             instruments.ShowChannel(current.Tracks[selectedTrack]);
             instruments.Refresh();
             echoButton.IsVisible = current.Chip == ChipKind.Snes;
@@ -161,6 +180,7 @@ namespace Arpeggio.Daw.Views
             exportButton.IsEnabled = !isRunning;
             revealExportButton.IsVisible = lastExportedPath != null;
             revealExportButton.IsEnabled = !isRunning;
+            ExportStatusChanged?.Invoke(text);
         }
         /// <summary>旧ファイルの監視を解放して新しい正本へ切り替える。</summary>
         public void SwitchDocument(string path)
@@ -194,6 +214,8 @@ namespace Arpeggio.Daw.Views
             transport.TempoSubmitted -= OnTempo;
             transport.LengthSubmitted -= OnLength;
             pianoRoll.ZoomChanged -= OnZoom;
+            pianoRollToolbar.SnapChanged -= OnSnapChanged;
+            pianoRollToolbar.Dispose();
             rollScroll.ScrollChanged -= OnScroll;
             SizeChanged -= OnSizeChanged;
             warningsButton.Click -= OnWarnings;
@@ -249,6 +271,11 @@ namespace Arpeggio.Daw.Views
         {
             if (!isDisposed) { MainPresenter.Execute(MainPresenter.ExternalFileChanged); }
         }
+        private void OnSnapChanged(SnapResolution resolution)
+        {
+            MainPresenter.Execute(() => MainPresenter.PianoRoll.SetSnapResolution(resolution));
+            pianoRoll.Focus();
+        }
         private void OnZoom(double anchorTick, double previousScale)
         {
             double anchorOnScreen = anchorTick * previousScale - rollScroll.Offset.X;
@@ -260,6 +287,8 @@ namespace Arpeggio.Daw.Views
             if (song == null) { return; }
             pianoRoll.SetViewport(new Rect(rollScroll.Offset.X, rollScroll.Offset.Y, rollScroll.Viewport.Width, rollScroll.Viewport.Height));
             keyboard.SetOffset(rollScroll.Offset.Y);
+            velocityLane.SetViewport(rollScroll.Offset.X, pianoRoll.PixelsPerTick);
+            velocityLane.Width = rollScroll.Viewport.Width;
             ruler.SetViewport(rollScroll.Offset.X, pianoRoll.PixelsPerTick, rollScroll.Viewport.Width, song.LengthTicks);
         }
         private void OnShortcut(object? sender, KeyEventArgs arguments)
@@ -272,17 +301,31 @@ namespace Arpeggio.Daw.Views
             else if (control && arguments.Key == Key.E) { action = ExportWithPicker; }
             else if (isParameterInput) { return; }
             else if (control && arguments.Key == Key.Z) { action = shift ? MainPresenter.Redo : MainPresenter.Undo; }
-            else if (!control) { action = GetPlainShortcut(arguments.Key); }
+            else if (control) { action = GetControlShortcut(arguments.Key); }
+            else { action = GetPlainShortcut(arguments.Key, shift); }
             if (action == null) { return; }
             MainPresenter.Execute(action);
             arguments.Handled = true;
         }
-        private Action? GetPlainShortcut(Key key) => key switch
+        private Action? GetControlShortcut(Key key) => key switch
         {
-            Key.Space => MainPresenter.Transport.TogglePlayback,
-            Key.Delete => MainPresenter.PianoRoll.Delete,
+            Key.A => MainPresenter.PianoRoll.SelectAll,
+            Key.C => MainPresenter.PianoRoll.Copy,
+            Key.X => MainPresenter.PianoRoll.Cut,
+            Key.V => MainPresenter.PasteNotesAtCursor,
+            Key.D => MainPresenter.PianoRoll.Duplicate,
             Key.Up => () => MainPresenter.PianoRoll.ChangeVolume(1),
             Key.Down => () => MainPresenter.PianoRoll.ChangeVolume(-1),
+            _ => null
+        };
+        private Action? GetPlainShortcut(Key key, bool shift) => key switch
+        {
+            Key.Space => MainPresenter.Transport.TogglePlayback,
+            Key.Delete or Key.Back => MainPresenter.PianoRoll.Delete,
+            Key.Up => () => MainPresenter.PianoRoll.MoveSelection(0, shift ? SemitonesPerOctave : 1),
+            Key.Down => () => MainPresenter.PianoRoll.MoveSelection(0, shift ? -SemitonesPerOctave : -1),
+            Key.Left => () => MainPresenter.PianoRoll.MoveSelection(-MainPresenter.PianoRoll.SnapTicks, 0),
+            Key.Right => () => MainPresenter.PianoRoll.MoveSelection(MainPresenter.PianoRoll.SnapTicks, 0),
             Key.R => MainPresenter.ConfirmReload,
             _ => null
         };

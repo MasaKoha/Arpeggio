@@ -946,6 +946,53 @@ README.md
 - `docs/design.md`
 - `docs/implementation.md`
 
+
+# FL 式ピアノロール（2026-09-08）
+
+## FL 式ピアノロールの実装判断
+
+- **選択と責務**: `NoteSelection` は開始 tick の集合を保持し、公開ソングから対象を解決する。移動成功後だけ新 tick 集合へ追従する。`PianoRollPresenter` は操作判断と結線、`PianoRollGesture` は押下時のノート・矩形・削除軌跡、`NoteEditGesture` は履歴統合を担当する。PianoRollPresenter は 300 行以内。VelocityLanePresenter は同じ選択集合を受け取り、PianoRollPresenter への逆依存を持たない。
+- **複数編集の原子性**: 既存 `BatchOperationApplier.Apply(EditSession, ...)` へ全対象の RemoveNote → 全候補の AddNote を一括で渡す。選択同士が隣接していても中間重複で誤拒否せず、Core の検証・保存・参照交換は一回のセッション変更で完結する。重複・範囲・効果の一件の違反も全件拒否する。公開ノートを直接書き換えない。
+- **履歴**: ノート追加開始前／移動・伸縮開始前／右削除開始前／音量入力開始前にソングと undo/redo を控え、解放時に押下前の履歴を復元して差分があれば一操作だけ記録する。追加しながら長さ決定する場合も一履歴。元へ戻したドラッグと選択操作は redo を維持する。キャプチャ喪失・トラック切替・Undo/Redo・別編集でも終了境界を通す。
+- **入力**: Ctrl＋空白は矩形選択、Shift＋ノートはトグル、二音以上選択中の通常空白クリックは解除だけ。移動・伸縮は掴んだノートを基準とする。右削除は入力通知間の線分とノート領域の交差を判定し、飛び飛びの通知でも途中の音を消す。上書き以外の複数移動は座標をクランプせず Validator の範囲検証を通す。
+- **クリップボード**: `NoteClipboard` がソング参照とトラック番号、相対 tick と全属性を保持する。効果配列も複製する。同一トラックへ戻れば貼り付け可能だが、文書を再オープンした後の古いコピーは拒否する。貼り付け・複製は時間範囲の重なる音を削除してから一括追加し、置換数と新選択を表示する。Ctrl+D はクリップボードを上書きしない。再生カーソルは MainWindowPresenter が PlaybackEngine から取得する。
+- **UI**: 既存の AXAML 親子関係と名前を維持し、ピアノロールの親 Grid にツールバー行と固定 80px の音量レーン行を追加した。音量レーンの左端・幅・ズームを RollScroll の viewport と同期する。カスタム描画、フィールド保持した Brush/Pen、テーマトークンを利用する。スナップ選択の購読を MainWindow／ToolbarView の Dispose で解除する。既存パラメーター入力のショートカット保護は維持する。
+- **変更境界**: Core / CLI / MCP / Codecs / Formats と依存パッケージは変更していない。git 操作も行っていない。
+
+## FL 式ピアノロールのテストコードと静的確認
+
+Avalonia／SDL を起動しない Presenter テストを 26 メソッド、43 ケース追加した。テストコードは未実行。
+
+| ファイル | ケース数 | 対象 |
+|---|---:|---|
+| PianoRollSelectionTests | 21 | 矩形の境界・部分重なり・逆方向、Shift と redo、二音選択時の空白誤追加防止、隣接音の相対移動・範囲外／重複拒否、共通長さ差分・最短 1 tick・効果制約、追加ドラッグ、先頭以外の音のドラッグと長さ記憶 |
+| PianoRollClipboardTests | 9 | 属性と効果配列の独立性、コピー・切り取り・複製の一履歴、部分重複上書きと件数・隣接保持、範囲外貼り付けで作業ファイル維持、トラック／文書境界、再生位置と先頭への貼り付け |
+| PianoRollEditingTests | 13 | 右削除の線分軌跡と一履歴・ゴースト除外、全選択と矢印・オクターブ・音量・全削除、全スナップ単位と Alt、音量レーンの複数編集・上下限・Undo/Redo・トラック切替 |
+
+- Core の Note / NoteEffect / BatchOperation / BatchOperationApplier / SongValidator と namespace、ローカル Avalonia 12.1.2 の Pointer Capture・DrawingContext.PushOpacity・ComboBox 選択 API、.NET 10 の LINQ API を照合した。
+- AXAML の XML 構文、StaticResource と ThemeResources のキー、MainWindow の Require と x:Name、C# の括弧対応、public/protected の summary、追加購読の解除を静的確認した。
+- dotnet build / dotnet test / コンパイル / アプリ起動は行っていない。警告ゼロ・既存テスト通過・目視済みとは主張しない。
+
+## FL 式ピアノロール 未完了
+
+実装コードとテストコードの追加は完了。以下は依頼者側で未実行の確認事項。
+
+- `dotnet build Arpeggio.slnx` の警告ゼロと、既存テストを含む全件通過。追加 43 ケースも未実行。
+- 実機入力での Ctrl／Shift／Alt、Delete／Backspace、矢印・オクターブ・音量・クリップボード、パラメーター入力フォーカスとの干渉。
+- 連続する右削除、追加しながら長さ決定、矩形表示、キャプチャ喪失、音量レーンの上下ドラッグ、横スクロール／ズーム時の棒とノートの一致。
+- 再生中の複数編集と次バッファ反映、および多数ノートでの Core バッチ・JSON 履歴統合の応答時間。
+
+## FL 式ピアノロール 変更ファイル一覧
+
+| 場所 | ファイル |
+|---|---|
+| `src/Arpeggio.Daw/Presenters/` 更新 | `PianoRollPresenter.cs`、`PianoRollDragMode.cs`、`MainWindowPresenter.cs` |
+| 同上・新規 | `NoteSelection.cs`、`NoteSelectionRectangle.cs`、`NotePointerModifiers.cs`、`NoteClipboard.cs`、`SnapResolution.cs`、`SnapGrid.cs`、`NoteBatchEditor.cs`、`NoteEditGesture.cs`、`PianoRollGesture.cs`、`VelocityLanePresenter.cs` |
+| `src/Arpeggio.Daw/Views/` 更新 | `PianoRollControl.cs`、`MainWindow.axaml`、`MainWindow.axaml.cs` |
+| 同上・新規 | `VelocityLaneControl.cs`、`PianoRollToolbarView.axaml`、`PianoRollToolbarView.axaml.cs` |
+| `src/Arpeggio.Daw/Themes/` | `ArpeggioTheme.axaml`、`ThemeResources.cs` |
+| `tests/Arpeggio.Core.Tests/Daw/` 新規 | `PianoRollSelectionTests.cs`、`PianoRollClipboardTests.cs`、`PianoRollEditingTests.cs` |
+| `docs/` | `design.md`、`implementation.md` |
 # .app バンドル化（2026-09-08）
 
 ## .app の実装判断
@@ -992,6 +1039,56 @@ README.md
 - `docs/design.md`
 - `docs/implementation.md`
 
+# Avalon 統合 実装記録（2026-09-08）
+
+## Avalon 統合の実装判断
+
+- **任意の Debug 依存**: DAW の csproj 基準の `../../../Avalon/src/Avalon/Avalon.csproj` を `Exists()` で判定する。Debug と存在判定の同じ条件で ProjectReference と `AVALON` を設定し、呼び出し・using・統合クラスは `#if AVALON` で囲む。Release へ操作サーバー・ファイル監視・診断依存を含めず、配布ビルドを隣接開発リポジトリから独立させるため Debug に限定した。
+- **起動順**: Avalon の実コードでは `UseAvalon` が `AfterSetup` からホストを起動し、通常は MainWindow / Presenter の生成より早い。`onStarted` で取得関数を登録し、観測時にインスタンスを解決する。生成前は動的キーを null とし、`daw.isReady` も公開する。起動時の初期読み込み成功後から登録するので、空の DawDocument を読まない。
+- **取得元と副作用**: ソング・選択・再生は Presenter の現在の状態だけを読む。PianoRollPresenter には選択実数・選択 tick 文字列・固定スナップの public getter、TransportPresenter には再生状態・位置の public getter だけを追加した。判断・編集・ショートカットのロジックは変更していない。`song.isDirty` は既存の JSON 比較であり、大曲の高頻度観測では比較コストが残る。
+- **トラック切替**: トラック番号は 0 始まり。文書 Opened の成功通知でキー数を同期し、SNES から GB などトラックが減る切替では古いキーを解除する。getter は観測のたびに現在の Presenter / Song を読むため、旧ソングの参照を保持しない。
+- **診断ログ**: DawDocument の Open / Save が保存基準まで更新した後に成功イベントを通知する。外部変更の再読込・SFX の文書切替・同じパスへの再保存も既存経路から記録する。MainWindow の既存 ShowExportStatus 通知を購読して書き出しの開始・完了・失敗をログ化し、連続する同一表示を除外する。保存拒否を dirty の変化から推測して成功扱いすることはない。Presenter へログ処理を追加していない。
+- **座標と要素名**: `PianoRoll` のローカル点 `(scrollOffsetX, scrollOffsetY)` を Window へ TranslatePoint した結果を可視原点とする。横幅は現行ズーム、半音高は既存定数、全体最上段は MIDI 127。DIP の計算式・可視範囲判定・スクロール後の再観測を docs/avalon.md に記載した。既存 x:Name と親子構造は維持し、ウィンドウ・タブ・スクロール・既存スナップ説明・動的トラック行と選択／ミュートへ名前だけを追加した。
+- **寿命**: Program の finally で文書／View のイベント購読と状態キーを解除する。Avalon のデスクトップ lifetime による Dispose に加え、起動失敗でもホストを解放する。通常終了時の重複 Dispose は AvalonHost の既存の冪等性を利用する。
+- **前提との差異**: 本 worktree の PianoRollPresenter は単一 SelectedTick を持ち、矩形選択・複数選択・コピペ・右ドラッグ連続削除の実装がない。MainWindow.axaml に音量レーン・スナップ選択もない。全 DAW ソースを検索して確認し、ユーザーへ実装場所を問い合わせた。編集挙動の変更禁止を優先して、存在しない状態やコントロールを捏造していない。
+
+## Avalon 統合のテストコードと静的確認
+
+- `DawObservationTests` を 8 ケース追加。ドラッグ中の読み取りで履歴・曲・正本・表示を変えないこと、解除／トラック切替／削除の選択追従、別編集経路で削除したノートの除外、再生状態取得で音声要求・表示更新が発生しないことを検証する。
+- 文書通知について、読み込み成功後の状態と失敗時の無通知、正本保存後の通知・同一パスへの再保存、外部変更との競合拒否、書き込み失敗時の無通知と dirty 維持を検証する。
+- Avalon の README / getting-started / ops-reference と src/Avalon の型定義・namespace・公開シグネチャを照合した。ドラッグの `modifiers` / `button` は依頼文では追加中とされていたが、参照時点の ActionExecutor / RoutedInputSender には実装が存在した。動作確認済みとは扱わない。
+- Avalonia 12.1.2 のローカル API XML で TranslatePoint / ScrollViewer.Offset / Viewport を確認した。AXAML / csproj の XML、文書内 JSON 11 例、固定状態キー 22 件と文書の対応、public summary の隣接・ブロック namespace・括弧数・イベント解除を静的に確認した。参照とコンパイル定数の Debug＋Exists 条件一致も確認した。
+- git 操作、dotnet build / dotnet test / コンパイル、DAW 起動は実行していない。Avalon を含む別リポジトリ、Core / CLI / MCP / Codecs / Formats は変更していない。
+
+## Avalon 統合 未完了
+
+- **FL 式編集の取り込み待ち**: 現状の選択数は 0 / 1 であり、複数選択検証の受け入れ条件は未達。実際の選択集合への getter 接続、昇順 tick の先頭 20 件＋総件数の表示、矩形選択・まとめて移動・右ドラッグ削除・コピペの実行確認が残る。docs/avalon.md の JSON は取り込み後の検証用で、貼付位置の決定規則も取り込み時に照合する。
+- **音量レーン・スナップ選択 UI の取り込み待ち**: 対象要素が未実装のため名前を付けられない。既存の固定スナップ説明には SnapLabel を追加したが、選択 UI の代替とは扱わない。
+- **依頼者側のビルド／テスト**: Debug＋Avalon あり、Debug＋Avalon なし、Release で `dotnet build Arpeggio.slnx` が警告ゼロ、追加 8 ケースを含む既存テスト全件成功。未実行のため受け入れ条件 1 は未検証。
+- **依頼者側の実アプリ確認**: `.enabled` の有無と再起動、起動前の状態登録、ping / observe / act / logs、文書切替時のトラックキー増減、ズーム・縦横スクロール・リサイズ後の座標、ファイル読み込み／保存／書き出しログ、終了・初期化失敗時のホスト解放を確認する。
+
+## Avalon 統合 変更ファイル一覧
+
+- `src/Arpeggio.Daw/Arpeggio.Daw.csproj`
+- `src/Arpeggio.Daw/Program.cs`
+- `src/Arpeggio.Daw/Diagnostics/AvalonDawIntegration.cs`（新規）
+- `src/Arpeggio.Daw/Editing/DawDocument.cs`
+- `src/Arpeggio.Daw/Presenters/PianoRollPresenter.cs`
+- `src/Arpeggio.Daw/Presenters/TransportPresenter.cs`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `src/Arpeggio.Daw/Views/TrackListView.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Daw/DawObservationTests.cs`（新規）
+- `docs/avalon.md`（新規）
+- `docs/design.md`
+- `docs/implementation.md`
+- `README.md`
+
+## 提案
+
+- 何を: 選択ノートの MIDI 音高・長さ・音量も上限付きで観測公開する。
+  なぜ: tick と選択数だけでは、上下移動・リサイズ・音量編集が意図どおりか観測テキストで確定できない。
+  見積もり: FL 式編集取り込み後に 1 ラン。
 # M3-A1 / A2 実装記録（2026-09-08）
 
 ## M3-A 設計との差

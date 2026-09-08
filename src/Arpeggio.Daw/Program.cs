@@ -7,6 +7,10 @@ using Arpeggio.Daw.Presenters;
 using Arpeggio.Daw.Views;
 using Avalonia;
 using Avalonia.Controls;
+#if AVALON
+using Avalon;
+using Arpeggio.Daw.Diagnostics;
+#endif
 
 namespace Arpeggio.Daw
 {
@@ -28,6 +32,9 @@ namespace Arpeggio.Daw
             using PlaybackEngine playback = new PlaybackEngine(new SdlAudioOutput());
             MainWindow? window = null;
             MainWindowPresenter? presenter = null;
+#if AVALON
+            AvalonDawIntegration? avalonIntegration = null;
+#endif
             try
             {
                 document.Open(arguments.Length == 1 ? arguments[0] : GetWelcomePath());
@@ -37,6 +44,9 @@ namespace Arpeggio.Daw
                     presenter = new MainWindowPresenter(window, document, playback);
                     window.Bind(presenter, document.Path);
                     presenter.Open(document.Path);
+#if AVALON
+                    avalonIntegration?.AttachWindow(window);
+#endif
                     return window;
                 }, paths =>
                 {
@@ -44,7 +54,19 @@ namespace Arpeggio.Daw
                     {
                         OpenRequestedFiles(window, presenter, paths);
                     }
-                })).UsePlatformDetect().WithInterFont().LogToTrace().StartWithClassicDesktopLifetime(arguments);
+                })).UsePlatformDetect().WithInterFont().LogToTrace()
+#if AVALON
+                    .UseAvalon(onStarted: host =>
+                    {
+                        // AfterSetup は画面生成より先に走るため、状態は観測時に解決する。
+                        avalonIntegration = new AvalonDawIntegration(host, document, () => presenter, () => window);
+                        if (window is not null)
+                        {
+                            avalonIntegration.AttachWindow(window);
+                        }
+                    })
+#endif
+                    .StartWithClassicDesktopLifetime(arguments);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
                 SongValidationException or ArgumentException or InvalidOperationException)
@@ -52,7 +74,13 @@ namespace Arpeggio.Daw
                 Console.Error.WriteLine(exception.Message);
                 return 1;
             }
-            finally { window?.Dispose(); }
+            finally
+            {
+#if AVALON
+                avalonIntegration?.Dispose();
+#endif
+                window?.Dispose();
+            }
         }
 
         private static string GetWelcomePath()
