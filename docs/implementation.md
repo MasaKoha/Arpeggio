@@ -1237,3 +1237,70 @@ A1 / A2 の予定コードとテストコードは追加済み。受け入れ条
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterCompilerTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterDiagnosticsTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/RegisterTimelineTests.cs`
+
+# M3-B2 実装記録（2026-09-08）
+
+## M3-B2 設計との差
+
+- `SongValidator` が `Delay < DurationTicks` を保証するため、正常な制御列では初回演奏に全元ノートの On が現れる。DPCM は On の元ノートを事前走査し、有限周回による重複を除いて拒否する。制御列の型・Core・設計書は変更しない。
+- 未指定の診断粒度を補完する。`PanReduced` は非ミュートの非ゼロ Pan を空トラックも含めトラックごとに一件、`UnsupportedDpcm` は元ノートごとに一件。`TriangleVolumeIgnored` は非 15 音量または VolumeSlide 指定を On ごとに一件とし、同じ元ノートの周回は既存 report で集約する。
+- `PulsePhaseRestarted` は効果の種類によらず継続中に timer high を実際に書くたびに報告する。On の必須ロードは警告にしない。`VolumeQuantized` の誤差単位は 0〜15 のレベル、`PulsePhaseRestarted` は変更前後の high 値を記録し数値誤差は持たせない。
+- 終端の制御列 Off を維持し、その後に `$4015=0` と Pulse 二声／Noise の volume=0 を必ず追記する。Pulse は最後の duty を保持し、未発音なら duty bits=0、halt / constant は維持する。同値の終端停止も省略しない。
+
+## M3-B2 実装範囲と判断
+
+- `NesRegisterCompiler` に Noise の `$400C/$400E/$400F` と enable bit 3 を追加した。変調後の値を 0〜127 に制限し ToEven で丸め、下位 4 bit を周期、音色の Short を bit 7 に詰める。継続時は音量／周期の変更分だけを書き、On では同値でも enable → control → period → length を保持する。
+- Noise selection の制限・丸めは既存 Noise 合成の選択規則そのものであり、連続音程の損失を示す `PitchClamped` にはしない。LFSR seed の任意リセット不可、Pulse high の duty sequencer と timer divider の副作用の差を恒常的な制限へ追加した。
+- DPCM はレジスタを生成する前に、非ミュートの元ノートの存在で拒否する。音量ゼロ・Delay 指定も除外しない。空トラック・未使用予約音色・ミュート済みノートは許可し、`$4015` の DMC enable は一度も立てない。元 Song の後編集と周回の重複に影響されない。
+- 終端サンプル位置に全停止と三つの volume=0 を必ず書く。既存の全 Off → 全 On／更新、四声間の共有 shadow、On の length ロード順序を維持する。終端の書き込みも既存の 4000000 件上限と `registerWrites` 統計に含める。
+- `NesConversionDiagnostics` にトラックの事前診断と、音量丸め・Triangle の音量省略・実際の Pulse high 更新の警告をまとめた。B1 の `PitchClamped` の診断構築も同型へ移し、判定式・元位置・最大誤差は維持した。元ノートの同原因を既存 report で集約し、strict は明細保持ゼロでも全警告数で部分列を拒否する。
+
+## M3-B2 テストコード
+
+5 テストクラスに **29 メソッド／65 ケース**と、独立したレジスタゲートモデルを追加した。合計は依頼の 812 件を基準に **877 件見込み**。件数は属性の静的集計であり、実際の検出・実行結果ではない。新規テストは PCM・音声合成器・外部エミュレーターを使用しない。
+
+| ファイル | 検証内容 |
+|---|---|
+| NesNoiseRegisterTests | 両 mode 各 16 周期、0／127 と変調後の範囲外・半整数 ToEven・下位 bit 選択、On の順序、継続差分、音量ゼロから復帰、同値再発音、音色での mode 交代、ミュート、Delay と有限二周 |
+| NesConversionDiagnosticsTests | Pulse／Noise の最終音量と最大誤差・発生数、全整数音量の丸め誤差抑止、半整数 AwayFromZero、Triangle 非 15 音量／VolumeSlide、パンの元位置・モノラル結果・空／ミュート、両 Pulse の vibrato による high 境界往復、Triangle との区別、各警告の strict・明細保持ゼロ、恒常的制限のみなら成功 |
+| NesDpcmRejectionTests | 非ミュート DPCM の通常／strict 拒否、Delay・音量ゼロ、空トラック・未使用予約音色の許可、ミュートとスナップショット保持、二ノート・二周の重複除去、明細保持ゼロのエラー、DMC enable／アドレス／長さを開始しないこと |
+| NesRegisterTerminationTests / NesRegisterGateModel | 四声の enable 前後の length load、Triangle high → 即時 linear load、他声を保持する個別 Off、四声同時交代の全 Off → 全 On、同値 length 再ロード、空／停止済み／終端まで発音する曲の停止列、音量ゼロと順序番号。ゲートモデルは生成サブセットの length index 0・共有 status・linear reload・Noise mode・Pulse 位相再開回数のみを独立して読む |
+| NesEffectRegisterTests | Delay・PitchSlide・VolumeSlide・Vibrato・ノート Arpeggio と音色マクロを同時に適用した Pulse／Noise の手計算レジスタ値、Noise の LoopIndex と非ループ終端保持 |
+
+B1 のテストは、暫定の Noise／DPCM 無視ケースを DPCM エラーへ更新した。Pulse 制御値の検証は終端消音の追加に合わせて時刻 0 を明示し、変調クランプの検証には新しい位相警告一件の検証を追加した。既存の期待値を削除して成功条件を緩和していない。
+
+## M3-B2 静的確認
+
+- Core・Formats の参照型と namespace、.NET 10 のローカル参照 XML（HashSet／Math／LINQ）、xUnit 2.9.2 の定義・既存使用例を照合した。レジスタ定数 34 件と診断メソッド 6 件の参照先を確認した。
+- 変更・新規 C# の括弧対応、日本語 summary の隣接と XML、ブロック namespace、一ファイル一型、末尾空白、禁止省略名、Unity lifecycle／コンポーネント API の不使用を確認した。固定レジスタ期待値は算術でも照合した。
+- 作業開始時のファイルハッシュと比較し、`src/Arpeggio.Core/`、設計書二つ、制御列の型、プロジェクト依存、CLI／MCP／DAW／Codecs、および B1 の対象二ファイル以外の既存テストが不変であることを確認した。NuGet・永続項目・JSON version は追加／変更していない。
+- git 操作、コンパイル、`dotnet build`／`dotnet test`、アプリ起動、PCM・NSF／VGM ファイル生成は実施していない。指定作業ディレクトリ外への書き込みは行っていない。
+
+## M3-B2 未完了
+
+予定した実装とテストコードは追加済み。次の受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 812 件を含む全件と追加 65 ケースの成功、実際のテスト検出件数の確認。
+- 独立ゲートモデルの副作用検証と既存 PCM／JSON／GC 回帰の実行。新しいアロケーション計測テストは追加していない。
+- 外部プレイヤー・実機の聴取／動作確認は未実施。レジスタ再合成と NSF／VGM の相互比較は設計済みの H 系列に残る。
+
+## M3-B2 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/Export/NesRegisterCompiler.cs`
+- `src/Arpeggio.Formats/Export/NesRegisters.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesRegisterCompilerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesRegisterDiagnosticsTests.cs`
+- `docs/implementation.md`
+
+新規:
+
+- `src/Arpeggio.Formats/Export/NesConversionDiagnostics.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesNoiseRegisterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesConversionDiagnosticsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesDpcmRejectionTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesRegisterTerminationTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesRegisterGateModel.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesEffectRegisterTests.cs`
