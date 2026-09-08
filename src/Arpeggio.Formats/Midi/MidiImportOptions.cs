@@ -3,7 +3,7 @@ using Arpeggio.Core.Document;
 
 namespace Arpeggio.Formats.Midi
 {
-    /// <summary>SMF を新規 Song へ変換する設定。読み取りと割り当ての実装は後続ランで接続する。</summary>
+    /// <summary>SMF を新規 Song へ変換する設定。入力名・時間量子化・声割り当て・保存可否を指定する。</summary>
     public sealed class MidiImportOptions
     {
         /// <summary>出力チップ。明示指定を必須とする。</summary>
