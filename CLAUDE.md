@@ -2,6 +2,15 @@
 
 ファミコン・ゲームボーイ・スーファミ風の曲と効果音を AI と人が作るチップチューン DAW。`Arpeggio.Core`（.NET 10 ライブラリ）＋ CLI `arpeggio` ＋ MCP サーバー `arpeggio-mcp` ＋ Avalonia DAW `arpeggio-daw`。
 
+## Codex の使い方（2026-09-08 ユーザー指示）
+
+- **実装ランは当分すべて `-p top`（gpt-6-astra）＋ `-c model_reasoning_effort=high`**。`~/.claude/rules/ai-operations.md` の
+  「top を選ぶ基準」より優先する。std へ落とさない。`docs/design-m3.md` の分割表に「既定 std」と書いてあるものも top で投げる
+- **仕様の判断も Codex に任せてよい**。設計ラン（実装を書かせず設計書だけ書かせる）→ メインがレビュー → 実装ランの順で回す
+- **「何を作るか」も Codex に提案させる**。`codex-propose` skill を使い、提案書 `docs/proposals/YYYY-MM-DD.md` を書かせて
+  メインが 1 案ずつ採否を判定してから実装へ回す。提案した Codex にそのまま実装させない
+- 起動は `karakuri/tools/codex_run.sh` 経由。並行するときは `git worktree` で作業ディレクトリを分ける
+
 - 設計の正本: `docs/design.md`。仕様変更はまずここを直す
 - ビルド: `dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly`
 - テスト: `dotnet test Arpeggio.slnx -nologo -v q`
