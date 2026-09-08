@@ -29,6 +29,16 @@ namespace Arpeggio.Formats.Export
             Instruments = new ReadOnlyDictionary<int, ControlInstrument>(instruments);
         }
 
+        internal ControlTimeline(ControlTimeline source, long endSamples, List<ControlEvent> events)
+        {
+            Chip = source.Chip;
+            Title = source.Title;
+            EndSamples = endSamples;
+            Events = Array.AsReadOnly(events.ToArray());
+            Tracks = source.Tracks;
+            Instruments = source.Instruments;
+        }
+
         /// <summary>対象チップ。</summary>
         public ChipKind Chip { get; }
         /// <summary>作成開始時の曲名。</summary>
