@@ -1,4 +1,9 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <x:Double x:Key="Arpeggio.VelocityLane.Height">80</x:Double>
+  <x:Double x:Key="Arpeggio.VelocityLane.HitTolerance">6</x:Double>
+  <x:Double x:Key="Arpeggio.VelocityLane.MinimumBarHeight">2</x:Double>
+  <x:Double x:Key="Arpeggio.Width.PianoRollSnap">128</x:Double>
+  <Thickness x:Key="Arpeggio.Margin.Small">4</Thickness>
   <Color x:Key="Arpeggio.Background.Color">#0E131A</Color>
   <SolidColorBrush x:Key="Arpeggio.Background" Color="{StaticResource Arpeggio.Background.Color}" />
   <Color x:Key="Arpeggio.Panel.Color">#161D27</Color>

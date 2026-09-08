@@ -946,3 +946,51 @@ README.md
 - `tests/Arpeggio.Core.Tests/Daw/SnesEchoAcceptanceTests.cs`（新規）
 - `docs/design.md`
 - `docs/implementation.md`
+
+
+# FL 式ピアノロール（2026-09-08）
+
+## FL 式ピアノロールの実装判断
+
+- **選択と責務**: `NoteSelection` は開始 tick の集合を保持し、公開ソングから対象を解決する。移動成功後だけ新 tick 集合へ追従する。`PianoRollPresenter` は操作判断と結線、`PianoRollGesture` は押下時のノート・矩形・削除軌跡、`NoteEditGesture` は履歴統合を担当する。PianoRollPresenter は 300 行以内。VelocityLanePresenter は同じ選択集合を受け取り、PianoRollPresenter への逆依存を持たない。
+- **複数編集の原子性**: 既存 `BatchOperationApplier.Apply(EditSession, ...)` へ全対象の RemoveNote → 全候補の AddNote を一括で渡す。選択同士が隣接していても中間重複で誤拒否せず、Core の検証・保存・参照交換は一回のセッション変更で完結する。重複・範囲・効果の一件の違反も全件拒否する。公開ノートを直接書き換えない。
+- **履歴**: ノート追加開始前／移動・伸縮開始前／右削除開始前／音量入力開始前にソングと undo/redo を控え、解放時に押下前の履歴を復元して差分があれば一操作だけ記録する。追加しながら長さ決定する場合も一履歴。元へ戻したドラッグと選択操作は redo を維持する。キャプチャ喪失・トラック切替・Undo/Redo・別編集でも終了境界を通す。
+- **入力**: Ctrl＋空白は矩形選択、Shift＋ノートはトグル、二音以上選択中の通常空白クリックは解除だけ。移動・伸縮は掴んだノートを基準とする。右削除は入力通知間の線分とノート領域の交差を判定し、飛び飛びの通知でも途中の音を消す。上書き以外の複数移動は座標をクランプせず Validator の範囲検証を通す。
+- **クリップボード**: `NoteClipboard` がソング参照とトラック番号、相対 tick と全属性を保持する。効果配列も複製する。同一トラックへ戻れば貼り付け可能だが、文書を再オープンした後の古いコピーは拒否する。貼り付け・複製は時間範囲の重なる音を削除してから一括追加し、置換数と新選択を表示する。Ctrl+D はクリップボードを上書きしない。再生カーソルは MainWindowPresenter が PlaybackEngine から取得する。
+- **UI**: 既存の AXAML 親子関係と名前を維持し、ピアノロールの親 Grid にツールバー行と固定 80px の音量レーン行を追加した。音量レーンの左端・幅・ズームを RollScroll の viewport と同期する。カスタム描画、フィールド保持した Brush/Pen、テーマトークンを利用する。スナップ選択の購読を MainWindow／ToolbarView の Dispose で解除する。既存パラメーター入力のショートカット保護は維持する。
+- **変更境界**: Core / CLI / MCP / Codecs / Formats と依存パッケージは変更していない。git 操作も行っていない。
+
+## FL 式ピアノロールのテストコードと静的確認
+
+Avalonia／SDL を起動しない Presenter テストを 26 メソッド、43 ケース追加した。テストコードは未実行。
+
+| ファイル | ケース数 | 対象 |
+|---|---:|---|
+| PianoRollSelectionTests | 21 | 矩形の境界・部分重なり・逆方向、Shift と redo、二音選択時の空白誤追加防止、隣接音の相対移動・範囲外／重複拒否、共通長さ差分・最短 1 tick・効果制約、追加ドラッグ、先頭以外の音のドラッグと長さ記憶 |
+| PianoRollClipboardTests | 9 | 属性と効果配列の独立性、コピー・切り取り・複製の一履歴、部分重複上書きと件数・隣接保持、範囲外貼り付けで作業ファイル維持、トラック／文書境界、再生位置と先頭への貼り付け |
+| PianoRollEditingTests | 13 | 右削除の線分軌跡と一履歴・ゴースト除外、全選択と矢印・オクターブ・音量・全削除、全スナップ単位と Alt、音量レーンの複数編集・上下限・Undo/Redo・トラック切替 |
+
+- Core の Note / NoteEffect / BatchOperation / BatchOperationApplier / SongValidator と namespace、ローカル Avalonia 12.1.2 の Pointer Capture・DrawingContext.PushOpacity・ComboBox 選択 API、.NET 10 の LINQ API を照合した。
+- AXAML の XML 構文、StaticResource と ThemeResources のキー、MainWindow の Require と x:Name、C# の括弧対応、public/protected の summary、追加購読の解除を静的確認した。
+- dotnet build / dotnet test / コンパイル / アプリ起動は行っていない。警告ゼロ・既存テスト通過・目視済みとは主張しない。
+
+## FL 式ピアノロール 未完了
+
+実装コードとテストコードの追加は完了。以下は依頼者側で未実行の確認事項。
+
+- `dotnet build Arpeggio.slnx` の警告ゼロと、既存テストを含む全件通過。追加 43 ケースも未実行。
+- 実機入力での Ctrl／Shift／Alt、Delete／Backspace、矢印・オクターブ・音量・クリップボード、パラメーター入力フォーカスとの干渉。
+- 連続する右削除、追加しながら長さ決定、矩形表示、キャプチャ喪失、音量レーンの上下ドラッグ、横スクロール／ズーム時の棒とノートの一致。
+- 再生中の複数編集と次バッファ反映、および多数ノートでの Core バッチ・JSON 履歴統合の応答時間。
+
+## FL 式ピアノロール 変更ファイル一覧
+
+| 場所 | ファイル |
+|---|---|
+| `src/Arpeggio.Daw/Presenters/` 更新 | `PianoRollPresenter.cs`、`PianoRollDragMode.cs`、`MainWindowPresenter.cs` |
+| 同上・新規 | `NoteSelection.cs`、`NoteSelectionRectangle.cs`、`NotePointerModifiers.cs`、`NoteClipboard.cs`、`SnapResolution.cs`、`SnapGrid.cs`、`NoteBatchEditor.cs`、`NoteEditGesture.cs`、`PianoRollGesture.cs`、`VelocityLanePresenter.cs` |
+| `src/Arpeggio.Daw/Views/` 更新 | `PianoRollControl.cs`、`MainWindow.axaml`、`MainWindow.axaml.cs` |
+| 同上・新規 | `VelocityLaneControl.cs`、`PianoRollToolbarView.axaml`、`PianoRollToolbarView.axaml.cs` |
+| `src/Arpeggio.Daw/Themes/` | `ArpeggioTheme.axaml`、`ThemeResources.cs` |
+| `tests/Arpeggio.Core.Tests/Daw/` 新規 | `PianoRollSelectionTests.cs`、`PianoRollClipboardTests.cs`、`PianoRollEditingTests.cs` |
+| `docs/` | `design.md`、`implementation.md` |
