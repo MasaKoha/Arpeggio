@@ -39,10 +39,7 @@ namespace Arpeggio.Core.Sequencing
         {
             note = null;
             elapsedTicks = 0.0;
-            if (_track.Muted)
-            {
-                return false;
-            }
+            // ミュートはミキサー段で行う。SPC700 はボリューム 0 でも前ボイス出力がピッチモジュレーションへ乗るため、発音自体は止めない
             int noteIndex = FindNoteIndex(tick);
             if (noteIndex < 0)
             {
@@ -69,7 +66,7 @@ namespace Arpeggio.Core.Sequencing
             double elapsedTicks = 0.0;
             double durationTicks = 0.0;
             double totalTicks = lengthTicks + (loopCount - 1.0) * (lengthTicks - loopStartTick);
-            if (!_track.Muted && absoluteSample < clock.TickToSamples(totalTicks))
+            if (absoluteSample < clock.TickToSamples(totalTicks))
             {
                 cycle = GetCycle(absoluteSample, clock, lengthTicks, loopStartTick);
                 double tickOffset = cycle * (double)(lengthTicks - loopStartTick);

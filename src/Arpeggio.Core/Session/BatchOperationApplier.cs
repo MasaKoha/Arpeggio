@@ -137,9 +137,9 @@ namespace Arpeggio.Core.Session
             int index = FindInstrument(song, instrumentId);
             foreach (Track track in song.Tracks)
             {
-                if (track.Notes.Exists(note => note.InstrumentId == instrumentId))
+                if (track.DefaultInstrumentId == instrumentId || track.Notes.Exists(note => note.InstrumentId == instrumentId))
                 {
-                    throw new InvalidOperationException($"音色 ID {instrumentId} はノートから参照されています。");
+                    throw new InvalidOperationException($"音色 ID {instrumentId} はトラックの既定音色またはノートから参照されています。");
                 }
             }
             song.Instruments.RemoveAt(index);

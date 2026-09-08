@@ -51,6 +51,23 @@ namespace Arpeggio.Daw.Editing
         /// <summary>自分の保存・重複通知を内容比較で判別する。</summary>
         public bool HasExternalChange() => SongSerializer.Serialize(SongSerializer.Load(Path)) != savedSnapshot;
 
+        /// <summary>Core に公開編集 API がないエコー設定を、保存成功後だけ一履歴で公開する。</summary>
+        internal void UpdateSnesEcho(SnesEchoSettings settings)
+        {
+            Song candidate = SongSerializer.Deserialize(SongSerializer.Serialize(Song));
+            candidate.SnesEcho = new SnesEchoSettings
+            {
+                DelayMilliseconds = settings.DelayMilliseconds,
+                Feedback = settings.Feedback,
+                Volume = settings.Volume,
+                FirCoefficients = (int[])settings.FirCoefficients.Clone()
+            };
+            // 公開ソングの先行変更を避け、検証や保存の失敗では履歴と表示を維持する。
+            SongSerializer.Save(candidate, workingPath);
+            Session.History.Record(Song);
+            Song.SnesEcho = candidate.SnesEcho;
+        }
+
         /// <summary>終了時に一時作業ファイルを削除する。</summary>
         public void Dispose()
         {

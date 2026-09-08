@@ -31,6 +31,7 @@ namespace Arpeggio.Daw.Presenters
             PianoRoll = new PianoRollPresenter(document, Refresh, ResolveInstrument);
             Instruments = new InstrumentPanelPresenter(document, PianoRoll, Refresh);
             Transport = new TransportPresenter(document, playback, Refresh);
+            SnesEcho = new SnesEchoPresenter(document, PianoRoll, Transport);
             Notes = new NotePanelPresenter(document, PianoRoll, Refresh);
             Analysis = new AnalysisPresenter(document, view, RefreshStatus);
             Export = new ExportPresenter(document, view, RefreshStatus);
@@ -42,6 +43,8 @@ namespace Arpeggio.Daw.Presenters
         public InstrumentPanelPresenter Instruments { get; }
         /// <summary>再生と構造編集。</summary>
         public TransportPresenter Transport { get; }
+        /// <summary>ソング単位の SNES エコー編集。</summary>
+        public SnesEchoPresenter SnesEcho { get; }
         /// <summary>選択ノートの効果編集。</summary>
         public NotePanelPresenter Notes { get; }
         /// <summary>非同期の音声解析。</summary>

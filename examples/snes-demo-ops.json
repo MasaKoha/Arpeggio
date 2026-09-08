@@ -1,0 +1,298 @@
+[
+  {
+    "kind": "SetTrackPan",
+    "track": 0,
+    "pan": -0.3
+  },
+  {
+    "kind": "AddNote",
+    "track": 0,
+    "tick": 0,
+    "durationTicks": 168,
+    "midiNote": 60,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 0,
+    "tick": 192,
+    "durationTicks": 168,
+    "midiNote": 64,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 0,
+    "tick": 384,
+    "durationTicks": 168,
+    "midiNote": 67,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 0,
+    "tick": 576,
+    "durationTicks": 168,
+    "midiNote": 62,
+    "volume": 10
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 1,
+    "pan": 0.3
+  },
+  {
+    "kind": "AddNote",
+    "track": 1,
+    "tick": 0,
+    "durationTicks": 168,
+    "midiNote": 55,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 1,
+    "tick": 192,
+    "durationTicks": 168,
+    "midiNote": 60,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 1,
+    "tick": 384,
+    "durationTicks": 168,
+    "midiNote": 64,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 1,
+    "tick": 576,
+    "durationTicks": 168,
+    "midiNote": 59,
+    "volume": 10
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 2,
+    "pan": -0.15
+  },
+  {
+    "kind": "AddNote",
+    "track": 2,
+    "tick": 0,
+    "durationTicks": 168,
+    "midiNote": 72,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 2,
+    "tick": 192,
+    "durationTicks": 168,
+    "midiNote": 76,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 2,
+    "tick": 384,
+    "durationTicks": 168,
+    "midiNote": 79,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 2,
+    "tick": 576,
+    "durationTicks": 168,
+    "midiNote": 74,
+    "volume": 10
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 3,
+    "pan": 0.15
+  },
+  {
+    "kind": "AddNote",
+    "track": 3,
+    "tick": 0,
+    "durationTicks": 168,
+    "midiNote": 64,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 3,
+    "tick": 192,
+    "durationTicks": 168,
+    "midiNote": 67,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 3,
+    "tick": 384,
+    "durationTicks": 168,
+    "midiNote": 71,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 3,
+    "tick": 576,
+    "durationTicks": 168,
+    "midiNote": 65,
+    "volume": 10
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 4,
+    "pan": 0
+  },
+  {
+    "kind": "AddNote",
+    "track": 4,
+    "tick": 0,
+    "durationTicks": 168,
+    "midiNote": 36,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 4,
+    "tick": 192,
+    "durationTicks": 168,
+    "midiNote": 40,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 4,
+    "tick": 384,
+    "durationTicks": 168,
+    "midiNote": 43,
+    "volume": 10
+  },
+  {
+    "kind": "AddNote",
+    "track": 4,
+    "tick": 576,
+    "durationTicks": 168,
+    "midiNote": 38,
+    "volume": 10
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 5,
+    "pan": 0
+  },
+  {
+    "kind": "AddNote",
+    "track": 5,
+    "tick": 0,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 5,
+    "tick": 192,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 5,
+    "tick": 384,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 5,
+    "tick": 576,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 6,
+    "pan": 0.1
+  },
+  {
+    "kind": "AddNote",
+    "track": 6,
+    "tick": 48,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 6,
+    "tick": 240,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 6,
+    "tick": 432,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 6,
+    "tick": 624,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "SetTrackPan",
+    "track": 7,
+    "pan": -0.2
+  },
+  {
+    "kind": "AddNote",
+    "track": 7,
+    "tick": 0,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 7,
+    "tick": 192,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 7,
+    "tick": 384,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  },
+  {
+    "kind": "AddNote",
+    "track": 7,
+    "tick": 576,
+    "durationTicks": 24,
+    "midiNote": 60,
+    "volume": 12
+  }
+]

@@ -1,5 +1,6 @@
 using System;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Instruments.Snes;
 
 namespace Arpeggio.Core.Document
 {
@@ -10,6 +11,9 @@ namespace Arpeggio.Core.Document
         private const int WaveSampleCount = 32;
         private const int ShortLfsrWidth = 7;
         private const int LongLfsrWidth = 15;
+        private const int MaximumSnesAttack = 15;
+        private const int MaximumSnesDecay = 7;
+        private const int MaximumSnesRate = 31;
 
         internal static void Validate(Instrument instrument, ChipKind chip)
         {
@@ -139,9 +143,32 @@ namespace Arpeggio.Core.Document
             SongValidator.Require(SongValidator.IsInRange(envelope.DecaySeconds, 0, double.MaxValue), "decay は有限の非負秒数です。");
             SongValidator.Require(SongValidator.IsInRange(envelope.ReleaseSeconds, 0, double.MaxValue), "release は有限の非負秒数です。");
             SongValidator.Require(SongValidator.IsInRange(envelope.SustainLevel, 0, 1), "sustain は 0〜1 です。");
+            SongValidator.Require(sample.NoiseRate >= 0 && sample.NoiseRate <= MaximumSnesRate, "noiseRate は 0〜31 です。");
+            if (sample.AdsrRegisters is SnesAdsrRegisters registers)
+            {
+                SongValidator.Require(registers.Attack >= 0 && registers.Attack <= MaximumSnesAttack, "ADSR attack は 0〜15 です。");
+                SongValidator.Require(registers.Decay >= 0 && registers.Decay <= MaximumSnesDecay, "ADSR decay は 0〜7 です。");
+                SongValidator.Require(registers.SustainLevel >= 0 && registers.SustainLevel <= MaximumSnesDecay, "ADSR sustainLevel は 0〜7 です。");
+                SongValidator.Require(registers.SustainRate >= 0 && registers.SustainRate <= MaximumSnesRate, "ADSR sustainRate は 0〜31 です。");
+            }
+            ValidatePreset(sample);
             ValidateEmbeddedSample(sample);
             ValidateMacro(sample.ArpeggioMacro);
             ValidateMacro(sample.PitchMacro);
+        }
+
+        private static void ValidatePreset(SnesSampleInstrument sample)
+        {
+            SongValidator.Require(sample.Preset is null || sample.SampleData is null, "preset と sampleData はどちらか一方だけ指定してください。");
+            if (sample.Preset != null)
+            {
+                SongValidator.Require(SnesInstrumentCatalog.TryGet(sample.Preset, out _), $"未知の SNES プリセットです: {sample.Preset}");
+                SongValidator.Require(sample.SampleRate > 0, "sampleRate は正の整数です。");
+                int count = SnesInstrumentCatalog.Get(sample.Preset).SampleCount;
+                int end = sample.LoopEnd == 0 ? count : sample.LoopEnd;
+                SongValidator.Require(!sample.Loop || (sample.LoopStart >= 0 && sample.LoopStart < end && end <= count),
+                    "プリセットのループ範囲が不正です。");
+            }
         }
 
         internal static void ValidateEmbeddedSample(SnesSampleInstrument sample)

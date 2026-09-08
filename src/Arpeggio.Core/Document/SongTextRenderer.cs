@@ -43,6 +43,10 @@ namespace Arpeggio.Core.Document
             StringBuilder output = new StringBuilder(JoinRows(rows, columnWidths));
             foreach (Instrument instrument in song.Instruments)
             {
+                if (instrument is SnesSampleInstrument presetSample && presetSample.Preset != null)
+                {
+                    output.AppendLine().Append($"{presetSample.Id:D2} SnesSample {presetSample.Preset} {presetSample.Name}");
+                }
                 if (instrument is SnesSampleInstrument sample && sample.SampleData != null)
                 {
                     output.AppendLine().Append($"{sample.Id:D2} {sample.Name}: {sample.SampleSummary}");

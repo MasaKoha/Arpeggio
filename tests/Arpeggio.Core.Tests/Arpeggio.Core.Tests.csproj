@@ -23,4 +23,9 @@
     <ProjectReference Include="..\..\src\Arpeggio.Daw\Arpeggio.Daw.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../examples/snes-demo.arpeggio.json" Link="Examples/snes-demo.arpeggio.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/snes-demo-ops.json" Link="Examples/snes-demo-ops.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

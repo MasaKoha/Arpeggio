@@ -7,7 +7,7 @@ namespace Arpeggio.Core.Session
     /// <summary>音色 ID が省略されたノートに、トラックのチャンネルへ使える音色を割り当てる。</summary>
     public static class DefaultInstrumentResolver
     {
-        /// <summary>指定があればそのまま返し、無ければチャンネルに合う最初の音色 ID を返す。合う音色が無ければ追加手順を含む例外を投げる。</summary>
+        /// <summary>指定 ID、トラックの既定 ID、チャンネルに合う最初の音色 ID の順に選ぶ。合う音色が無ければ追加手順を含む例外を投げる。</summary>
         public static int Resolve(Song song, int trackIndex, int? instrumentId)
         {
             if (instrumentId.HasValue)
@@ -15,6 +15,10 @@ namespace Arpeggio.Core.Session
                 return instrumentId.Value;
             }
             Track track = EditSession.GetTrack(song, trackIndex);
+            if (track.DefaultInstrumentId is int defaultInstrumentId)
+            {
+                return defaultInstrumentId;
+            }
             foreach (Instrument instrument in song.Instruments)
             {
                 if (InstrumentValidator.GetChannel(instrument.Kind) == track.Channel)

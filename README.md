@@ -151,8 +151,50 @@ arpeggio-daw melody.arpeggio.json
 }
 ```
 
-ツールは `new_song` / `open_song` / `save_song` / `song_info` / `show_song` / `add_note` / `remove_note` / `update_note` / `apply_operations` / `add_instrument` / `update_instrument` / `remove_instrument` / `export_wav` / `export_ogg` / `undo` / `redo` / `chip_reference` / `analyze_song` / `analyze_wav` / `new_sfx` / `sfx_presets` / `import_wav_sample`。
+ツールは `new_song` / `open_song` / `save_song` / `song_info` / `show_song` / `add_note` / `remove_note` / `update_note` / `apply_operations` / `add_instrument` / `update_instrument` / `remove_instrument` / `export_wav` / `export_ogg` / `undo` / `redo` / `chip_reference` / `analyze_song` / `analyze_wav` / `new_sfx` / `sfx_presets` / `snes_presets` / `import_wav_sample`。
 
 `new_song` と編集ツールは成功時に自動保存する。`open_song` は現在の曲とセッション履歴を差し替える。MCP の履歴はセッション内に保持し、CLI の履歴とは共有しない。`add_instrument` / `update_instrument` の `instrument` と `apply_operations` の `operations` は JSON **文字列**で渡す。音色更新はオブジェクト全体の置き換え。ノートの `effects` も JSON 配列文字列、省略で既存値を保持し `[]` で解除する。
 
 戻り値は JSON 文字列。ただし `show_song` の既定と `chip_reference` はテキストをそのまま返す。入力・操作の失敗は `{"error":"説明","exitCode":1}` などの JSON 文字列を返す。
+
+## SNES 内蔵音色バンク
+
+WAV 素材なしで 16 音色を使える。保存するのはプリセット名と設定値だけで、サンプルは固定シードの合成から生成し、BRR 往復・ガウス補間・DSP ADSR を通して再生する。
+
+```sh
+arpeggio instrument presets snes
+arpeggio new orchestra.arpeggio.json --chip snes --bank orchestral
+arpeggio instrument add orchestra.arpeggio.json --kind SnesSample --preset strings --name str
+arpeggio instrument set orchestra.arpeggio.json --id 1 --preset brass
+arpeggio instrument set orchestra.arpeggio.json --id 1 --preset organ --echo-send 0.2 --adsr-registers 15,0,7,0
+```
+
+- 持続系: `strings` / `brass` / `organ` / `choir` / `flute` / `lead` / `bass`
+- 減衰系: `piano` / `pluck` / `bell`
+- ドラム: `kick` / `snare` / `hat`（closed）/ `openhat` / `tom` / `crash`
+
+`--bank orchestral|band|chip` は 8 トラックに音色を割り当てる。ノート追加時の `--instrument` 省略でも各トラックの音色が選ばれる。未指定時は従来の音色一つで作成する。
+
+| bank | トラック順 |
+|---|---|
+| orchestral | strings / brass / flute / choir / bass / kick / snare / hat |
+| band | lead / organ / pluck / bass / piano / kick / snare / hat |
+| chip | lead / lead / bass / organ / bell / kick / snare / hat |
+
+`--preset` の差し替えでは推奨 ADSR・ルート音・ループ・EchoSend を再適用し、同じコマンドの明示オプションを優先する。`--root C4`、`--loop false`、`--echo-send 0.3`、`--adsr-registers 15,3,6,0` で調整できる。`--adsr` はレジスタを解除して秒指定に戻す。DSP の release は固定約 8 ms。WAV 取り込みは Preset を解除し、プリセットへの差し替えは SampleData を解除する。
+
+MCP では `snes_presets()`、`new_song(path: "orchestra.arpeggio.json", chip: "snes", bank: "orchestral")` を使う。`add_instrument` / `update_instrument` の `instrument` JSON 文字列は次の内容で指定できる。`preset` と `sampleData` の同時指定・未知のプリセット名はエラーになる。
+
+```json
+{"kind":"SnesSample","id":9,"name":"str","preset":"strings"}
+```
+
+4 小節・各トラック 4 音の例は `examples/snes-demo.arpeggio.json`。次の手順で同梱バッチから別パスへ再生成できる。
+
+```sh
+arpeggio new /tmp/snes-demo.arpeggio.json --chip snes --bank orchestral --length-beats 16 --title snes-demo
+arpeggio apply /tmp/snes-demo.arpeggio.json --operations examples/snes-demo-ops.json
+arpeggio export wav /tmp/snes-demo.arpeggio.json /tmp/snes-demo.wav --sample-rate 32000 --tail 0
+```
+
+デモ再生成・WAV の非無音／無クリップ確認は `SnesBankCommandsTests` に含む。今回の実装ではビルド・テスト・WAV 書き出しは未実行。

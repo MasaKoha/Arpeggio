@@ -7,6 +7,7 @@ namespace Arpeggio.Core.Document
     /// <summary>保存と読み込みの境界でソングの整合性を保証する。</summary>
     public static class SongValidator
     {
+        private const int SnesFirTapCount = 8;
         private const int MaximumMidiNote = 127;
         private const int MaximumVolume = 15;
         private const int MaximumArpeggio = 255;
@@ -67,8 +68,23 @@ namespace Arpeggio.Core.Document
                 channelCounts[channels[index]] = channelIndex + 1;
                 Require(track.Name != null, "track.name は null にできません。");
                 Require(IsInRange(track.Pan, -1, 1), "track.pan は -1〜1 です。");
+                ValidateDefaultInstrument(track, song.Chip, instruments);
                 ValidateNotes(track, song.LengthTicks, instruments);
             }
+        }
+
+        private static void ValidateDefaultInstrument(Track track, ChipKind chip, Dictionary<int, Instrument> instruments)
+        {
+            if (track.DefaultInstrumentId is not int instrumentId)
+            {
+                return;
+            }
+            Require(chip == ChipKind.Snes, "defaultInstrumentId は SNES のバンク用です。");
+            if (!instruments.TryGetValue(instrumentId, out Instrument? instrument))
+            {
+                throw new SongValidationException($"既定音色 ID {instrumentId} が存在しません。");
+            }
+            Require(InstrumentValidator.GetChannel(instrument.Kind) == track.Channel, "既定音色とチャンネルの種類が一致しません。");
         }
 
         private static void ValidateNotes(Track track, int lengthTicks, Dictionary<int, Instrument> instruments)
@@ -137,6 +153,14 @@ namespace Arpeggio.Core.Document
             Require(echo.DelayMilliseconds >= 0 && echo.DelayMilliseconds <= MaximumEchoDelay && echo.DelayMilliseconds % EchoDelayStep == 0, "エコー遅延は 0〜240 ms の 16 ms 刻みです。");
             Require(IsInRange(echo.Feedback, -1, 1) && Math.Abs(echo.Feedback) < 1, "エコーフィードバックの絶対値は 1 未満です。");
             Require(IsInRange(echo.Volume, 0, 1), "エコー音量は 0〜1 です。");
+            if (echo.FirCoefficients is null || echo.FirCoefficients.Length != SnesFirTapCount)
+            {
+                throw new SongValidationException("FIR 係数は 8 要素です。");
+            }
+            foreach (int coefficient in echo.FirCoefficients)
+            {
+                Require(coefficient >= sbyte.MinValue && coefficient <= sbyte.MaxValue, "FIR 係数は -128〜127 です。");
+            }
         }
 
         internal static bool IsInRange(double value, double minimum, double maximum)

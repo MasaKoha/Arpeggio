@@ -4,33 +4,42 @@ using Arpeggio.Core.Instruments;
 
 namespace Arpeggio.Core.Synthesis.Snes
 {
-    /// <summary>内蔵／埋め込みサンプルの線形補間再生とサンプル単位の ADSR。</summary>
+    /// <summary>BRR キャッシュ・ガウス補間・ADSR・ノイズを 32 kHz で合成するボイス。</summary>
     public sealed class SnesVoiceSynthesizer : ChannelSynthesizer
     {
         private const int WaveformCount = 6;
-        private const double SilenceEpsilon = 0.0000001;
-        private readonly float[][] _waveforms = new float[WaveformCount][];
-        private float[] _waveform = Array.Empty<float>();
-        private AdsrEnvelope _envelope;
+        private const double PcmScale = 32768.0;
+        private const int MaximumVolume = 127;
+        private const int ModulationShift = 15;
+        private const double SemitonesPerOctave = 12;
+        private readonly BrrSample[] _waveforms = new BrrSample[WaveformCount];
+        private readonly SnesEnvelope _envelope = new SnesEnvelope();
+        private readonly SnesNoiseGenerator _noise = new SnesNoiseGenerator();
+        private BrrSample? _sample;
         private bool _loop;
-        private bool _hasEmbeddedSample;
+        private bool _looped;
+        private bool _sampleEnded;
+        private bool _hasSampleSource;
+        private bool _noiseEnabled;
+        private bool _pitchModulation;
+        private bool _externalClock;
+        private int _noiseRate;
         private int _sourceSampleRate;
         private int _rootMidiNote;
         private int _loopStart;
         private int _loopEnd;
+        private int _pitchRegister;
         private double _samplePosition;
-        private bool _releasing;
-        private long _ageSamples;
-        private long _releaseSamples;
-        private double _level;
-        private double _releaseLevel;
+        private long _outputClock;
+        private double _previousOutput;
+        private double _currentOutput;
 
-        /// <summary>全内蔵波形を事前確保して指定レートのボイスを作る。</summary>
+        /// <summary>内蔵波形を BRR 往復して事前確保する。</summary>
         public SnesVoiceSynthesizer(int sampleRate = 44100) : base(sampleRate, ChipKind.Snes, ChannelKind.Sample)
         {
             for (int index = 0; index < _waveforms.Length; index++)
             {
-                _waveforms[index] = SnesWaveformBuilder.Build((SnesWaveformKind)(index + 1));
+                _waveforms[index] = BrrSample.Create(SnesWaveformBuilder.Build((SnesWaveformKind)(index + 1), PitchTable.SnesWaveformLength));
             }
         }
 
@@ -38,125 +47,140 @@ namespace Arpeggio.Core.Synthesis.Snes
         public double EchoSend { get; private set; }
         /// <summary>音色別の左右定位。</summary>
         public double Pan { get; private set; }
+        /// <summary>変調前の 14 bit ピッチレジスタ。</summary>
+        public int PitchRegister => _pitchRegister;
 
-        /// <summary>事前生成した波形を選び、ADSR を先頭へ戻す。</summary>
+        internal void UseExternalClock() => _externalClock = true;
+
+        /// <summary>準備済みキャッシュを選び、発音状態を初期化する。</summary>
         protected override void ConfigureInstrument(Instrument instrument)
         {
             var sample = (SnesSampleInstrument)instrument;
             ConfigureMacros(null, sample.ArpeggioMacro, sample.PitchMacro);
-            _hasEmbeddedSample = sample.SampleData != null;
-            _waveform = _hasEmbeddedSample ? sample.DecodedSamples : _waveforms[(int)sample.Waveform - 1];
+            _hasSampleSource = sample.SampleData != null || sample.Preset != null;
+            _sample = sample.SampleData != null ? sample.PreparedSample : sample.PreparedPreset;
+            if (!_hasSampleSource)
+            {
+                _sample = _waveforms[(int)sample.Waveform - 1];
+            }
             _sourceSampleRate = sample.SampleRate;
             _rootMidiNote = sample.RootMidiNote;
-            _loopStart = sample.LoopStart;
-            _loopEnd = sample.LoopEnd == 0 ? _waveform.Length : sample.LoopEnd;
-            _samplePosition = 0;
-            _envelope = sample.Envelope;
             _loop = sample.Loop;
-            _releasing = false;
-            _ageSamples = 0;
-            _releaseSamples = 0;
-            _level = 0;
+            _loopStart = _hasSampleSource ? _sample!.LoopStart : 0;
+            _loopEnd = _hasSampleSource && _loop ? _sample!.LoopEnd : _sample!.Samples.Length;
+            _samplePosition = 0;
+            _looped = false;
+            _sampleEnded = false;
+            _envelope.Start(sample.AdsrRegisters ?? SnesEnvelope.Quantize(sample.Envelope));
+            _noise.Reset();
+            _noiseEnabled = sample.NoiseEnabled;
+            _noiseRate = sample.NoiseRate;
+            _pitchModulation = sample.PitchModulation;
+            _outputClock = SampleRate;
+            _previousOutput = 0;
+            _currentOutput = 0;
             EchoSend = sample.EchoSend;
             Pan = sample.Pan;
         }
 
-        /// <summary>現在の音量を起点にリリースへ移る。</summary>
-        public override void NoteOff()
+        /// <summary>現在音量から DSP 固定速度のリリースへ移る。</summary>
+        public override void NoteOff() => _envelope.Release();
+
+        /// <summary>同じ DSP 時刻の前ボイス出力を受け、一サンプル進める。単独時は変調源を 0 とする。</summary>
+        public short ReadDspSample(short previousVoiceOutput = 0)
         {
-            if (_releasing || !IsActive)
+            // perf: BRR は音色設定時に処理済み。音声処理中はキャッシュと整数状態だけを使う。
+            if (!IsActive || _sampleEnded)
+            {
+                IsActive = false;
+                return 0;
+            }
+            double level = _envelope.ReadSample();
+            if (_envelope.IsSilent)
+            {
+                IsActive = false;
+                return 0;
+            }
+            double sample = _noiseEnabled ? _noise.ReadSample(_noiseRate) : ReadWaveform();
+            if (!_noiseEnabled)
+            {
+                int pitch = _pitchModulation ? ModulatePitch(_pitchRegister, previousVoiceOutput) : _pitchRegister;
+                AdvanceSample(pitch);
+            }
+            int volume = (int)Math.Round(Volume * MaximumVolume);
+            return (short)Math.Clamp(Math.Round(sample * level * volume / MaximumVolume * PcmScale), short.MinValue, short.MaxValue);
+        }
+
+        /// <summary>前ボイスの signed 16 bit 出力でピッチを変調し、14 bit 範囲へ飽和する。</summary>
+        public static int ModulatePitch(int pitch, short previousVoiceOutput)
+            => Math.Clamp(pitch + (pitch * previousVoiceOutput >> ModulationShift), 0, PitchTable.MaximumSnesPitch);
+
+        /// <summary>単独ボイスの出力時間軸へ線形補間する。全曲時はミキサーの共通クロックに任せる。</summary>
+        protected override double ReadSample()
+        {
+            // perf: 二点の履歴と整数クロックを保持し、バッファ分割に依存しない補間を行う。
+            if (_externalClock)
+            {
+                return 0;
+            }
+            while (_outputClock >= SampleRate)
+            {
+                _outputClock -= SampleRate;
+                _previousOutput = _currentOutput;
+                _currentOutput = ReadDspSample() / PcmScale;
+            }
+            double result = _previousOutput + (_currentOutput - _previousOutput) * _outputClock / SampleRate;
+            _outputClock += SnesRateTable.SampleRate;
+            return result;
+        }
+
+        /// <summary>元レートを含む増分を 32 kHz の 14 bit レジスタに量子化する。</summary>
+        protected override double GetPhaseIncrement()
+        {
+            double step = _hasSampleSource
+                ? Math.Pow(2, (MidiNote - _rootMidiNote) / SemitonesPerOctave) * _sourceSampleRate / SnesRateTable.SampleRate
+                : PitchTable.Quantize(ChipKind.Snes, ChannelKind.Sample, MidiNote) * PitchTable.SnesWaveformLength / SnesRateTable.SampleRate;
+            _pitchRegister = PitchTable.GetSnesPitchRegister(step);
+            return 0;
+        }
+
+        private double ReadWaveform()
+        {
+            int position = (int)_samplePosition;
+            return GaussianInterpolator.Interpolate(ReadAt(position - 1), ReadAt(position), ReadAt(position + 1),
+                ReadAt(position + 2), _samplePosition - position);
+        }
+
+        private float ReadAt(int position)
+        {
+            if (_loop && (position >= _loopEnd || (_looped && position < _loopStart)))
+            {
+                int length = _loopEnd - _loopStart;
+                position = _loopStart + ((position - _loopStart) % length + length) % length;
+            }
+            if (position < 0)
+            {
+                return 0;
+            }
+            return _sample!.Samples[Math.Min(position, _loopEnd - 1)];
+        }
+
+        private void AdvanceSample(int pitch)
+        {
+            _samplePosition += pitch / (double)PitchTable.SnesUnityPitch;
+            if (_samplePosition < _loopEnd)
             {
                 return;
             }
-            _releasing = true;
-            _releaseLevel = _level;
-            _releaseSamples = 0;
-            if (_envelope.ReleaseSeconds <= SilenceEpsilon)
+            if (_loop)
             {
-                IsActive = false;
+                _samplePosition = _loopStart + (_samplePosition - _loopStart) % (_loopEnd - _loopStart);
+                _looped = true;
             }
-        }
-
-        /// <summary>補間波形と ADSR を掛け合わせる。</summary>
-        protected override double ReadSample()
-        {
-            // perf: NoteOn を含めて既存の波形配列を参照するだけで再生成しない。
-            if (_hasEmbeddedSample)
+            else
             {
-                return ReadEmbeddedSample();
+                _sampleEnded = true;
             }
-            double position = Phase * _waveform.Length;
-            int index = (int)position;
-            int next = (index + 1) % _waveform.Length;
-            double interpolated = _waveform[index] + (_waveform[next] - _waveform[index]) * (position - index);
-            _level = GetEnvelopeLevel();
-            _ageSamples++;
-            if (!_loop && Phase + PhaseIncrement >= 1)
-            {
-                IsActive = false;
-            }
-            return interpolated * _level * Volume;
-        }
-
-        /// <summary>元サンプルのレートと基準音を再生位置の増分に織り込む。</summary>
-        protected override double GetPhaseIncrement()
-        {
-            return _hasEmbeddedSample
-                ? PitchTable.GetSnesSampleRatio(MidiNote, _rootMidiNote) * _sourceSampleRate / SampleRate
-                : base.GetPhaseIncrement();
-        }
-
-        private double ReadEmbeddedSample()
-        {
-            // perf: 位置・補間・ループの更新は既存配列と値型だけで完結する。
-            int end = _loop ? _loopEnd : _waveform.Length;
-            int index = (int)_samplePosition;
-            int next = index + 1;
-            if (next >= end)
-            {
-                next = _loop ? _loopStart : index;
-            }
-            double interpolated = _waveform[index] + (_waveform[next] - _waveform[index]) * (_samplePosition - index);
-            _samplePosition += PhaseIncrement;
-            if (_samplePosition >= end)
-            {
-                if (_loop)
-                {
-                    _samplePosition = _loopStart + (_samplePosition - _loopStart) % (_loopEnd - _loopStart);
-                }
-                else
-                {
-                    IsActive = false;
-                }
-            }
-            _level = GetEnvelopeLevel();
-            _ageSamples++;
-            return interpolated * _level * Volume;
-        }
-
-        private double GetEnvelopeLevel()
-        {
-            if (_releasing)
-            {
-                double remaining = 1 - _releaseSamples++ / Math.Max(1, _envelope.ReleaseSeconds * SampleRate);
-                if (remaining <= SilenceEpsilon)
-                {
-                    IsActive = false;
-                    return 0;
-                }
-                return _releaseLevel * remaining;
-            }
-            double seconds = (double)_ageSamples / SampleRate;
-            if (seconds < _envelope.AttackSeconds)
-            {
-                return seconds / _envelope.AttackSeconds;
-            }
-            double decayTime = seconds - _envelope.AttackSeconds;
-            if (decayTime < _envelope.DecaySeconds)
-            {
-                return 1 - (1 - _envelope.SustainLevel) * decayTime / _envelope.DecaySeconds;
-            }
-            return _envelope.SustainLevel;
         }
     }
 }

@@ -14,10 +14,14 @@ namespace Arpeggio.Core.Synthesis
         private const int MinimumPulseTimer = 8;
         private const double GameBoyPulseClock = 131072;
         private const double GameBoyWaveClock = 65536;
-        private const int SnesRootNote = 60;
         private const double MaximumSnesRatio = 4;
-        private const int SnesUnityPitch = 16384;
-        private const int MaximumSnesPitch = 65535;
+        /// <summary>原速を表す SNES ピッチ値。</summary>
+        public const int SnesUnityPitch = 4096;
+        /// <summary>SNES の 14 bit ピッチ上限。</summary>
+        public const int MaximumSnesPitch = 0x3FFF;
+        /// <summary>内蔵サンプルの一周期長。32 kHz で原速 250 Hz。</summary>
+        public const int SnesWaveformLength = 128;
+        private const int SnesSampleRate = 32000;
 
         /// <summary>平均律の MIDI 番号を Hz に変換する。</summary>
         public static double GetFrequency(double midiNote) => ConcertFrequency * Math.Pow(2, (midiNote - ConcertNote) / SemitonesPerOctave);
@@ -49,18 +53,22 @@ namespace Arpeggio.Core.Synthesis
             }
             if (chip == ChipKind.Snes)
             {
-                double rootFrequency = GetFrequency(SnesRootNote);
-                double register = Math.Clamp(Math.Round(frequency / rootFrequency * SnesUnityPitch), 1, MaximumSnesPitch);
+                double rootFrequency = (double)SnesSampleRate / SnesWaveformLength;
+                int register = GetSnesPitchRegister(frequency / rootFrequency);
                 return rootFrequency * register / SnesUnityPitch;
             }
             return frequency;
         }
 
-        /// <summary>埋め込みサンプルの基準音に対して SNES 風の整数ピッチ倍率を求める。</summary>
+        /// <summary>32 kHz の一サンプル当たりの増分を 14 bit レジスタへ四捨五入する。</summary>
+        public static int GetSnesPitchRegister(double sampleStep)
+            => (int)Math.Clamp(Math.Round(sampleStep * SnesUnityPitch, MidpointRounding.AwayFromZero), 0, MaximumSnesPitch);
+
+        /// <summary>32 kHz サンプルの基準音に対する 14 bit ピッチ倍率を求める。</summary>
         public static double GetSnesSampleRatio(double midiNote, int rootMidiNote)
         {
             double ratio = Math.Pow(2, (midiNote - rootMidiNote) / SemitonesPerOctave);
-            return Math.Clamp(Math.Round(ratio * SnesUnityPitch), 1, MaximumSnesPitch) / SnesUnityPitch;
+            return GetSnesPitchRegister(ratio) / (double)SnesUnityPitch;
         }
 
         /// <summary>埋め込みサンプルのピッチ倍率上限・下限に対応する音程へ制限する。</summary>
@@ -89,7 +97,7 @@ namespace Arpeggio.Core.Synthesis
             }
             else if (chip == ChipKind.Snes)
             {
-                maximum = GetFrequency(SnesRootNote) * Math.Min(MaximumSnesRatio, (double)MaximumSnesPitch / SnesUnityPitch);
+                maximum = (double)SnesSampleRate / SnesWaveformLength * Math.Min(MaximumSnesRatio, (double)MaximumSnesPitch / SnesUnityPitch);
             }
         }
     }

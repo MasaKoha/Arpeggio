@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.History;
+using Arpeggio.Core.Instruments.Snes;
 
 namespace Arpeggio.Core.Session
 {
@@ -33,14 +34,14 @@ namespace Arpeggio.Core.Session
         }
 
         /// <summary>曲名を含む新規ソングを一度の保存で作成する。</summary>
-        public void New(string path, ChipKind chip, int tempoBpm, int lengthTicks, string title)
+        public void New(string path, ChipKind chip, int tempoBpm, int lengthTicks, string title, SnesBankKind bank = SnesBankKind.None)
         {
             ValidatePath(path);
             if (File.Exists(path))
             {
                 throw new ArgumentException("保存先が既に存在します。Open するか別のパスを指定してください。", nameof(path));
             }
-            Song created = SongFactory.Create(chip, tempoBpm, lengthTicks);
+            Song created = SongFactory.Create(chip, tempoBpm, lengthTicks, bank);
             created.Title = title;
             SongSerializer.Save(created, path);
             Song = created;
