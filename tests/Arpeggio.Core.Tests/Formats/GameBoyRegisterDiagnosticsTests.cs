@@ -11,7 +11,7 @@ using static Arpeggio.Core.Tests.Formats.GameBoyRegisterTestData;
 
 namespace Arpeggio.Core.Tests.Formats
 {
-    /// <summary>GB 変換の音域・量子化診断・strict・状態分離と現ランの対象外を検証する。</summary>
+    /// <summary>GB 変換の音域・量子化診断・strict・状態分離を検証する。</summary>
     public sealed class GameBoyRegisterDiagnosticsTests
     {
         private const int PulseOneEnvelope = 0xFF12;
@@ -145,11 +145,11 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.Equal(new[] { "EnvelopeRetriggered", "VolumeQuantized" }, control.Report.Warnings.Select(warning => warning.Code).OrderBy(code => code));
         }
 
-        /// <summary>C2 は envelope の時間増減を適用せず、初期値保持という段階的制限を明記する。</summary>
+        /// <summary>時間 envelope は各制御フレームで増減し、暫定的な未対応制限を残さない。</summary>
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public void TimeVaryingEnvelopeRemainsForNextRun(bool increasing)
+        public void TimeVaryingEnvelopeUpdatesEveryControlFrame(bool increasing)
         {
             Song song = CreateSong();
             var instrument = Assert.IsType<GbPulseInstrument>(song.Instruments[0]);
@@ -161,9 +161,11 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.NotNull(control.Timeline);
             RegisterTimeline? timeline = GameBoyRegisterCompiler.Compile(control.Timeline, control.Report);
             Assert.NotNull(timeline);
-            Assert.Equal(0x90, (int)Assert.Single(timeline.Writes, write => write.Address == PulseOneEnvelope && write.Value > 0).Value);
-            Assert.Empty(ValuesAt(timeline, FrameSamples));
-            Assert.Contains(control.Report.Limitations, limitation => limitation.Contains("未対応"));
+            int[] expectedVolumes = increasing ? new[] { 0x90, 0xA0, 0xB0, 0xC0 } : new[] { 0x90, 0x80, 0x70, 0x60 };
+            Assert.Equal(expectedVolumes, timeline.Writes.Where(write => write.Address == PulseOneEnvelope && write.Value > 0)
+                .Select(write => (int)write.Value));
+            Assert.Equal(3L, Assert.Single(control.Report.Warnings).OccurrenceCount);
+            Assert.DoesNotContain(control.Report.Limitations, limitation => limitation.Contains("未対応"));
         }
 
         /// <summary>strict は明細保持ゼロでもパン・段階音量・音域の警告全数を確認して部分列を拒否する。</summary>
@@ -207,16 +209,18 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.DoesNotContain(timeline.Writes, write => highAddresses.Contains(write.Address) && (write.Value & TriggerMask) != 0);
         }
 
-        /// <summary>現ランの Noise ノートは無視し、終端 DAC 停止を含めて空曲と同じ列を返す。</summary>
+        /// <summary>Noise ノートを一定音量で開始し、元ノートの終端で DAC と routing を停止する。</summary>
         [Fact]
-        public void NoiseIsIgnoredInThisRun()
+        public void NoiseOnsetAndOffAreCompiled()
         {
             const int NoiseInstrument = 3;
             Song song = CreateSong();
-            RegisterTimeline empty = Compile(song);
             song.Instruments.Add(new GbNoiseInstrument { Id = NoiseInstrument });
             AddNote(song, NoiseTrack, 0, FrameTicks).InstrumentId = NoiseInstrument;
-            Assert.Equal(empty.Writes.ToArray(), Compile(song).Writes.ToArray());
+            RegisterTimeline timeline = Compile(song);
+            Assert.Equal(new[] { (0xFF21, 0), (0xFF22, 0x76), (0xFF21, 0xF0), (0xFF23, 0x80), (Routing, 0x88) },
+                ValuesAt(timeline, 0).TakeLast(5));
+            Assert.Equal(new[] { (0xFF21, 0), (Routing, 0) }, ValuesAt(timeline, FrameSamples));
         }
 
         /// <summary>元 Song・Wave 配列・レポート・後続変換から確定列を隔離し、同じ制御列の再変換を決定的に保つ。</summary>
