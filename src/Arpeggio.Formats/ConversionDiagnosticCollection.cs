@@ -23,6 +23,21 @@ namespace Arpeggio.Formats
             CodeCounts = new ReadOnlyDictionary<string, long>(_codeCounts);
         }
 
+        internal ConversionDiagnosticCollection(ConversionDiagnosticCollection source) : this(source._detailLimit)
+        {
+            _details.AddRange(source._details);
+            foreach (var entry in source._detailIndices)
+            {
+                _detailIndices.Add(entry.Key, entry.Value);
+            }
+            foreach (var entry in source._codeCounts)
+            {
+                _codeCounts.Add(entry.Key, entry.Value);
+            }
+            TotalCount = source.TotalCount;
+            DroppedCount = source.DroppedCount;
+        }
+
         internal IReadOnlyList<ConversionDiagnostic> Details { get; }
         internal IReadOnlyDictionary<string, long> CodeCounts { get; }
         internal long TotalCount { get; private set; }

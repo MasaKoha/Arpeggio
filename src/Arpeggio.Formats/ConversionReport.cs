@@ -26,6 +26,24 @@ namespace Arpeggio.Formats
             Statistics = new ReadOnlyDictionary<string, long>(_statistics);
         }
 
+        internal ConversionReport(ConversionReport source, bool strict)
+        {
+            Format = source.Format;
+            Chip = source.Chip;
+            Strict = strict;
+            DurationSeconds = source.DurationSeconds;
+            OutputBytes = source.OutputBytes;
+            _warnings = new ConversionDiagnosticCollection(source._warnings);
+            _errors = new ConversionDiagnosticCollection(source._errors);
+            _limitations.AddRange(source._limitations);
+            foreach (var entry in source._statistics)
+            {
+                _statistics.Add(entry.Key, entry.Value);
+            }
+            Limitations = _limitations.AsReadOnly();
+            Statistics = new ReadOnlyDictionary<string, long>(_statistics);
+        }
+
         /// <summary>対象形式。</summary>
         public ConversionFormat Format { get; }
         /// <summary>対象チップ。</summary>

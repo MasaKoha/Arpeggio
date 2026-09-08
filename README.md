@@ -218,6 +218,34 @@ arpeggio analyze wav jump.wav --window-ms 100  # 既存 WAV を解析
 
 プリセットは `jump / coin / hit / explosion / powerup / laser / blip / select`。`analyze` は長さ・RMS・ピーク・クリップ数・無音割合・左右差・帯域比率・窓ごとの支配的周波数と音名、および警告（クリップ・小音量・先頭無音・末尾無音・左右差）と合成側の警告（音域クランプ等）を返す。`--json` で全窓を取得できる。
 
+### NSF / VGM 書き出し
+
+```sh
+arpeggio export nsf melody.arpeggio.json melody.nsf --author "Composer" --copyright "Owner"
+arpeggio export vgm melody.arpeggio.json melody.vgm --loops 2 --dry-run --json
+arpeggio export vgm melody.arpeggio.json melody.vgm --overwrite
+```
+
+NSF v1 は NTSC NES の Pulse / Triangle / Noise、VGM v1.71 は NES / Game Boy に対応する。DPCM・拡張音源・SNES は対象外。`--loops` は 1〜16（既定 1）の有限展開で、無限ループは保存しない。`--author` は両形式、`--copyright` は NSF 専用。`--tail` と `--sample-rate` は受け付けない。
+
+`--dry-run` は全変換・検証・予定サイズを返し、ファイルと履歴を変更しない。既存出力も診断でき、`destinationExists` で存在を返す。通常保存は既存ファイルを保護し、`--overwrite` で明示置換する。入力と同じパスには保存できない。`--strict` は変換警告があれば exit 1 で保存を拒否する。位相・ミキサー等の恒常的な制限だけでは拒否しない。
+
+通常は要約と制限を stdout、警告・エラーを stderr へ出す。`--json` は成功・失敗とも `report` を含む一つの JSON を返す。`report` は形式・チップ・演奏秒数・予定 byte 数・位置付き診断・全件数・統計を含む。終了コードは 0 / 1 / 2 / 3 を維持し、保存競合は I/O エラー 3。既存 PCM とのビット一致や実機互換性の検証済みを意味しない。
+
+### MIDI 取り込み
+
+```sh
+arpeggio import midi melody.mid imported.arpeggio.json --chip nes --dry-run --json
+arpeggio import midi melody.mid imported.arpeggio.json --chip gameboy --tempo 120 --quantize-ticks 12
+arpeggio import midi melody.mid imported.arpeggio.json --chip snes --channel-map map.json --polyphony drop-new --title "Imported"
+```
+
+SMF format 0 / 1、PPQN、MIDI 1.0 を対象に、新規の version 1 JSON を作る。`--chip nes|gameboy|snes` は必須。`--tempo` は 1〜1000、省略時は MIDI の先頭有効テンポを基準とする。テンポ変化は元の実時間を固定 BPM のノート位置へ焼き込む。`--quantize-ticks` は 48 の正の約数（既定 1）。`--polyphony` は `steal-oldest`（既定）または `drop-new`。
+
+`--channel-map` は UTF-8 JSON ファイル。例 `{"1":[0,1],"2":[2],"10":[3]}` のキーは MIDI チャンネル 1〜16、配列は 0 始まりの出力トラック候補。指定チャンネルだけ自動割り当てを上書きし、空配列は除外する。候補の重複・範囲外・NES DPCM・NES / GB の旋律と Noise の相互指定は拒否する。
+
+`--dry-run`・`--strict`・`--json` は上記の書き出しと同じ診断契約。GM 音色はチップ音色／SNES プリセットへ近似するため、通常の旋律でも警告が出る。保存は新規作成だけで、`--overwrite` はない。既存 JSON は保護し、新しい CLI 履歴は空から始める。古い側車の current が同じ JSON でも履歴を引き継がない。履歴を保存できない場合は今回作成した JSON を取り消す。
+
 ### OGG 書き出しと WAV 取り込み
 
 ```sh

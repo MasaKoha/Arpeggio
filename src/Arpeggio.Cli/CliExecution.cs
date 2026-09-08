@@ -11,14 +11,22 @@ namespace Arpeggio.Cli
     public static class CliExecution
     {
         internal const int Success = 0;
-        private const int OperationError = 1;
-        private const int DocumentError = 2;
-        private const int InputOutputError = 3;
+        internal const int OperationError = 1;
+        internal const int DocumentError = 2;
+        internal const int InputOutputError = 3;
 
         /// <summary>プロセスを起動せずコマンドを実行し、0/1/2/3 の終了コードを返す。</summary>
         public static int Run(string[] arguments)
         {
-            return Run(() => CommandFactory.Create().Parse(arguments).Invoke());
+            return Run(() =>
+            {
+                var result = CommandFactory.Create().Parse(arguments);
+                if (result.Errors.Count > 0 && CliConversionExecution.IsConversionCommand(arguments))
+                {
+                    return CliConversionExecution.ArgumentFailure(arguments, result);
+                }
+                return result.Invoke();
+            });
         }
 
         internal static int Run(Func<int> action)

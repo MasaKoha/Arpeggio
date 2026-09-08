@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Arpeggio.Codecs\Arpeggio.Codecs.csproj" />
     <ProjectReference Include="..\Arpeggio.Core\Arpeggio.Core.csproj" />
+    <ProjectReference Include="..\Arpeggio.Formats\Arpeggio.Formats.csproj" />
   </ItemGroup>
 
 </Project>
