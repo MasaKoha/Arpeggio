@@ -5,7 +5,7 @@ using Arpeggio.Core.Instruments;
 
 namespace Arpeggio.Formats.Export
 {
-    /// <summary>GB の Pulse 二声と Wave を、副作用を保持したレジスタ列へ変換する。</summary>
+    /// <summary>GB の Pulse 二声・Wave・Noise を、副作用を保持したレジスタ列へ変換する。</summary>
     public sealed class GameBoyRegisterCompiler
     {
         private readonly ConversionReport _report;
@@ -20,6 +20,9 @@ namespace Arpeggio.Formats.Export
         private readonly GameBoyRegisterChannel _wave = new GameBoyRegisterChannel(GameBoyRegisters.WaveLength,
             GameBoyRegisters.WaveVolume, GameBoyRegisters.WaveFrequencyLow,
             GameBoyRegisters.WaveFrequencyHigh, GameBoyRegisters.WaveRouting);
+        private readonly GameBoyRegisterChannel _noise = new GameBoyRegisterChannel(GameBoyRegisters.NoiseLength,
+            GameBoyRegisters.NoiseEnvelope, GameBoyRegisters.NoiseFrequency,
+            GameBoyRegisters.NoiseTrigger, GameBoyRegisters.NoiseRouting);
         private byte _routing;
         private bool _writeLimitExceeded;
 
@@ -29,7 +32,7 @@ namespace Arpeggio.Formats.Export
             _values = new GameBoyRegisterValues(report);
         }
 
-        /// <summary>制御列を変換し同じチップのレポートへ診断を追記する。エラーまたは strict 警告時は null。現段階では Noise を無視し、Pulse envelope は初期値を保持する。</summary>
+        /// <summary>制御列を変換し同じチップのレポートへ診断を追記する。エラーまたは strict 警告時は null。</summary>
         public static RegisterTimeline? Compile(ControlTimeline timeline, ConversionReport report)
         {
             if (timeline is null)
@@ -60,7 +63,6 @@ namespace Arpeggio.Formats.Export
         {
             _report.AddLimitation("実機周期・位相・DAC・ミキサーの差により既存 PCM とは一致しません。Pulse の再トリガーだけで duty 位相を任意値へ戻せません。");
             _report.AddLimitation("Wave の右シフト音量と DAC は、既存の符号付き浮動小数乗算とは異なります。");
-            _report.AddLimitation("現段階では GB Noise と時間経過による Pulse envelope の増減は未対応で、Pulse の初期 envelope 音量を保持します。");
             Initialize();
             foreach (ControlEvent control in timeline.Events)
             {
@@ -87,7 +89,7 @@ namespace Arpeggio.Formats.Export
         private void CompileEvent(ControlEvent control, ControlTimeline timeline)
         {
             ControlTrack track = timeline.Tracks[control.TrackIndex];
-            if (track.Channel != ChannelKind.Pulse && track.Channel != ChannelKind.Wave)
+            if (track.Channel != ChannelKind.Pulse && track.Channel != ChannelKind.Wave && track.Channel != ChannelKind.Noise)
             {
                 return;
             }
@@ -106,14 +108,19 @@ namespace Arpeggio.Formats.Export
                 _values.ReportPan(control, track.Pan);
             }
             ControlInstrument instrument = timeline.Instruments[control.Note!.InstrumentId];
-            int frequency = _values.CalculateFrequencyRegister(control, track.Channel);
             byte routing = GameBoyRegisterValues.CalculateRouting(track.Pan, channel.RoutingMask);
+            int frequency = track.Channel == ChannelKind.Noise
+                ? _values.CalculateNoiseRegister(control, instrument)
+                : _values.CalculateFrequencyRegister(control, track.Channel);
             if (track.Channel == ChannelKind.Wave)
             {
                 CompileWave(control, instrument, frequency, routing);
                 return;
             }
-            CompilePulse(control, instrument, channel, frequency, routing);
+            int volume = track.Channel == ChannelKind.Noise
+                ? _values.CalculateNoiseVolume(control)
+                : _values.CalculatePulseVolume(control, instrument);
+            CompileEnvelope(control, channel, volume, frequency, routing);
         }
 
         private GameBoyRegisterChannel SelectChannel(ControlTrack track)
@@ -122,14 +129,18 @@ namespace Arpeggio.Formats.Export
             {
                 return _wave;
             }
+            if (track.Channel == ChannelKind.Noise)
+            {
+                return _noise;
+            }
             return track.ChannelIndex == 0 ? _pulseOne : _pulseTwo;
         }
 
-        private void CompilePulse(ControlEvent control, ControlInstrument instrument,
-            GameBoyRegisterChannel channel, int frequency, byte routing)
+        private void CompileEnvelope(ControlEvent control, GameBoyRegisterChannel channel,
+            int volume, int frequency, byte routing)
         {
             bool isOnset = control.Kind == ControlEventKind.NoteOn;
-            int volume = _values.CalculatePulseVolume(control, instrument);
+            ChannelKind kind = channel == _noise ? ChannelKind.Noise : ChannelKind.Pulse;
             bool needsTrigger = volume > 0 && (isOnset || channel.Volume != volume);
             if (needsTrigger)
             {
@@ -138,19 +149,26 @@ namespace Arpeggio.Formats.Export
             }
             else if (volume == 0 && (isOnset || channel.Volume != 0))
             {
-                StopChannel(control.PositionSamples, channel, ChannelKind.Pulse);
+                StopChannel(control.PositionSamples, channel, kind);
             }
-            WritePulseDuty(control, channel);
-            // 同時に音量も変わる場合、trigger より先に新周期の上下を設定する。
-            WriteFrequency(control.PositionSamples, channel, frequency, isOnset);
+            // 同時の音量更新でも新周期で再起動するため、trigger より先に周期を設定する。
+            if (kind == ChannelKind.Noise)
+            {
+                WriteFrequencyLow(control.PositionSamples, channel, frequency, isOnset);
+            }
+            else
+            {
+                WritePulseDuty(control, channel);
+                WriteFrequency(control.PositionSamples, channel, frequency, isOnset);
+            }
             if (needsTrigger)
             {
                 Write(control.PositionSamples, channel.VolumeAddress, (byte)(volume << GameBoyRegisters.EnvelopeVolumeShift));
-                WriteTrigger(control.PositionSamples, channel, frequency);
+                WriteTrigger(control.PositionSamples, channel, kind == ChannelKind.Noise ? 0 : frequency);
                 SetRouting(control.PositionSamples, channel, routing);
                 if (!isOnset)
                 {
-                    _values.ReportRetrigger(control);
+                    _values.ReportRetrigger(control, kind);
                 }
             }
             channel.Volume = volume;
