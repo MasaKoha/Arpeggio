@@ -282,6 +282,8 @@ Avalonia 12。MVP。`Presenters/` にプレゼンター、`Views/` に AXAML と
 - **オーディオ出力**: `IAudioOutput`（Start / Stop / コールバックでバッファ要求）を抽象化し、実装は SDL3-CS 3.4.16 ＋ SDL3-CS.Native 3.4.2。`SongRenderer.Render(Span<float>)` をコールバックから呼ぶ。編集は再生中でも反映される（Song の変更を次バッファから拾う。ロックは最小限）
 - **ファイル監視**: AI が CLI / MCP で保存したら自動で再読み込み（colors-viewer と同じ）。編集中の競合は「外部変更を検知したら再読み込みの確認」で対処
 - `Awake` 相当の暗黙初期化を持たず、`MainWindowPresenter` を `Program` から明示的に組み立てる
+- 配布はランタイム同梱の macOS `.app`／Windows ZIP。`tools/build_app.sh` で生成し、macOS の Bundle ID は `dev.pisuke.arpeggio`。Developer ID 署名・公証は行わず、ローカル実行用の ad-hoc 署名だけを付ける。
+- 引数なしでは既存の SNES デモをユーザーデータ領域へ初回コピーして開く。macOS の関連付け／Dock ドロップは `App` が受信し、CLI と同じ Presenter／文書読み込み経路へ渡す。一文書を維持し、複数ファイルの一括要求と未保存時の別文書への切り替えは拒否する。同一パスの通知は前面化のみ。
 
 ### M1-C の編集・再生境界（2026-09-07）
 

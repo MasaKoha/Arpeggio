@@ -890,7 +890,6 @@ README.md
 - `docs/design.md`
 - `docs/implementation.md`
 
-
 # M2-E-C 実装記録（2026-09-08）
 
 ## M2-E-C の実装判断
@@ -994,3 +993,48 @@ Avalonia／SDL を起動しない Presenter テストを 26 メソッド、43 �
 | `src/Arpeggio.Daw/Themes/` | `ArpeggioTheme.axaml`、`ThemeResources.cs` |
 | `tests/Arpeggio.Core.Tests/Daw/` 新規 | `PianoRollSelectionTests.cs`、`PianoRollClipboardTests.cs`、`PianoRollEditingTests.cs` |
 | `docs/` | `design.md`、`implementation.md` |
+# .app バンドル化（2026-09-08）
+
+## .app の実装判断
+
+- **配布形式**: `tools/build_app.sh <RID> [version] [build-number]` から `dotnet publish --self-contained true` を呼び、macOS `.app` と Windows の依存同梱フォルダを ZIP 化する。RID は `osx-arm64`／`osx-x64`／`win-x64`／`win-arm64`。既定バージョンは `1.0.0`、ビルド番号は `1`。Avalonia・SDL3・.NET のネイティブ探索経路を維持するため、単一ファイル化・トリミング・AOT は無効。パッケージのバージョンは変更しない。
+- **生成と出力**: macOS の ZIP は標準の `ditto`、Windows は `zip` を使う。DMG 作成ツールへの追加依存は持たない。出力は worktree 内の `artifacts/` に固定し、RID／数値バージョンを検証してパス展開を制限する。同ディレクトリの一時領域で publish・署名・圧縮を完了してから、前回の同 RID 出力を置き換える。終了・失敗時に一時領域を削除する。macOS の生成は macOS 上に限定し、Windows 用はクロス publish も受け付ける。
+- **macOS バンドル**: publish の全ファイルを `Contents/MacOS/` に置き、apphost `arpeggio-daw` を直接 `CFBundleExecutable` にする。シェルランチャーを挟まない。アイコンは既存の `arpeggio.icns` を `Contents/Resources/` へコピーする。plist テンプレートは `tools/macos/Info.plist`。名前は `Arpeggio`、ID は `dev.pisuke.arpeggio`、バージョンはスクリプトの入力を .NET のメタデータと plist に反映する。`CFBundleVersion` は正整数のビルド番号、`LSMinimumSystemVersion` は .NET 10 に合わせて `14.0`、`NSHighResolutionCapable` は true。バックグラウンドアプリにはしない。
+- **署名**: Developer ID／公証／Windows Authenticode は使わない。Apple Silicon でのローカル実行を成立させるため、macOS の dylib を内側から ad-hoc 署名し、最後にバンドルを署名・検証する。Hardened Runtime は有効化しないため、JIT 用 entitlement は追加しない。ad-hoc は開発元の証明ではなく Gatekeeper の許可を代替しない。README に右クリック → 開く、現行 macOS の「このまま開く」、対象 `.app` に限定した quarantine 解除手順を記載する。ビルド時には起動・Launch Services 登録・quarantine 解除を行わない。
+- **Windows のネイティブ前提**: ローカルの SDL3-CS.Native 3.4.2 の x64／ARM64 `SDL3.dll` は `VCRUNTIME140.dll` に依存する。.NET 同梱だけではクリーンな PC で不足するため、Microsoft の公式 `aka.ms/vc14` URL から対応する VC++ ランタイムインストーラーをビルド時に取得し、`Prerequisites/` と導入説明を ZIP に含める。取得されるインストーラーはビルド時の最新版で固定バージョンではない。初回は必要に応じて利用者が導入する。Arpeggio の exe は既存の `ApplicationIcon` を維持し、レジストリによる関連付けは変更しない。
+- **関連付け**: `CFBundleDocumentTypes` と `UTExportedTypeDeclarations` に `dev.pisuke.arpeggio.song`／`arpeggio.json` を登録する。複合拡張子を JSON と判定する Finder への対応として `public.json` の Alternate ハンドラーも宣言する。既存の JSON 関連付けを強制変更しないため、必要なら対象ファイルだけの「情報を見る → このアプリケーションで開く」で選択する。「すべてを変更」は勧めない。アプリ側の OS 通知経路では `.arpeggio.json` 以外を拒否する。複合拡張子の自動判定・既定ハンドラー選択は実機確認が必要。
+- **受信経路**: `App.OnFrameworkInitializationCompleted` で `IActivatableLifetime.Activated` を同期的に購読する。`FileActivatedEventArgs` の `IStorageItem` を `TryGetLocalPath()` で文字列に変換し、必ず Dispose する。`ProtocolActivatedEventArgs` の file URL も受け付ける。UI Dispatcher へ投稿することで初期ウィンドウ作成完了後に既存 Presenter の `Open` を呼ぶ。終了時は購読解除し、投稿済み処理の適用も止める。`Reopen` は最小化解除と前面化を行う。旧 `UrlsOpened` API は使わない。
+- **文書の保護**: CLI の起動と OS 通知の双方が `MainWindowPresenter.Open` → `DawDocument.Open` を使う。既存の一文書構成を維持し、同一パスの通知は前面化だけ、別パスはドラッグ確定後に dirty を検査して未保存なら拒否する。複数ファイルの一括要求も拒否する。失敗は既存の `Execute` でステータス表示へ渡す。UI・Presenter・テーマのコードは変更しない。
+- **引数なし起動**: 既存の `examples/snes-demo.arpeggio.json` を csproj の Content として出力へ同梱する。初回だけ `LocalApplicationData/Arpeggio/welcome.arpeggio.json` へコピーし、以後はその保存内容を開く。Finder の通常起動に必要な文書を確保し、読み取り専用の配布先や署名済みバンドルへ保存しない。CLI でファイルを指定した場合はコピーしない。
+
+## .app の静的確認
+
+- `bash -n`、`--help`、不正 RID／パストラバーサル／バージョン形式／ビルド番号／余分な引数の拒否 9 ケースを確認した。publish 経路は実行していない。
+- `plutil -lint`、Python の plist 解析による置換後の名前・ID・実行ファイル名・バージョン・最小 OS・Retina・UTI 対応を確認した。csproj の XML と同梱デモの参照先も確認した。
+- 既存 `.icns`／`.ico` の形式、SDL3 の各 RID のネイティブ資産と Windows の VC++ 依存を読み取り確認した。Avalonia／Core の使用型・namespace・公開 API をローカル NuGet XML と一次資料で照合した。
+- イベント購読／解除、ストレージ項目の Dispose、終了後の投稿抑止、同一文書の再読み込み回避、dirty 時の切り替え拒否をセルフレビューした。追加の Unity lifecycle／`View.Presenter` はない。
+- git 操作、コンパイル、`dotnet build`／`dotnet test`／`dotnet publish`、アプリ起動、osascript、署名コマンドの実行は行っていない。
+
+確認元: [Avalonia の activation](https://docs.avaloniaui.net/docs/services/activatable-lifetime)、[FileActivatedEventArgs](https://api-docs.avaloniaui.net/docs/T_Avalonia_Controls_ApplicationLifetimes_FileActivatedEventArgs)、[Apple の plist キー](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html)、[.NET 10 の対応 OS](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)、[VC++ ランタイム](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)、[Gatekeeper の初回許可](https://support.apple.com/ja-jp/102445)。
+
+## .app 未完了
+
+実装上の残タスクはなし。次の実行確認は依頼者側に残る。確認手順と期待結果は README の「配布ビルド」に記載した。
+
+- `dotnet build Arpeggio.slnx` の警告ゼロ、既存テスト 676 件の全件成功。
+- 4 RID の publish、macOS の ad-hoc 署名・検証・ZIP 展開後の起動、Windows ZIP と VC++ ランタイムの導入後の起動・アイコン・SDL3 音声出力。
+- Finder の通常起動、未起動／起動済みでのファイルダブルクリック、Dock ドロップ、最小化からの復帰、osascript の `activate` と実際の前面ウィンドウの確認。
+- 空白・日本語・`#` を含むパス、未保存の切り替え拒否、同一ファイル通知、複数ファイル拒否、不正ファイルの状態保持、保存・外部監視の継続。
+
+## .app 変更ファイル一覧
+
+- `tools/build_app.sh`（新規）
+- `tools/macos/Info.plist`（新規）
+- `tools/windows/README.txt`（新規）
+- `src/Arpeggio.Daw/Program.cs`
+- `src/Arpeggio.Daw/App.axaml.cs`
+- `src/Arpeggio.Daw/Arpeggio.Daw.csproj`
+- `.gitignore`
+- `README.md`
+- `docs/design.md`
+- `docs/implementation.md`

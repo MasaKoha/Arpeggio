@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <Content Include="..\..\examples\snes-demo.arpeggio.json" Link="Examples\snes-demo.arpeggio.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

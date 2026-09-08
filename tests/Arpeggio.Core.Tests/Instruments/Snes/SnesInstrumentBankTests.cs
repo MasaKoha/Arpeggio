@@ -7,11 +7,13 @@ using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Synthesis.Snes;
+using Arpeggio.Core.Tests.Analysis;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Instruments.Snes
 {
     /// <summary>内蔵バンクの素材・音程・スペクトル・音声経路の確保量を検証する。</summary>
+    [Collection(AllocationCollection.Name)]
     public sealed class SnesInstrumentBankTests
     {
         private const int SampleRate = 32000;
