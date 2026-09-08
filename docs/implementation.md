@@ -1449,3 +1449,69 @@ B1 のテストは、暫定の Noise／DPCM 無視ケースを DPCM エラーへ
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterTerminationTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterGateModel.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesEffectRegisterTests.cs`
+
+# M3-C1 実装記録（2026-09-08）
+
+## M3-C1 設計との差
+
+- 未指定の writer API は `VgmWriter.CalculateSize(RegisterTimeline, title, author, ConversionReport)` と `VgmWriter.Write(Stream, RegisterTimeline, title, author, ConversionReport)` で補完する。前者は保存前の全サイズ検証と予定サイズの返却（拒否時 null）、後者は同じ事前検証後の書き込み（拒否時 false）を担う。チップが異なるレポートは引数例外とし、I/O 例外は呼び出し元へ伝える。曲名はスナップショットの `ControlTimeline.Title` を渡す。copyright を受け取る入口は設けない。
+- Stream の現在位置から一つの完全な VGM を追記し、相対オフセットはその開始位置を基準にする。Seek／Length／Position を要求せず、呼び出し側の Stream は閉じない。パス単位の隣接一時ファイル・上書き保護・ChipExportService は設計の M3-F1 に残す。
+- GD3 の不正な単独サロゲートの扱いは未指定。文字を無断で置換しないため `InvalidMetadata` として書き込み前に拒否する。既定の NUL／1024 UTF-16 コード単位検証は既存 `ConversionLimits` を internal で共用する。
+- writer の形式符号化は設計どおり NES／GB の二種を扱う。今回の全往復検証は NES を対象とし、GB の Noise／時間 envelope／四声を通した VGM 接続は M3-C3 に残す。レジスタ列の時刻・順序・停止は既存の不変列とコンパイラーが保証し、writer は並べ替え・同値除去・停止の再生成を行わない。
+
+## M3-C1 実装範囲と判断
+
+- `VgmWriter` は 256 byte ヘッダー、BCD version `0x171`、EOF／GD3／data の相対オフセット、44100 Hz の総待機数、単一チップのクロック欄を出す。未使用欄・loop offset／samples・rate はゼロ。NES は `B4` と `$4000` 基準、GB は `B3` と `$FF10` 基準でアドレスを符号化する。
+- 入力列の絶対時刻差から正の `61 ll hh` だけを生成する。65536 は 65535＋1、131070 は 65535＋65535、131071 は 65535＋65535＋1。ゼロ待機・短縮命令・データブロックを出さず、同時刻の同値書き込みも全順序を保持する。既存の終端停止列の後に `66`、直後に GD3 を配置する。
+- `Gd3Tag` は GD3 v1.00 の 11 個の NUL 終端 UTF-16LE 文字列を作る。曲名は原語欄に保存し、ASCII の場合だけ英語欄へも複写する。system 英語欄と変換者 Arpeggio、指定された author 原語欄以外は空。BOM・実行日・パス・推測した翻訳は入れない。補助平面の文字はサロゲートペアのまま保存する。
+- 書き込み前にメタデータと全コマンド／GD3 の予定サイズを算定し、既存 `ValidateExportSize` でレジスタ数／VGM 容量を検証する。`OutputBytes` と `DurationSeconds` を予定値へ設定する。先行エラー・strict 警告時は Stream に一切書かない。I/O 失敗時の `OutputBytes` は実際に保存できた長さではなく予定値のままとする。
+- `BinaryWriter` は using と `leaveOpen: true` で管理する。ヘッダーの後戻り修正もファイル全体の中間バイト配列も不要。呼び出し側は FileStream を渡して NES VGM を保存できる。パス単位の安全保存 API はこの writer の責務へ混ぜない。
+- 既存変更は `ConversionLimits.ValidateMetadata` の private → internal と、この実装記録の追記のみ。Formats の参照は Core と BCL のまま。Core・設計書・JSON version・プロジェクト定義・フロントエンドは変更していない。
+
+## M3-C1 テストコード
+
+4 テストクラスに **25 メソッド／72 ケース**と、独立パーサー・解析結果型・故障注入 Stream を追加した。依頼の 963 件に対して **1035 件見込み**。件数は属性の静的集計であり、検出・実行結果ではない。PCM・音声合成器・外部エミュレーター・ネットワークを使用せず、アロケーション計測テストも追加していない。
+
+| ファイル | 検証内容 |
+|---|---|
+| VgmWriterTests | 空曲の全 256 byte ヘッダー／全コマンド／410 byte 全長の固定値、待機 1／65535／65536／131070／131071 の正確な byte 列、735→736 の 1 サンプル差、先頭無音、NES 四声の同時 Off→On と同値再トリガー、非ゼロ loopStartTick の有限二周、全停止直後の END／GD3、1800 秒上限、時刻・アドレス・値・全順序番号の完全往復と決定性 |
+| VgmMetadataTests | 日本語・補助平面文字の固定 UTF-16LE byte 列と 116 byte ペイロード、全 11 欄、スナップショットの曲名、ASCII の英語欄条件、ASCII author の原語欄限定、1024 コード単位の両端、NUL／null／単独サロゲート／上限超過の保存前拒否 |
+| VgmWriterContractTests | FileStream の実保存・閉じた後の再読込、Seek 不可、既存 prefix を持つ Stream の相対位置、予定サイズの一致、明細保持ゼロでの先行エラー／strict 拒否、制限だけの場合の成功、ヘッダー／命令／GD3 途中の I/O 失敗、Stream 非所有、チップ不一致・形式不一致・書き込み不可の拒否。GB は空曲による単一クロック・B3・system 名の形式選択だけを確認 |
+| IndependentVgmParserTests | writer を使わない手書き 300 byte ファイルによる既知の二書き込み／待機／GD3、待機の上位 byte、magic／BCD version／全相対 offset／総待機／loop／rate／未使用欄／チップ／未知命令／ゼロ待機／END／GD3 長・終端の破損検出、全 byte 境界の切断と末尾余剰の拒否 |
+
+パーサーと `ParsedVgm` は Formats／Core の型・定数を参照しない。ヘッダーを手動の little-endian 読み取りで解析し、命令の待機をヘッダーとは独立に合計して `(sample,address,value,order)` を再構築する。生成した配列をそのまま期待値にせず、空曲ヘッダー・初期化・待機・日本語・手書きパーサー入力の固定値も併用する。
+
+## M3-C1 静的確認
+
+- 指定の設計書全文、M3-A／B1／B2／C2 の実装記録、既存 Formats／テストと C# 規約を読んだ。Core／Formats の使用型・namespace と .NET 10 の BinaryWriter／BinaryPrimitives／UnicodeEncoding／Stream／File API、xUnit 2.9.2 の参照定義を照合した。
+- 新規・変更 C# の括弧対応、summary の XML と public／protected メンバーへの隣接、ブロック namespace、一ファイル一型、末尾空白、禁止省略名、Unity lifecycle／コンポーネント API の不使用を確認した。固定サンプル時刻は有理数の独立算術で照合した。
+- 作業開始時のハッシュから、既存ファイルの変更が `ConversionLimits.cs` と `docs/implementation.md` のみであることを確認した。Core・両設計書・既存テスト・依存定義は不変。独立パーサーには Formats の参照・生成定数の共用がない。
+- git 操作、コンパイル、`dotnet build`／`dotnet test`、アプリ起動、PCM・実 VGM ファイル生成は実施していない。FileStream の保存も今回作成した未実行テストに含む。作業ディレクトリ外への書き込みは行っていない。
+
+## M3-C1 未完了
+
+予定した実装・テストコードと静的確認は完了。受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 963 件と追加 72 ケースの全件成功、および実際の検出件数の確認。
+- FileStream による実ファイル保存、独立パーサーによる全往復、I/O 失敗・所有権契約のテスト実行。
+- 外部プレイヤー・実機での再生は未検証。M3-C3 の GB 四声 VGM 接続、M3-F1 の ChipExportService／パス単位の安全保存／CLI は設計の後続ランに残る。
+
+## M3-C1 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/ConversionLimits.cs`
+- `docs/implementation.md`
+
+新規:
+
+- `src/Arpeggio.Formats/Export/VgmWriter.cs`
+- `src/Arpeggio.Formats/Export/Gd3Tag.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmWriterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmMetadataTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmWriterContractTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/IndependentVgmParser.cs`
+- `tests/Arpeggio.Core.Tests/Formats/IndependentVgmParserTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ParsedVgm.cs`
+- `tests/Arpeggio.Core.Tests/Formats/VgmTestStream.cs`
