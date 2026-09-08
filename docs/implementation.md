@@ -1450,6 +1450,69 @@ B1 のテストは、暫定の Noise／DPCM 無視ケースを DPCM エラーへ
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterGateModel.cs`
 - `tests/Arpeggio.Core.Tests/Formats/NesEffectRegisterTests.cs`
 
+# M3-E3 / E4 実装記録（2026-09-08）
+
+## M3-E3 / E4 設計との差
+
+- 設計書は変更しない。未指定の中間 API は `MidiTempoMap.Create`、`MidiTickQuantizer.Create` と単音の量子化、不変 `MidiQuantizedNote` とする。実時間は PPQN を分母とする checked 64 bit 整数分子で渡し、固定実時間 gate を E5 から指定できるようにする。最終グリッドへの除算だけ decimal を使用し、区間ごとの丸めを避ける。
+- `PitchTable.GetRange` は private のため、Core を変更せず公開 `ClampMidiNote` の MIDI 0 / 127 に対する結果から整数音域を得る。SNES は別途 sampleRate / root を含む未クランプのレジスタ値で音域を判定する。
+- E4 は音色 ID 採番前の不変割り当て結果を返す。全 ChipLayout トラックと元ノートを保持し、音色生成・ID 採番・Song 構築は E5 / E6 に残す。SNES のドラム予約は明示除外前の有効な入力 On の有無で決める（除外は候補だけを上書きする）。
+
+## M3-E3 / E4 未完了
+
+- E3 / E4 の予定実装とテストコードは追加済み。実行を含む受け入れ確認は未完了。依頼者側で `dotnet build Arpeggio.slnx` のエラー・警告ゼロと、既存 1127 件＋追加テストの全成功を確認する必要がある。今回の追加は静的集計で 6 テストクラス・48 メソッド・113 ケースであり、ランナーの検出件数は未確認。
+- E5 は `MidiVoiceNote` に変換音程／Noise selection・`MidiDrumPriority`・選択サンプルの `MidiPitchRange` を渡す。打楽器終端は `map.GetTimeNumerator(OnTick) + gateMicroseconds × map.TicksPerQuarterNote` と CC120 の早い方を量子化器へ渡す。ドラム表・音色生成・固定 gate 内の CC 警告・採用順の音色 ID 採番は今回の対象外。
+- E6 は不変 `MidiVoiceTrack` 全列から Song を構築し、Muted=false・Pan=0・DefaultInstrumentId=null・全 Note の InstrumentId・LoopStartTick=0 を設定する。曲長には割り当て後の全 `EndTick` を `GetLengthTicks` へ渡す。最終曲長の資源検証、SongValidator、JSON version 1 保存・往復は E6 に残す。量子化／短音延長による終端移動は保持し、上限付近を無断で切り詰めない。
+
+## M3-E3 実装・静的確認
+
+- `MidiTempoMap` は同 tick の最後の Tempo を選び、非 conductor・競合・実効変化・基準 BPM 整数化を診断する。既定 500000 µs、明示 BPM 1〜1000、checked 64 bit 共通分子、二分探索による任意 tick 照会を実装した。E1 の入力上限検証は維持した。
+- `MidiTickQuantizer` は 48 の約数 grid を検証し、開始／終了／入力 EOT を独立して絶対量子化する。正の短音だけを延長し、最大誤差を出力 tick 単位で元発音へ集約する。曲長は割り当て後終端列と EOT・最小 48 から計算する。打楽器は E5 の確定実時間終端を受け、元 Off を誤って量子化しない。
+- E3 の実装とテストコード作成、名前空間・API・括弧対応・境界式の静的読解を終えてから E4 に着手した。0/48/144、端数 BPM、同 tick 競合、先頭無音、1800 秒、10000 音の端数区間、全グリッド、短音・元ゼロ長・EOT・固定実時間 gate のテストを追加した。コンパイル／実行成功は未確認。
+
+## M3-E4 実装・静的確認
+
+- `MidiChannelCandidates` はチップ別の自動候補を作り、指定 ch だけを明示 map で上書きする。候補配列はコピーして昇順化し、重複・範囲外・DPCM・NES / GB の旋律／Noise 相互指定を未使用 ch も含めて拒否する。複数 ch の候補共有と空配列の明示除外を扱う。
+- `MidiVoiceAllocator` は確定した gate を開始 tick、ドラム優先／分類、実効音量、旋律 pitch、ch、元 MTrk／event の規定順で配置する。終了済み候補を先に使い、steal-oldest / drop-new と同時 On 保護を実装した。打ち切りは不変結果を置き換えて反映し、元ノートは変更・再開しない。
+- `MidiPitchRange` は NES Pulse=33〜126、Triangle=21〜114、GB Pulse=36〜127、Wave=24〜127 の整数端点を使う。SNES は未クランプ pitch の四捨五入結果が 1〜16383 となる音を調べ、root=60 の 32 kHz=0〜83、16 kHz=0〜95、24 kHz=0〜88 等を固定テストにした。Noise selection はクランプしない。Triangle だけ Volume=15 を反映して診断する。
+- 全 ChipLayout トラックを音色 ID 採番前の不変列で保持し、採用数・破棄数・打ち切り数・明示除外 ch／ノート数・実際の ch→出力トラック別件数を report に残す。全音消失は `NoPlayableNotes` として部分結果を返さない。strict 警告だけでは残りの割り当て診断を止めない。
+- NES 四和音、GB 全候補、SNES 6＋2／8 声、量子化で同時になった On、同分類ドラムの順序、後発打撃、候補共有・除外、全チップ／両モードの 160 音列の正の長さ・昇順・非重複・再実行決定性をテストコードで検証対象にした。E5 のドラム表は実装せず、分類値をテストから直接与えている。
+
+## M3-E3 / E4 静的確認と未実行の確認事項
+
+- 既存の型定義・namespace と BCL の .NET 10 ローカル参照 XML を照合した。公開宣言の summary 隣接、日本語 XML コメントの整形式、括弧対応、ブロック namespace、末尾空白を静的に検査した。音域端点と MIDI 時間の固定値は独立した式でも照合した。
+- 開始時の SHA-256 と比較し、既存ファイルの変更は `docs/implementation.md` だけ。設計書 2 ファイル・Core・既存 Formats／テスト・プロジェクト参照・JSON version は変更していない。Formats の依存は Core と BCL のまま。
+- git 操作、Unity 起動、コンパイル、`dotnet build` / `dotnet test`、PCM 生成は実施していない。テスト成功・警告ゼロは未確認。30 分以内で実装・記録を終えた。
+
+## M3-E3 / E4 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規実装:
+
+- `src/Arpeggio.Formats/Midi/MidiTempoSegment.cs`
+- `src/Arpeggio.Formats/Midi/MidiTempoMap.cs`
+- `src/Arpeggio.Formats/Midi/MidiTickQuantizer.cs`
+- `src/Arpeggio.Formats/Midi/MidiQuantizedNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiPitchRange.cs`
+- `src/Arpeggio.Formats/Midi/MidiDrumPriority.cs`
+- `src/Arpeggio.Formats/Midi/MidiVoiceNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiAllocatedNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiVoiceTrack.cs`
+- `src/Arpeggio.Formats/Midi/MidiChannelCandidates.cs`
+- `src/Arpeggio.Formats/Midi/MidiVoiceAllocator.cs`
+
+新規テスト・補助型:
+
+- `tests/Arpeggio.Core.Tests/Formats/MidiTempoMapTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiTickQuantizerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiVoiceAllocatorTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiPolyphonyTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiChannelMapTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiPitchRangeTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiVoiceFixture.cs`
 # M3-C1 実装記録（2026-09-08）
 
 ## M3-C1 設計との差
