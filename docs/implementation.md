@@ -1962,3 +1962,74 @@ D3／D4 の予定実装・テストコード作成と静的確認は完了。次
 - `tests/Arpeggio.Core.Tests/Cli/MidiChannelMapCommandsTests.cs`
 - `tests/Arpeggio.Core.Tests/Cli/MidiImportCommandsTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/ChipExportServiceTests.cs`
+# M3-H1 / H2 実装記録（2026-09-08）
+
+## M3-H1 / H2 設計との差
+
+- 再合成器の未指定 API はテスト内の `IRegisterTraceChip`（実機アドレスの Apply・整数 CPU cycles の AdvanceCycles・左右出力）と `RegisterTraceRenderer`（44100 Hz の絶対時刻走査）で補完する。チップごとの状態再構成は独立型とし、Core／Formats の合成器・周期計算・生成定数・既存ゲートモデルを使用しない。
+- 検証対象は生成サブセットに限定する。NES は length index 0／halt／constant volume／sweep=$08／即時 linear load、GB は length 無効／sweep 無効／envelope pace=0 を扱い、対象外の命令・設定は明示的に拒否する。NES の frame counter 遅延、アナログミキサー／フィルター、GB の Wave 読み出しバッファの起動遅延は対象外。Triangle の停止後 DAC 保持と Pulse の位相・divider の再起動差、Noise の状態遷移は保持する。
+- `RegisterTimeline` の構築が internal のため、NSF 用量子化列の VGM 化はテスト専用の B4／61／66 符号化で補完する。公開 API の拡張や reflection は行わない。PLAY→44100 Hz は絶対位置を整数丸めし、独立 VGM パース後の整数時刻・全書き込み順を CPU 実行トレースと照合する。
+
+## M3-H1 実装・静的確認
+
+- H1 のコード・テスト作成と静的読解を先に終えてから H2 に着手した。受け入れの実行確認が済んだという意味ではない。
+- NES の両 Pulse の一周期 duty 全ビット／比率、divider の残時間と high の sequencer リセット、enable 前の length load 無効、個別 Off の他声保持、Triangle の linear load／32 段波形／停止 DAC 保持、Noise 全16周期／長短フィードバック／再 On で seed を保持するケースを追加した。
+- Song→既存 VgmWriter→独立パース→再合成で、両 Pulse／Triangle の A4・一オクターブ下の周期誤差2%以内、非無音、先頭無音、停止、音量の単調性を検証する。Noise は周期設定・非無音・停止を検証し、周波数推定は使わない。
+- NSF は四声・先頭無音・同値再発音・duty macro・個別 Off・有限一／二周を実ファイルへ保存し、独立ロードした INIT／PLAY の APU トレースを量子化 VGM と照合する。終端後二回の PLAY を含め、整数時刻／address／value／order と左右再合成列の全値を一致条件にした。実機 CPU cycles による各書き込みの物理時間差は比較時刻へ混ぜない。
+- 使用型の定義・namespace、括弧対応・末尾空白、合成器／PitchTable／生成定数への非依存を静的に確認した。テスト・コンパイルは未実行。
+
+## M3-H2 実装・テストコード
+
+- `GameBoyRegisterTraceChip` は両 Pulse の全 duty、11 bit 周期と divider、一定音量の trigger 時ロード、DAC off と再 enable／trigger の区別、Wave RAM の全ニブルと NR32 右シフト、NR51 の声別左右選択、NR50 の左右倍率を独立実装する。Pulse の初回出力ゼロと、再 trigger では duty 位相を保持して divider を戻す条件も検証する。
+- Noise は NR43 の divisor 0〜7／shift 0〜13 と両幅を扱う。Pan Docs の XNOR／zero seed 表現を採用し、手書き seed 遷移、周期の直前／直後、trigger による再初期化を固定値で照合する。shift 14／15・length 有効・hardware envelope pace 非ゼロ・sweep 有効はサブセット外として失敗する。
+- Song→既存 VgmWriter→独立パース→再合成で、両 Pulse／Wave の A4 と一オクターブ下の周波数2%以内、四声の左右／中央のパン境界、先頭無音／非無音／停止、両幅 Noise の周期設定、Pulse／Wave／Noise の音量単調性を検証する。
+- 音量 `15→0→0→8` の Pulse／Noise を他二声と同時に鳴らし、ゼロ保持／復帰時の active／DAC／routing／trigger 回数と、他声・Wave RAM の維持を観測する。60 Hz envelope 増加と同時の音程変更は、trigger 時点で新しい周期・音量が揃い、routing がまだ解除されていることを検証する。
+- Wave の各 On は DAC off 中に16 byteすべてを書き、周期を設定して trigger することを逐次観測する。同時 Off→On と非ゼロ loopStartTick の有限二周で、RAM 再ロード回数と再 trigger を検証する。
+
+## M3-H1 / H2 検証範囲と静的確認
+
+| 新規テストクラス | メソッド数 | 属性からのケース数 | 主な検証対象 |
+|---|---:|---:|---|
+| NesRegisterTraceChipTests | 8 | 37 | 両 Pulse 全 duty、低音 sweep、length／linear、high と divider、Triangle DAC 保持、Noise 全周期・両 mode、対象外拒否 |
+| NesRegisterResynthesisTests | 6 | 20 | 生成 NES VGM の周期／duty／gate／振幅／Noise／停止、NSF 実行トレースと量子化 VGM の完全一致 |
+| GameBoyRegisterTraceChipTests | 7 | 33 | 両 Pulse 全 duty／trigger、DAC、全 Wave ニブルと NR32、Noise 全 divisor／shift 端／両幅、NR50／NR51、対象外拒否 |
+| GameBoyRegisterResynthesisTests | 6 | 35 | 生成 GB VGM の周期／duty／左右／Noise／振幅／個別 Off／全停止 |
+| GameBoyRegisterRetriggerTests | 3 | 3 | ゼロ復帰と他声保持、60 Hz envelope／同時周期変更、Wave 再 On／有限二周 |
+| RegisterTraceRendererTests | 3 | 5 | 整数サンプル境界と書き込み順、観測区間・順序の拒否、量子化 VGM の固定時刻と長待機分割 |
+| **合計** | **33** | **133** | 検出数・成功数ではなく、未実行テスト属性の静的集計 |
+
+- NES の duty と high／divider、Noise の period／feedback は [NESdev Pulse](https://www.nesdev.org/wiki/APU_Pulse)・[NESdev Noise](https://www.nesdev.org/wiki/APU_Noise) の取得できた検索本文を参照した。直接取得は403だった。GB の duty 位相／DAC／Noise の状態表現は [Pan Docs Audio Details](https://raw.githubusercontent.com/gbdev/pandocs/master/src/Audio_details.md)、周期／trigger／NR32／NR50 は [Audio Registers](https://raw.githubusercontent.com/gbdev/pandocs/master/src/Audio_Registers.md) と照合した。
+- 再合成器本体は BCL とテスト内インターフェースだけを参照する。Song／ControlTimeline／Formats の型を渡すのはテストの接続部分だけであり、既存の合成器・PitchTable・NoiseOscillator・生成レジスタ定数・既存ゲートモデルを呼ばない。Core PCM とのビット／RMS 一致は要求しない。
+- 使用した自前型の定義と namespace、.NET 10.0.8 のローカル参照 XML、xUnit 2.9.2 の Assert API を確認した。追加12 C#ファイルの括弧対応、日本語 summary XML／public への隣接、ブロック namespace、末尾空白、未使用定数・フィールドを静的に確認した。`Assert.Single(collection, predicate)` を使用し、Where を渡す形式はない。
+- `src/` 全体、両設計書、README、Directory.Build.props、テスト csproj の SHA-256 は編集前と一致する。Core／Formats／CLI／MCP／DAW／NuGet 依存／JSON version 1 の変更はない。既存テストの削除・期待値変更も行っていない。
+- git 操作、アプリ／Unity 起動、コンパイル、`dotnet build`／`dotnet test`、生成プログラムや再合成テストの実行は行っていない。アロケーション計測テストは追加していない。実 NSF 保存・CPU 実行・PCM 相当の配列生成も、今回作成した未実行テストコードの内容である。
+
+## M3-H1 / H2 未完了
+
+H1→H2 の順で予定した実装・テストコード作成と静的確認を完了した。コードの残作業はない。次の受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。xUnit アナライザを含むコンパイル確認。
+- 今回追加133ケースと既存テスト全件の成功・実際の検出件数。独立モデル単体、実ファイルを通す NSF／VGM 相互比較、再合成の周期／左右／非無音／停止を含む。
+- 既存 PCM・JSON・GC 回帰。Core と既存テストは変更していないが、回帰テストの成功を再確認したわけではない。
+- 外部プレイヤー／実機での互換性・聴取は未検証。テスト用の線形ミキサー、frame counter 即時モデル、GB Wave 起動バッファ省略は実機サイクル互換の保証ではない。
+
+## M3-H1 / H2 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規（すべて `tests/Arpeggio.Core.Tests/Formats/`）:
+
+- `IRegisterTraceChip.cs`
+- `RegisterTraceRenderer.cs`
+- `RegisterTraceAssertions.cs`
+- `RegisterTraceRendererTests.cs`
+- `NesRegisterTraceChip.cs`
+- `NesRegisterTraceChipTests.cs`
+- `NesRegisterResynthesisTests.cs`
+- `QuantizedNesVgmFixture.cs`
+- `GameBoyRegisterTraceChip.cs`
+- `GameBoyRegisterTraceChipTests.cs`
+- `GameBoyRegisterResynthesisTests.cs`
+- `GameBoyRegisterRetriggerTests.cs`
