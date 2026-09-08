@@ -128,9 +128,11 @@ namespace Arpeggio.Cli
 
         internal static Command CreateExport()
         {
-            Command command = new Command("export", "音声を書き出す");
+            Command command = new Command("export", "音声・チップ演奏を書き出す");
             command.Subcommands.Add(CreateAudioExport("wav"));
             command.Subcommands.Add(CreateAudioExport("ogg"));
+            command.Subcommands.Add(ChipExportCommands.Create("nsf"));
+            command.Subcommands.Add(ChipExportCommands.Create("vgm"));
             return command;
         }
 

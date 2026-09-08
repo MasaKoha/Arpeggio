@@ -38,19 +38,33 @@ namespace Arpeggio.Formats.Export
             {
                 throw new ArgumentException("書き込み可能な Stream を指定してください。", nameof(destination));
             }
+            Action<Stream>? write = Prepare(data, title, report, author, copyright);
+            if (write is null)
+            {
+                return false;
+            }
+            write(destination);
+            return true;
+        }
+
+        internal static Action<Stream>? Prepare(NsfEncodedData data, string title, ConversionReport report,
+            string author, string copyright)
+        {
             NsfDriverImage? image = NsfDriverBuilder.Build(data, report);
             byte[]? metadata = NsfMetadata.Encode(title, author, copyright, report);
             report.SetOutputMetrics(data.EndFrame * NsfTiming.PlayMicroseconds /
                 (double)NsfTiming.MicrosecondsPerSecond, data.OutputBytes);
             if (image is null || metadata is null || !report.CanWrite)
             {
-                return false;
+                return null;
             }
             byte[] header = CreateHeader(image);
             metadata.CopyTo(header, TitleOffset);
-            destination.Write(header);
-            WriteBanks(destination, image, data);
-            return true;
+            return destination =>
+            {
+                destination.Write(header);
+                WriteBanks(destination, image, data);
+            };
         }
 
         private static byte[] CreateHeader(NsfDriverImage image)

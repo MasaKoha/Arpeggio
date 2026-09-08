@@ -1883,3 +1883,82 @@ D3／D4 の予定実装・テストコード作成と静的確認は完了。次
 - `tests/Arpeggio.Core.Tests/Formats/GameBoyNoiseRegisterTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/GameBoyEnvelopeRegisterTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/GameBoyVgmTests.cs`
+
+# M3-F1 / F2 実装記録（2026-09-08）
+
+## M3-F1 設計との差
+
+- 公開 API は設計どおり Prepare → ChipExportPlan → Write とする。Stream 版と CancellationToken、ファイル版の任意 sourcePath を補完する。Song だけから入力パスは復元できないため、CLI は sourcePath を必ず渡して入力同一パスを拒否する。
+- 既存の下位コンパイラーは strict 警告時に部分列を返さない。サービス内では strict=false で全変換・サイズ・CPU・メタデータ検証を完了し、最終レポートの独立コピーへ要求された strict を適用する。単独 API の挙動を変更せず、明細上限後の件数もコピーする。
+- writer の既存公開 Stream API は維持し、検証済みの列・ヘッダー・メタデータを保存する内部入口を抽出する。plan はその確定済み内容を所有し、保存時の再変換と診断の二重加算を防ぐ。I/O・保存競合は exit 3、同一入力パスは exit 1 とする。
+- CLI の変換コマンドは成功・失敗とも report を含む一つの JSON を返す。解析段階の引数エラーも対象とし、変換前でチップ不明なら None とする。I/O 例外は外側の code / error / exitCode で返し、既に確定した変換 report を変更しない。
+
+## M3-F1 実装・静的確認
+
+- ChipExportService / ChipExportPlan を追加。NSF は制御列 → PLAY 量子化 → NES レジスタ → データ符号化 → CPU 予算・メタデータ検証、VGM は制御列 → NES / GB レジスタ → GD3・サイズ検証を一度だけ実行する。plan は不変な列と検証済みメタデータを保持する保存関数を所有する。
+- ファイル保存は隣接 CreateNew 一時ファイル → flush → File.Move。既定上書き拒否、明示上書き、入力同一パス拒否、キャンセル、失敗後の一時ファイル清掃を接続した。Stream は呼び出し元所有で、I/O 例外と部分書き込みを伝播する。
+- CLI に export nsf / vgm を追加し、既存 wav / ogg の引数・既定値は維持した。共通の変換応答で report、written、dryRun、destinationExists、code / error / exitCode を返す。通常表示は要約・制限を stdout、位置付き診断を stderr とする。
+- ChipExportCommandsTests / ChipExportServiceTests に対応チップ、独立パース、loops・author・copyright、strict 全診断・サイズ、dry-run、DPCM と元位置、文書・引数・I/O 終了コード、上書き・元 JSON・履歴の保護、plan の隔離、診断二重加算防止、明細上限後の件数、部分 Stream・キャンセル・移動失敗後の清掃を追加した。
+- 自前型の定義・namespace と System.CommandLine のローカル参照 XML を照合し、括弧・末尾空白・禁止 API を確認した。Core と設計書二つは開始時ハッシュと同じ。F1 の実装・テストコード・静的確認を先に終えてから F2 へ進む。
+
+## M3-F1 未完了
+
+- 予定コードとテストコードは追加済み。dotnet build / dotnet test は依頼に従い未実行。警告・エラーゼロ、既存全テストと追加テストの成功、実際の検出件数は依頼者側の確認待ち。
+- 実 NSF / VGM ファイル保存、独立パース、キャンセル・I/O・競合のテスト実行は未確認。外部プレイヤー・実機互換性の検証済みとは扱わない。
+
+## M3-F2 設計との差
+
+- channel-map の JSON 構造を CLI で厳密に読み、数値キーの重複（同値の別表記を含む）・非整数候補を拒否する。チップ別候補の互換性・範囲・重複は既存 MidiImporter へ委ねる。UTF-8 の不正 byte は置換せず操作エラーとする。
+- 新規 JSON 保存後、新しく開いた空履歴の EditSession を CliHistoryStore.Save へ渡す。古い側車を Load しない。同一内容の古い current が残っていても undo / redo を引き継がない。履歴保存に失敗した場合は今回新規作成した JSON を取り消す。dry-run・strict・変換拒否・保存競合では側車に触れない。
+
+## M3-F2 実装・静的確認
+
+- import midi を CommandFactory に登録。必須 chip、任意 tempo、48 の約数 quantize-ticks、両 polyphony、UTF-8 channel-map、title、strict、dry-run、json を既存 MidiImporter へ接続した。SourceName に入力パスを渡し、MIDI メタデータがなければ入力ファイル名から曲名を決める。
+- map はオブジェクト・ch 1〜16・整数候補配列・数値としての重複キーを検証し、候補の互換性と声競合は Formats の既存規則へ渡す。BOM 付き UTF-8 を許可し、不正 UTF-8 / JSON / map は InvalidChannelMap、読み取り I/O は exit 3。
+- 全診断を得た結果を MidiSongFile で新規保存し、CliMidiSongFile で空の側車履歴を保存する。古い current と今回の正規 JSON が一致していても履歴を復元しない。履歴 I/O 失敗時は今回の新規 JSON を取り消し、既存側車の内容を保つ。
+- MidiImportCommandsTests / MidiChannelMapCommandsTests に三チップ・format 0 / 1・version 1 往復・全固定トラック・曲名優先順・120→60 BPM の焼き込み・明示基準 tempo・量子化による端点変更・map の除外／声競合／両 polyphony・不正 map と UTF-8・strict / dry-run / 保存競合・古い同一 current の側車・履歴 I/O 失敗を追加した。
+- README に CLI 三コマンド、対応形式・チップ、全オプション、診断・終了コード、有限展開と GM 音色近似、上書きと履歴保護を追記した。MCP / DAW の記載を実装済み扱いへ先行変更していない。
+
+## M3-F1 / F2 最終静的確認
+
+- 新規テストは 4 クラス・30 メソッド・84 ケース（属性による静的集計）。アロケーション計測は追加していない。既存テストの削除・緩和・変更はない。
+- 自前型の定義・namespace、System.CommandLine 2.0.11 の ParseResult / OptionResult / SetAction、.NET 10.0.8 の File / FileStream / UTF8Encoding / JsonElement、xUnit 2.9.2 の Assert.Single(collection, predicate) 等をローカル参照と照合した。新規・変更 C# の字句上の括弧対応、日本語 summary XML と public への隣接、ブロック namespace、末尾空白を確認した。
+- strict の最終レポートは診断コレクション・全件数・code 別件数・未保持件数・統計を独立コピーする。保存前後で report と確定 byte 列が変わらないことをテスト対象にした。
+- 開始時ハッシュと照合し、Core、設計書二つ、MCP、DAW、既存テストは不変。Formats の依存は Core と BCL のみ。CLI に Formats の ProjectReference を追加し、NuGet と JSON version は変更していない。
+- git 操作、コンパイル、dotnet build / dotnet test、Unity / アプリ起動、音声生成、作業ディレクトリ外への書き込みは行っていない。
+
+## M3-F2 未完了
+
+- F1 / F2 の予定実装とテストコードは追加済み。受け入れの実行確認は依頼者側に残る。dotnet build Arpeggio.slnx の警告・エラーゼロ、既存全テストと今回の追加テストの成功、実際の検出件数は未確認。
+- 実 MIDI → JSON の保存、基準テンポ・map・声競合、strict / dry-run、側車初期化と履歴失敗時の取り消しを含む CLI 統合テストの実行は未確認。NSF / VGM の実機・外部プレイヤー検証も未実施。
+- 本ランのコード実装に残タスクはない。MCP は F3、DAW は G1 / G2、全体の再合成・実行回帰は H 系列の範囲のまま。
+
+## M3-F1 / F2 変更ファイル一覧
+
+更新:
+
+- `README.md`
+- `docs/implementation.md`
+- `src/Arpeggio.Cli/Arpeggio.Cli.csproj`
+- `src/Arpeggio.Cli/CliExecution.cs`
+- `src/Arpeggio.Cli/CommandFactory.cs`
+- `src/Arpeggio.Cli/SongCommands.cs`
+- `src/Arpeggio.Formats/ConversionDiagnosticCollection.cs`
+- `src/Arpeggio.Formats/ConversionReport.cs`
+- `src/Arpeggio.Formats/Export/NsfWriter.cs`
+- `src/Arpeggio.Formats/Export/VgmWriter.cs`
+
+新規:
+
+- `src/Arpeggio.Cli/ChipExportCommands.cs`
+- `src/Arpeggio.Cli/CliConversionExecution.cs`
+- `src/Arpeggio.Cli/CliMidiSongFile.cs`
+- `src/Arpeggio.Cli/MidiChannelMapFile.cs`
+- `src/Arpeggio.Cli/MidiImportCommands.cs`
+- `src/Arpeggio.Formats/Export/ChipExportPlan.cs`
+- `src/Arpeggio.Formats/Export/ChipExportService.cs`
+- `tests/Arpeggio.Core.Tests/Cli/ChipExportCommandsTests.cs`
+- `tests/Arpeggio.Core.Tests/Cli/CliConversionFixture.cs`
+- `tests/Arpeggio.Core.Tests/Cli/MidiChannelMapCommandsTests.cs`
+- `tests/Arpeggio.Core.Tests/Cli/MidiImportCommandsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/ChipExportServiceTests.cs`

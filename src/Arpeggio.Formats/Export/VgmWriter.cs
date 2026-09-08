@@ -50,18 +50,30 @@ namespace Arpeggio.Formats.Export
             {
                 throw new ArgumentException("書き込み可能な Stream を指定してください。", nameof(destination));
             }
-            Gd3Tag? tag = Prepare(timeline, title, author, report);
-            if (tag is null)
+            Action<Stream>? write = PrepareWrite(timeline, title, author, report);
+            if (write is null)
             {
                 return false;
             }
-            long outputBytes = report.OutputBytes;
-            byte[] header = CreateHeader(timeline, outputBytes, tag.Length);
-            using var writer = new BinaryWriter(destination, Encoding.UTF8, leaveOpen: true);
-            writer.Write(header);
-            WriteCommands(writer, timeline);
-            tag.Write(writer);
+            write(destination);
             return true;
+        }
+
+        internal static Action<Stream>? PrepareWrite(RegisterTimeline timeline, string title, string author, ConversionReport report)
+        {
+            Gd3Tag? tag = Prepare(timeline, title, author, report);
+            if (tag is null)
+            {
+                return null;
+            }
+            byte[] header = CreateHeader(timeline, report.OutputBytes, tag.Length);
+            return destination =>
+            {
+                using var writer = new BinaryWriter(destination, Encoding.UTF8, leaveOpen: true);
+                writer.Write(header);
+                WriteCommands(writer, timeline);
+                tag.Write(writer);
+            };
         }
 
         private static Gd3Tag? Prepare(RegisterTimeline timeline, string title, string author, ConversionReport report)

@@ -16,6 +16,7 @@ namespace Arpeggio.Cli
             root.Subcommands.Add(InstrumentCommands.Create());
             root.Subcommands.Add(BatchCommands.Create());
             root.Subcommands.Add(SongCommands.CreateExport());
+            root.Subcommands.Add(MidiImportCommands.Create());
             root.Subcommands.Add(AnalysisCommands.Create());
             root.Subcommands.Add(SfxCommands.Create());
             root.Subcommands.Add(SongCommands.CreateChipReference());
