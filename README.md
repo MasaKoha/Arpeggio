@@ -11,7 +11,7 @@
 
 ## 状態
 
-M1（Core / CLI / MCP / DAW）と M2（効果音プリセット・音声解析・OGG 書き出し・SNES への WAV 取り込み・DAW の効果音／解析パネル）を実装済み。次は M3（NSF / VGM 書き出し・MIDI 取り込み）。
+M1（Core / CLI / MCP / DAW）と M2（効果音プリセット・音声解析・OGG 書き出し・SNES への WAV 取り込み・DAW の効果音／解析パネル）を実装済み。M3 は CLI / MCP の NSF / VGM 書き出し・MIDI 取り込みと、DAW のチップ書き出し設定・診断・保存までコードを追加した。DAW の MIDI 取り込みと全体の受け入れ確認は後続。
 
 ## AI 向けの基本手順
 
@@ -264,9 +264,17 @@ arpeggio-daw melody.arpeggio.json
 ```
 
 - 左: トラック一覧（選択・ミュート）。中央: ピアノロール（クリックで追加、ドラッグで移動、右端ドラッグで長さ、Delete で削除、上下キーで音量、Alt でスナップ解除、Ctrl＋ホイールでズーム）。右: 「編集」（ノートのエフェクト・音色）「解析」「SFX」タブ。下: 再生 / 停止 / ループ / BPM / 長さ / 書き出し
-- Space 再生・停止、Ctrl+S 保存、Ctrl+Z / Ctrl+Shift+Z、Ctrl+E 書き出し（拡張子で WAV / OGG）
+- Space 再生・停止、Ctrl+S 保存、Ctrl+Z / Ctrl+Shift+Z、Ctrl+E 書き出し（拡張子で WAV / OGG / NSF / VGM。チップに適合する候補だけを表示）
 - AI が CLI / MCP で保存すると自動で再読み込みする。未保存の編集がある場合はステータスバーで確認を待つ
 - 音声出力は SDL3（macOS / Windows）
+
+### DAW のチップ書き出し
+
+「書き出し」または Ctrl+E で保存先を選ぶ。NES は NSF / VGM、GB は VGM に対応し、SNES は WAV / OGG を使う。手入力した拡張子もチップ適合性を検証する。
+
+NSF / VGM を選ぶと右ペインの「書き出し」タブで、有限再生回数（1〜16）・著作者・NSF の権利表記・strict を設定できる。「変換を確認」で開始時の曲を診断し、長さ・予定サイズ・位置付き警告／エラー・方式の制限を表示する。「書き出す」は診断した同じ内容を保存する。曲を後から編集しても診断済みの内容は変わらないため、最新の編集を反映するときは再度「変換を確認」を押す。
+
+エラーまたは strict の警告があれば保存できない。設定変更・文書切替では古い診断を破棄する。既存ファイルの上書きは OS の保存ピッカーで確定し、診断後に新しく作られた同名ファイルは上書きしない。診断・保存・音声書き出しの二重開始を拒否し、画面終了時はキャンセルして遅れた通知を抑止する。
 
 ## MCP
 
@@ -283,11 +291,23 @@ arpeggio-daw melody.arpeggio.json
 }
 ```
 
-ツールは `new_song` / `open_song` / `save_song` / `song_info` / `show_song` / `add_note` / `remove_note` / `update_note` / `apply_operations` / `add_instrument` / `update_instrument` / `remove_instrument` / `export_wav` / `export_ogg` / `undo` / `redo` / `chip_reference` / `analyze_song` / `analyze_wav` / `new_sfx` / `sfx_presets` / `snes_presets` / `import_wav_sample`。
+ツールは `new_song` / `open_song` / `save_song` / `song_info` / `show_song` / `add_note` / `remove_note` / `update_note` / `apply_operations` / `add_instrument` / `update_instrument` / `remove_instrument` / `export_wav` / `export_ogg` / `undo` / `redo` / `chip_reference` / `analyze_song` / `analyze_wav` / `new_sfx` / `sfx_presets` / `snes_presets` / `import_wav_sample` / `export_nsf` / `export_vgm` / `import_midi`。
 
 `new_song` と編集ツールは成功時に自動保存する。`open_song` は現在の曲とセッション履歴を差し替える。MCP の履歴はセッション内に保持し、CLI の履歴とは共有しない。`add_instrument` / `update_instrument` の `instrument` と `apply_operations` の `operations` は JSON **文字列**で渡す。音色更新はオブジェクト全体の置き換え。ノートの `effects` も JSON 配列文字列、省略で既存値を保持し `[]` で解除する。
 
 戻り値は JSON 文字列。ただし `show_song` の既定と `chip_reference` はテキストをそのまま返す。入力・操作の失敗は `{"error":"説明","exitCode":1}` などの JSON 文字列を返す。
+
+### MCP のチップ書き出し・MIDI 取り込み
+
+| ツール | 引数 |
+|---|---|
+| `export_nsf` | `path, loops=1, author="", copyright="", strict=false, dryRun=false, overwrite=false` |
+| `export_vgm` | `path, loops=1, author="", strict=false, dryRun=false, overwrite=false` |
+| `import_midi` | `midiPath, path, chip, tempo=null, quantizeTicks=1, polyphony="steal-oldest", channelMap=null, title=null, strict=false, dryRun=false` |
+
+export は現在開いている曲を対象とする。NSF は NES、VGM は NES / GB に対応する。`loops` は 1〜16。`channelMap` は `"{\"1\":[0,1],\"10\":[3]}"` のような JSON **文字列**で渡す。MIDI は新規保存だけで、曲を開かず実行できる。現在の曲・保存先・undo / redo は維持し、切り替えるときだけ別途 `open_song(path)` を呼ぶ。
+
+三ツールは `path / written / dryRun / destinationExists / exitCode / report` を返す。失敗時は `code / error` も含む。`report` は変換時間・予定バイト数・位置付き警告／エラー・恒常的な制限・統計を含む。終了コードは CLI と同じ 0 / 1 / 2 / 3。`dryRun` は全変換を診断して保存せず、既存出力があっても診断できる。`strict` は変換警告時に保存を拒否する。NSF / VGM の既存出力は `overwrite=true` でのみ置換し、入力と同じパスは拒否する。
 
 ## SNES 内蔵音色バンク
 
