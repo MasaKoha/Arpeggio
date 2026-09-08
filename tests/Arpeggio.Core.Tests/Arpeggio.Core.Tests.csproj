@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Arpeggio.Codecs\Arpeggio.Codecs.csproj" />
     <ProjectReference Include="..\..\src\Arpeggio.Core\Arpeggio.Core.csproj" />
+    <ProjectReference Include="..\..\src\Arpeggio.Formats\Arpeggio.Formats.csproj" />
     <ProjectReference Include="..\..\src\Arpeggio.Cli\Arpeggio.Cli.csproj" />
     <ProjectReference Include="..\..\src\Arpeggio.Mcp\Arpeggio.Mcp.csproj" />
     <ProjectReference Include="..\..\src\Arpeggio.Daw\Arpeggio.Daw.csproj" />
