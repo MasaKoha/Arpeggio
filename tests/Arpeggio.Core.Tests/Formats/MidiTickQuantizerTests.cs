@@ -26,7 +26,7 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.Equal(48, quantizer.GetLengthTicks(new[] { note.EndTick }));
             Assert.Equal(1L, report.WarningCountsByCode["ZeroLengthNoteDropped"]);
             Assert.Equal(1L, report.WarningCountsByCode["ShortNoteExtended"]);
-            ConversionDiagnostic timing = Assert.Single(report.Warnings.Where(warning => warning.Code == "MidiTimingQuantized" && warning.SourceEvent == 2));
+            ConversionDiagnostic timing = Assert.Single(report.Warnings, warning => warning.Code == "MidiTimingQuantized" && warning.SourceEvent == 2);
             Assert.Equal(2L, timing.OccurrenceCount);
             Assert.Equal(0.2, timing.MaximumError);
         }
