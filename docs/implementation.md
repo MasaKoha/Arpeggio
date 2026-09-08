@@ -1176,3 +1176,64 @@ A1 / A2 の予定コードとテストコードは追加済み。受け入れ条
 - `tests/Arpeggio.Core.Tests/Formats/ControlTimelineTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/ControlModulationTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/ControlIsolationTests.cs`
+
+# M3-B1 実装記録（2026-09-08）
+
+## M3-B1 設計との差
+
+- 未指定の API は `NesRegisterCompiler.Compile(ControlTimeline, ConversionReport)` とし、A のレポートへ診断を追記して、不変の `RegisterTimeline`（エラーまたは strict 警告時は null）を返す。`RegisterWrite` に絶対サンプル位置・列全体での 0 始まりの順序・実機アドレス・byte 値を保持する。
+- Noise / DPCM トラックはこのランでは無視する。DPCM 拒否・Noise・全レジスタの終端消音・PitchClamped 以外の変換警告の網羅は B2 に残す。対応する三声の終端 Off は既存制御列どおり処理する。
+- On は enable → 制御値 → low → high を毎回書く。継続では副作用のない Pulse 制御値も変更時だけ書き、timer は low / high を独立比較する。On の同値 high と Triangle のフレームカウンター書き込みは省略しない。
+- `PitchTable.GetRange` は現コードでは private。公開済みの `ClampMidiNote` / `GetFrequency` を使い、Core は変更しない。警告判定では周波数の連続範囲を比較し、MIDI→周波数→MIDI の微小誤差を誤ってクランプ警告にしない。
+
+## M3-B1 実装範囲と判断
+
+- `Export/RegisterTimeline` はチップ・書き込み列・終端サンプル位置を保持する。構築時に書き込みを独立配列へコピーし、読み取り専用ビューと getter のみの値型で公開する。元 Song・レポート・次の変換から変更できない。
+- `NesRegisterCompiler` は呼び出しごとに独立した三声の状態と `$4015` shadow を作る。制御列が保証する全 Off → トラック番号順の On／更新を維持し、初期化を時刻 0 の先頭へ挿入する。
+- 周期は `ClampMidiNote` の制限後に周波数へ戻し、Pulse は分母 16、Triangle は 32、ToEven の丸めと timer 8〜2047 を適用する。Pulse の最終音量は AwayFromZero、DutyCycle 1〜4 は bits 0〜3 に変換する。Triangle は音量を無視し固定 linear 値で起動する。
+- sweep は両 Pulse とも `$08`。On は length index 0 を毎回ロードし、Pulse は halt / constant volume、Triangle は `$4008=$FF` と最後の `$4017=$C0` で保持する。他声の enable bit を変えずに On／Off を行う。
+- `PitchClamped` は On と継続更新の両方で記録し、元トラック・元ノート番号・元 tick・出力トラック・変換前後の連続 MIDI 値を返す。`MaximumError` は半音単位。既存 report の集約で最大誤差と発生数を保持し、strict でも全更新の診断を集めた後に列の公開を拒否する。
+- 書き込み列は `ConversionLimits.MaximumRegisterWrites` を超える前にエラーで停止し、部分列を返さない。成功時の件数は `registerWrites` に記録する。ファイルのサイズ算定・保存 API は追加しない。
+- レジスタ定数は `NesRegisters`、各声の配置と直前値は `NesRegisterChannel` に置く。依存追加・合成器の呼び出し・PCM 生成・フロントエンドへの接続はない。
+
+## M3-B1 テストコード
+
+3 クラス、19 メソッド／34 ケースを追加した。生成したレジスタ列を直接検証し、PCM と外部エミュレータは使用しない。アロケーション計測テストは追加していない。
+
+| ファイル | 検証内容 |
+|---|---|
+| NesRegisterCompilerTests | 初期化の順序・先頭無音・全順序番号、A4 の Pulse=253 / Triangle=126 と制御値、低音 timer=2033 と sweep 無効／target overflow 回避、三声の vibrato の low 差分と同音 On の high 強制、継続 high の両方向差分・同値保持・low 同値時の high 単独更新、duty と半整数音量、Triangle の起動順と Off 時の二声維持、三声同時交代の全書き込み順、非ゼロ loopStartTick の有限二周 |
+| NesRegisterDiagnosticsTests | 三声それぞれの上下限 timer 8／2047、元位置と警告発生数、通常量子化での警告抑制、変調中の集約と最大誤差、明細保持ゼロの strict 拒否、ミュート、Noise／DPCM の現ランでの無視、チップ不一致 |
+| RegisterTimelineTests | コレクションの変更拒否、元 Song・レポート・後続変換からの隔離、同じ制御列の再変換で状態が残らないこと、終端の保持、先行エラー時の部分列非公開 |
+
+## M3-B1 静的確認
+
+- 自前型の定義・namespace と .NET 10 のローカル参照 XML、既存 xUnit の使い方を照合した。追加 C# 全ファイルの括弧対応・summary XML・ブロック namespace・一ファイル一型・末尾空白を検査した。
+- レジスタアドレスの名前付き定数、公開メンバーの日本語 summary、using の解決、初期化・共有 shadow・low／high 個別比較・On の強制書き込みを読み直した。A4・低音・high 境界の数値は生成コードの定数を流用せず算術で照合した。
+- Render / ReadSample / NoiseOscillator / ファイル書き込み / Unity lifecycle の追加がないことを検索した。既存の Core・設計書・CLI／MCP／DAW／Codecs・既存テスト・プロジェクト参照は、作業開始時のハッシュと一致する。
+- git 操作、Unity 起動、コンパイル、`dotnet build` / `dotnet test`、音声・NSF／VGM ファイル生成は実施していない。
+
+## M3-B1 未完了
+
+予定した実装とテストコードは追加済み。次の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` のエラー・警告ゼロ。
+- 既存 778 件と追加 34 ケースのテスト成功、および実際の検出件数。
+- 外部プレイヤー・実機での聴取と副作用の動作確認は未実施。自動テストの実行済み・実機検証済みとは扱わない。
+
+## M3-B1 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規:
+
+- `src/Arpeggio.Formats/Export/RegisterTimeline.cs`
+- `src/Arpeggio.Formats/Export/RegisterWrite.cs`
+- `src/Arpeggio.Formats/Export/NesRegisterCompiler.cs`
+- `src/Arpeggio.Formats/Export/NesRegisterChannel.cs`
+- `src/Arpeggio.Formats/Export/NesRegisters.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesRegisterCompilerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NesRegisterDiagnosticsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/RegisterTimelineTests.cs`
