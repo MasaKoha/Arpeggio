@@ -81,6 +81,17 @@ namespace Arpeggio.Daw.Views
             revealExportButton = Require<Button>("RevealExportButton");
             filePicker = new AudioFilePicker(this);
         }
+        /// <summary>ピアノロール可視領域の左上。ウィンドウ内 DIP 座標で、未接続なら null。</summary>
+        public Point? PianoRollOrigin => pianoRoll.TranslatePoint(new Point(rollScroll.Offset.X, rollScroll.Offset.Y), this);
+        /// <summary>ピアノロールのスクロール量。単位は DIP。</summary>
+        public Vector PianoRollScrollOffset => rollScroll.Offset;
+        /// <summary>スクロールバーを除いたピアノロールの可視領域の大きさ。</summary>
+        public Size PianoRollViewportSize => rollScroll.Viewport;
+        /// <summary>ズームを反映した 1 tick の DIP 幅。</summary>
+        public double PianoRollPixelsPerTick => pianoRoll.PixelsPerTick;
+        /// <summary>書き出しの既存表示通知を診断ログへ渡す。</summary>
+        public event Action<string>? ExportStatusChanged;
+
         /// <summary>Program が組み立てた Presenter と明示的に結線する。</summary>
         public void Bind(MainWindowPresenter mainPresenter, string path)
         {
@@ -169,6 +180,7 @@ namespace Arpeggio.Daw.Views
             exportButton.IsEnabled = !isRunning;
             revealExportButton.IsVisible = lastExportedPath != null;
             revealExportButton.IsEnabled = !isRunning;
+            ExportStatusChanged?.Invoke(text);
         }
         /// <summary>旧ファイルの監視を解放して新しい正本へ切り替える。</summary>
         public void SwitchDocument(string path)

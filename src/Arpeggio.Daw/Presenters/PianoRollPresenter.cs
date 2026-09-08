@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Daw.Editing;
@@ -52,6 +53,24 @@ namespace Arpeggio.Daw.Presenters
         public string StatusText { get; private set; } = string.Empty;
         /// <summary>音量レーンの入力判断。</summary>
         public VelocityLanePresenter Velocity { get; }
+        /// <summary>選択に対応する実在ノート数。Avalon の状態公開が読む。</summary>
+        public int SelectedNoteCount => Selection.Resolve(Song.Tracks[SelectedTrack].Notes).Length;
+        /// <summary>選択中ノートの開始 tick をカンマ区切りで返す。多いときは先頭 20 件と総数。Avalon の状態公開が読む。</summary>
+        public string SelectedTicks
+        {
+            get
+            {
+                const int MaximumListedTicks = 20;
+                Note[] selected = Selection.Resolve(Song.Tracks[SelectedTrack].Notes);
+                if (selected.Length == 0)
+                {
+                    return string.Empty;
+                }
+                int[] ticks = selected.Select(note => note.Tick).OrderBy(tick => tick).ToArray();
+                string listed = string.Join(",", ticks.Take(MaximumListedTicks).Select(tick => tick.ToString(CultureInfo.InvariantCulture)));
+                return ticks.Length <= MaximumListedTicks ? listed : $"{listed},…（全 {ticks.Length} 件）";
+            }
+        }
         /// <summary>トラック切替時に前の操作を確定する。</summary>
         public void SelectTrack(int trackIndex)
         {

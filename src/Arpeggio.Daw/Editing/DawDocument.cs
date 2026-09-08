@@ -21,6 +21,11 @@ namespace Arpeggio.Daw.Editing
         /// <summary>正本保存時から編集内容が変わっているか。</summary>
         public bool IsDirty => SongSerializer.Serialize(Song) != savedSnapshot;
 
+        /// <summary>文書の読み込み成功後に正本パスを通知する。</summary>
+        public event Action<string>? Opened;
+        /// <summary>正本の明示保存成功後に保存先パスを通知する。</summary>
+        public event Action<string>? Saved;
+
         /// <summary>読めることを確認してから作業セッションへ切り替える。</summary>
         public void Open(string path)
         {
@@ -30,6 +35,7 @@ namespace Arpeggio.Daw.Editing
             Session.Open(workingPath);
             Path = System.IO.Path.GetFullPath(path);
             savedSnapshot = SongSerializer.Serialize(Song);
+            Opened?.Invoke(Path);
         }
 
         /// <summary>正本の EditSession.Save を成功させたときだけ保存基準を進める。</summary>
@@ -46,6 +52,7 @@ namespace Arpeggio.Daw.Editing
             target.SnesEcho = Song.SnesEcho;
             savedSession.Save();
             savedSnapshot = SongSerializer.Serialize(Song);
+            Saved?.Invoke(Path);
         }
 
         /// <summary>自分の保存・重複通知を内容比較で判別する。</summary>
