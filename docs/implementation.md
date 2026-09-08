@@ -1754,3 +1754,132 @@ D1／D2 の予定実装とテストコードは追加済み。受け入れ条件
 - `tests/Arpeggio.Core.Tests/Formats/MidiDrumMappingTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/MidiImporterTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/MidiSongFileTests.cs`
+
+# M3-D3 / D4 実装記録（2026-09-08）
+
+## M3-D3 / D4 設計との差
+
+- 未指定の writer API は `NsfWriter.Write(Stream, NsfEncodedData, title, ConversionReport, author="", copyright="")` → bool とする。容量検証済みの不変データを受け、同じデータからドライバーを生成して CPU 予算を再検証し、全ヘッダー検証後にだけ保存する。予定サイズは既存 `NsfEncodedData.OutputBytes` を使用する。パス単位の隣接一時ファイル・上書き保護は、VGM と同じく設計の F1 に残す。
+- 不正な単独サロゲートは既存 GD3 と同じ `InvalidMetadata` で拒否する。正常な補助平面文字は一つの Unicode scalar として `?` 一文字へ縮約する。切り詰め後に見えなくなる位置も UTF-16 の正当性を検証する。
+- 通常データ長は `3n+1` のため、bank 255 の最終 byte に END を置く列は現 encoder から生成できない。最大容量の正常出力を独立ロードする検証に加え、テスト側だけで保存済みファイルの末尾を改変しカーソルを設定して、最終 byte の END とその先への防御停止を検証する。生成形式・容量・設計書は変更しない。
+- 限定 CPU は使用 21 opcode だけを実装する。APU 書き込みは命令の最終 cycle を記録し、RAM の RMW は旧値／新値の二書き込みを再現する。IRQ・DMA・未使用 opcode・APU 合成・全ダミー読み出しを備える汎用エミュレーターには拡張しない。
+
+## M3-D3 実装・静的確認
+
+- `Limited6502` と `Limited6502Memory` は Core／Formats の型・定数・命令表・ラベル・サイクル解析を参照しない。手書き命令列で全使用命令の flags、アドレスの折り返し、ページ越え、前後分岐、入れ子 JSR／RTS と SP 復元、未知 opcode・非復帰の拒否を検証するテストを追加した。
+- 生成 INIT の 146 cycles、RAM・bank 1・APU 初期化、再 INIT、WAIT 1／256／65535／65536、同値 trigger の順序、END 後の追加 PLAY と読み出し停止、未知データ命令・不正レジスタ・ゼロ WAIT の防御停止を検証するテストを追加した。実行トレースは PLAY 番号・cycle・アドレス・値を持つ。
+- D3 の実装・テストコード作成と静的読解を先に終えてから D4 に着手した。コンパイル・テスト実行は依頼により行っておらず、D3 の受け入れ実行確認が済んだという意味ではない。
+
+## M3-D4 実装・テストコード
+
+- `NsfWriter` は 128 byte の NSF v1 ヘッダー、実 INIT／PLAY アドレス、NTSC=16639／PAL 欄=19997、初期 bank `[0,1,0,0,0,0,0,0]`、region／expansion／予約 byte=0 を生成する。固定 bank と不変データを 4096 byte の作業バッファで順に書き、末尾 bank はゼロ埋めする。
+- writer は渡されたデータから `NsfDriverBuilder.Build` を呼び、別データに対する古い CPU 上限を流用しない。29 WRITE／PLAY の 7776 cycles は保存、30 WRITE／PLAY の 8033 cycles は `NsfCpuBudgetExceeded` として最初の byte を書く前に拒否する。Stream の Seek／Length／Position を要求せず、呼び出し元所有の Stream を閉じない。I/O 失敗は伝播し、予定サイズと部分出力の実長を混同しない。
+- `NsfMetadata` は title／author／copyright の ASCII 31 byte＋NUL を生成する。`MetadataReduced` は縮約した欄数を occurrenceCount とし、共通レポートで元位置なしの同一コードが集約されても情報を失わないよう、変更した全欄の名称・元値・結果を一明細に記録する。strict は明細保持ゼロでも保存を拒否する。
+- `IndependentNsfLoader` は生成側の型・定数を参照せず、ヘッダーから独立メモリへ bank を配置する。署名・version・曲数・load・固定 bank 内の両入口・速度・初期 bank・予約欄・ASCII NUL・ROM 整列／上限を検証する。writer を使わない手書きファイルによるローダー自身の正常・破損・全 byte 切断テストも追加した。
+- FileStream を閉じた後にファイルパスから独立ロードし、四声・先頭無音・同時 Off→On・同値 trigger・非ゼロ loopStartTick の二周・全停止・再 INIT を `NsfFrameCompiler` の期待列と完全比較する。テスト用ファイルはテストの作業ディレクトリ内へ一意名で作成し、finally で削除する。
+- WRITE の offset／value、WAIT の low／high、命令先頭、END の直前にある 4 KiB 境界を実ファイルで検証する。END が bank 最終 byte にある場合の先行切り替え禁止と、次 bank 先頭にある場合の必要な切り替えを両方扱う。
+- 最大容量の正常入力は 336154 WRITE を最大 28 WRITE／PLAY に分散し、12005 WAIT を挟んだデータ 1044478 byte、ROM 256 bank、末尾 2 byte パディングとする。全 INIT／PLAY を独立 CPU で実行し静的上限以下を確認するテストを追加した。追加一 WRITE の 1044481 byte は符号化前に拒否する。bank 255 最終 END と WRITE／WAIT オペランド不足の防御停止は、保存済みデータをテスト側で改変して別の実ファイルへ保存・独立ロードする。
+- CPU 観測は APU／bank の順序と cycle を保持する。banked 実行では予約領域外への書き込みを即時拒否し、長曲の観測量を抑えるため RAM／stack 書き込みの全履歴は保持しない。CPU 単体テストの非 banked メモリでは stack と RMW の旧値／新値も観測する。
+
+## M3-D3 / D4 静的確認
+
+- 追加は **7 テストクラス・35 メソッド・117 ケース**（D3=61、D4=56、属性による静的集計）。基準 1363 件を含めると 1480 件見込みであり、ランナーによる検出・成功を確認した値ではない。PCM と合成器、外部エミュレーターを呼ばない。アロケーション計測テストは追加していない。
+- 自前型の定義・namespace、.NET 10.0.8 のローカル参照 XML、xUnit 2.9.2 の参照 API を照合した。全新規 C# の括弧対応・日本語 summary XML と public 宣言への隣接・ブロック namespace・一ファイル一型・末尾空白・省略名・禁止 API を静的に検査した。`Assert.Single(collection, predicate)` を使用し、Where を渡す形式はない。
+- 6502 の一次参照は [NESdev 命令一覧](https://www.nesdev.org/obelisk-6502-guide/instructions.html)・[命令リファレンス](https://www.nesdev.org/wiki/Instruction_reference)・[アドレス方式](https://www.nesdev.org/wiki/Addressing_modes)。本文直接取得は 403 だったため、取得できた検索記載で flags・JSR／RTS・間接ポインター折り返し・ページ追加 cycles を照合した。
+- 4 KiB 境界の byte 位置、bank 切り替え PLAY 番号、END の配置、最大容量の命令数を独立の整数算術で読み合わせた。これは生成プログラムや CPU テストを実行したという意味ではない。
+- 既存ファイルの変更は本記録のみ。Core、設計書二つ、既存 Formats／テスト、プロジェクト・依存定義・JSON version 1 を変更していない。新規 Formats の依存は既存 Core と BCL のみ。git 操作、コンパイル、`dotnet build`／`dotnet test`、アプリ起動、PCM 生成は行っていない。指定作業ディレクトリ外への書き込みも行っていない。
+
+## M3-D3 / D4 未完了
+
+D3／D4 の予定実装・テストコード作成と静的確認は完了。次の受け入れ実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 1363 件を含む全件と今回追加 117 ケースの成功、および実際のテスト検出件数。
+- 独立 CPU 単体テスト、生成 INIT／PLAY、実 NSF ファイル保存・独立ロード・全トレース、最大 bank／CPU 予算／strict／I/O 失敗のテスト実行。実ファイルの作成も今回は未実行のテストコードに含む。
+- 外部プレイヤー・実機での再生互換性は未検証。パス単位の安全保存・ChipExportService は F1、VGM 相互比較・レジスタ再合成は H 系列の対象のままとする。
+
+## M3-D3 / D4 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規 Formats:
+
+- `src/Arpeggio.Formats/Export/NsfWriter.cs`
+- `src/Arpeggio.Formats/Export/NsfMetadata.cs`
+
+新規テスト・補助型:
+
+- `tests/Arpeggio.Core.Tests/Formats/Limited6502.cs`
+- `tests/Arpeggio.Core.Tests/Formats/Limited6502Memory.cs`
+- `tests/Arpeggio.Core.Tests/Formats/Limited6502Tests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfExecutionFixture.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfDriverExecutionTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/IndependentNsfLoader.cs`
+- `tests/Arpeggio.Core.Tests/Formats/IndependentNsfLoaderTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfWriterFixture.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfWriterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfBankExecutionTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfMetadataTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/NsfWriterContractTests.cs`
+# M3-C3 実装記録（2026-09-08）
+
+## M3-C3 設計との差
+
+- 設計書は変更しない。NoiseRateQuantized の original／converted と MaximumError の単位は未指定のため Hz とし、選択自体は規定の対数比で行う。元ノートへの集約と strict の拒否は既存の診断契約に従う。
+- C1 の VgmWriter は既に GB のクロック・B3・Wave RAM・GD3 を符号化できるため、その API へ四声の完成したレジスタ列を渡す。形式 writer の重複実装や新しい公開入口は追加しない。
+- C2 の「時間 envelope／Noise は次ラン」の暫定期待値だけを完成仕様の検証へ更新する。その他の既存テストは保持する。
+
+## M3-C3 実装範囲と判断
+
+- `GameBoyRegisterCompiler` に第四声の Noise を接続した。NR43 は変調後 selection を 0〜127 に制限して ToEven で選び、Core と同じ目標クロックへ divisor code 0〜7／shift 0〜13 の対数比が最小の組を総当たりする。同点は小さい NR43、7 bit 幅は bit 3 とし、停止する shift 14／15 は候補へ入れない。
+- Pulse の E は不変な音色設定と `ControlEvent.Frame` から計算する。step=0 は初期値保持、増減は整数除算の後に 0〜15 へ制限し、共通音量 V と掛けて AwayFromZero で最終整数化する。グローバルな 60 Hz 更新、Delay 後開始、隣接 On と周回再発音でのフレームリセットは既存制御列をそのまま利用する。
+- Pulse と Noise の音量ゲートは同じ処理へまとめた。正音量の開始／変更では自声 routing 解除 → DAC off → 必要な周期設定 → 一定音量 → trigger → routing 復元とする。Noise は NR43 だけを周期として更新し、NR44 の trigger は `$80`、length enable=0。継続ピッチだけでは trigger を出さない。
+- 音量 0 は DAC と routing を停止し、同じ整数音量の継続では再起動しない。ゼロから正音量への復帰を含む継続再起動に `EnvelopeRetriggered` を付け、Noise の説明には LFSR 再初期化を含めた。NR51 shadow は他三声の左右ビットを保ち、開始後の NR52 リセットは行わない。
+- `NoiseRateQuantized`／`VolumeQuantized`／`EnvelopeRetriggered` は既存レポートへ元ノート単位で集約する。strict は明細保持ゼロでも全発生数で拒否する。書き込み上限と有限終端の全停止を維持し、C2 の段階的な未対応 limitation を削除した。
+- C1 の既存 writer へ GB 四声の列を渡せる状態とした。B3・クロック 4194304・Wave RAM の 20〜2F offset・GD3・待機／END の符号化は変更不要。C3 は Formats の Stream 書き出しまでで、ChipExportService／パス保存／CLI は設計どおり F1 に残る。
+
+## M3-C3 テストコード
+
+3 クラスに **22 メソッド／56 ケース**を追加した。既存 C2 の暫定 2 メソッド／3 ケースを完成仕様へ更新し、削除・緩和はしていない。依頼の既存 1363 件に対して **1419 件見込み**で、属性の静的集計による値であり実際の検出件数ではない。PCM・音声合成・外部エミュレーターを使わず、レジスタ列・バイト列・ドキュメントモデルを直接検証する。
+
+| ファイル | 検証内容 |
+|---|---|
+| GameBoyNoiseRegisterTests | 全 128 selection×両 LFSR 幅について整数比の交差積による独立した最短距離／同点順／shift 上限検証、低速端と通常域の固定 NR43、変調後の ToEven／範囲制限、周期差分だけの更新、幅交換・同値 On の強制 trigger、元位置と Hz 誤差集約、strict／明細ゼロ、ミュート、Noise の左右パン境界 |
+| GameBoyEnvelopeRegisterTests | 両 Pulse の増減／step=0／任意整数間隔／0・15 保持、開始音量 0 からの復帰、V×マクロ×VolumeSlide×E の最終丸め、同じ整数音量の更新抑止、時間 envelope 再起動時の他三声維持、Noise の周期・音量同時変更とゼロ保持／復帰、四声それぞれの個別 Off、Delay／global frame／隣接 On／有限二周での E リセット、strict、元音色編集からの隔離 |
+| GameBoyVgmTests | 空曲の全 256 byte header・全命令列・386 byte 全長の固定値、四声の時刻／アドレス／値／全順序番号の完全往復、先頭無音・同時 Off→On・Noise 復帰・時間 envelope・有限二周、日本語 GD3 全 11 欄、Wave RAM 両端の B3 offset、長待機分割、全停止直後の END、決定性・元 JSON 不変・Stream 所有権・strict 拒否、writer を使わない手書き GB ファイルによるパーサー自身の照合 |
+| GameBoyRegisterDiagnosticsTests（更新） | 暫定だった時間 envelope 初期値保持を各フレームの増減へ、Noise 無視を NR42／NR43／NR44／routing の On／Off 固定列へ更新 |
+
+## M3-C3 静的確認
+
+- 設計書全文、既存 Formats・M3 各節の判断と申し送り、C# 規約を参照した。Core／Formats の型定義と namespace、.NET 10 の Math／Array／Stream と xUnit 2.9.2 の参照定義を照合した。
+- 変更・新規 C# 7 ファイルの括弧対応、summary XML と public 宣言への隣接、ブロック namespace、末尾空白、未使用定数、禁止省略名、`Assert.Single(...Where(...))` と Unity lifecycle／コンポーネント API の不使用を確認した。
+- 低速端・同点・上端の NR43 固定値、空 GB VGM の command 46 byte／GD3 84 byte／全長 386 byte、長待機の開始時刻は独立した有理数の算術で照合した。C# のコンパイル・テストコードや writer の実行を行ったという意味ではない。
+- 開始時の SHA-256 と比較し、既存変更は GB 実装 3 ファイル・C2 診断テスト・本記録だけであることを確認した。Core、両設計書、既存 VgmWriter／独立パーサー、他の既存テスト、プロジェクト依存とフロントエンドは不変。Formats の依存は Core と BCL のみ、JSON version 1 を維持した。
+- git 操作、Unity／アプリ起動、コンパイル、`dotnet build`／`dotnet test`、PCM・実 VGM ファイル生成は実施していない。作業ディレクトリ外への書き込みとアロケーション計測テストの追加もない。
+
+## M3-C3 未完了
+
+予定した実装・テストコードと静的確認は完了。次の受け入れ条件の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。
+- 既存 1363 件と追加 56 ケースの全成功、および実際の検出件数。
+- 独立パーサーを通した GB 四声 VGM の完全往復、Noise の全 selection、ソフトウェア envelope／再 trigger／他声維持のテスト実行。
+- 外部プレイヤー・実機の動作と聴取は未検証。GB の独立レジスタ再合成は設計済み H2、パス保存・CLI 接続は F1 の範囲に残る。
+
+## M3-C3 変更ファイル一覧
+
+更新:
+
+- `src/Arpeggio.Formats/Export/GameBoyRegisterCompiler.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisterValues.cs`
+- `src/Arpeggio.Formats/Export/GameBoyRegisters.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyRegisterDiagnosticsTests.cs`
+- `docs/implementation.md`
+
+新規:
+
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyNoiseRegisterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyEnvelopeRegisterTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/GameBoyVgmTests.cs`
