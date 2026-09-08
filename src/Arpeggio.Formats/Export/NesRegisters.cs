@@ -14,6 +14,9 @@ namespace Arpeggio.Formats.Export
         internal const ushort TriangleLinear = 0x4008;
         internal const ushort TriangleTimerLow = 0x400A;
         internal const ushort TriangleTimerHigh = 0x400B;
+        internal const ushort NoiseControl = 0x400C;
+        internal const ushort NoisePeriod = 0x400E;
+        internal const ushort NoiseLength = 0x400F;
         internal const ushort DmcControl = 0x4010;
         internal const ushort DmcOutput = 0x4011;
         internal const ushort Status = 0x4015;
@@ -25,6 +28,10 @@ namespace Arpeggio.Formats.Export
         internal const byte PulseOneEnable = 0x01;
         internal const byte PulseTwoEnable = 0x02;
         internal const byte TriangleEnable = 0x04;
+        internal const byte NoiseEnable = 0x08;
+        internal const int NoiseShortMode = 0x80;
+        internal const int NoisePeriodMask = 0x0F;
+        internal const int VolumeMask = 0x0F;
         internal const int DutyShift = 6;
         internal const int TimerHighShift = 8;
         internal const int TimerHighMask = 0x07;

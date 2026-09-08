@@ -73,7 +73,7 @@ namespace Arpeggio.Core.Tests.Formats
             AddNote(song, trackIndex, 0, FrameTicks);
             RegisterTimeline timeline = Compile(song);
             Assert.Equal(expectedTimer, TimerAt(timeline, 0, lowAddress, highAddress));
-            Assert.Equal(expectedControl, (int)Assert.Single(timeline.Writes, write => write.Address == controlAddress).Value);
+            Assert.Equal(expectedControl, (int)Assert.Single(timeline.Writes, write => write.PositionSamples == 0 && write.Address == controlAddress).Value);
             Assert.Equal(0, Assert.Single(timeline.Writes, write => write.Address == highAddress).Value & LengthIndexMask);
         }
 
