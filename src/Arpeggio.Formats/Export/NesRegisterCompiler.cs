@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Synthesis;
 
 namespace Arpeggio.Formats.Export
 {
-    /// <summary>NES の Pulse 二声と Triangle を、副作用を保持したレジスタ列へ変換する。</summary>
+    /// <summary>NES の Pulse 二声・Triangle・Noise を、副作用と変換診断を保持したレジスタ列へ変換する。</summary>
     public sealed class NesRegisterCompiler
     {
         private const double ClockRate = 1789773;
@@ -15,8 +14,9 @@ namespace Arpeggio.Formats.Export
         private const int TriangleDivider = 32;
         private const int MinimumTimer = 8;
         private const int MaximumTimer = 2047;
-        private const int MaximumVolume = 15;
+        private const int MaximumNoiseSelection = 127;
         private readonly ConversionReport _report;
+        private readonly NesConversionDiagnostics _diagnostics;
         private readonly List<RegisterWrite> _writes = new List<RegisterWrite>();
         private readonly NesRegisterChannel _pulseOne = new NesRegisterChannel(NesRegisters.PulseOneControl,
             NesRegisters.PulseOneTimerLow, NesRegisters.PulseOneTimerHigh, NesRegisters.PulseOneEnable);
@@ -24,15 +24,18 @@ namespace Arpeggio.Formats.Export
             NesRegisters.PulseTwoTimerLow, NesRegisters.PulseTwoTimerHigh, NesRegisters.PulseTwoEnable);
         private readonly NesRegisterChannel _triangle = new NesRegisterChannel(NesRegisters.TriangleLinear,
             NesRegisters.TriangleTimerLow, NesRegisters.TriangleTimerHigh, NesRegisters.TriangleEnable);
+        private readonly NesRegisterChannel _noise = new NesRegisterChannel(NesRegisters.NoiseControl,
+            NesRegisters.NoisePeriod, NesRegisters.NoiseLength, NesRegisters.NoiseEnable);
         private byte _enabledChannels;
         private bool _writeLimitExceeded;
 
         private NesRegisterCompiler(ConversionReport report)
         {
             _report = report;
+            _diagnostics = new NesConversionDiagnostics(report);
         }
 
-        /// <summary>制御列を変換して同じチップのレポートへ診断を追記する。エラーまたは strict 警告時は部分列を返さない。Noise / DPCM は現段階では無視する。</summary>
+        /// <summary>制御列を変換して同じチップのレポートへ診断を追記する。DPCM・他のエラーまたは strict 警告時は部分列を返さない。</summary>
         public static RegisterTimeline? Compile(ControlTimeline timeline, ConversionReport report)
         {
             if (timeline is null)
@@ -63,15 +66,24 @@ namespace Arpeggio.Formats.Export
         {
             _report.AddLimitation("実機周期への量子化・位相・DAC・ミキサーの差により、既存の PCM 出力とは一致しません。");
             _report.AddLimitation("Triangle の位相を NoteOn で任意値へ戻せません。停止後は DAC 値を保持し、フレームカウンターの即時クロックにも物理的遅延があります。");
+            _report.AddLimitation("Noise の LFSR seed を NoteOn で任意値へ戻せません。Pulse の high 書き込みは duty sequencer を戻しますが timer divider は戻しません。");
+            _diagnostics.InspectTracks(timeline.Tracks);
+            _diagnostics.InspectDpcmNotes(timeline);
+            if (_report.ErrorCount != 0)
+            {
+                _report.SetStatistic("registerWrites", 0);
+                return null;
+            }
             Initialize();
             foreach (ControlEvent control in timeline.Events)
             {
-                CompileEvent(control, timeline.Tracks[control.TrackIndex]);
+                CompileEvent(control, timeline.Tracks[control.TrackIndex], timeline.Instruments);
                 if (_writeLimitExceeded)
                 {
                     break;
                 }
             }
+            StopAll(timeline.EndSamples);
             _report.SetStatistic("registerWrites", _writes.Count);
             return _report.CanWrite ? new RegisterTimeline(timeline.Chip, timeline.EndSamples, _writes) : null;
         }
@@ -86,9 +98,26 @@ namespace Arpeggio.Formats.Export
             Write(0, NesRegisters.FrameCounter, NesRegisters.FiveStepInterruptDisabled);
         }
 
-        private void CompileEvent(ControlEvent control, ControlTrack track)
+        private void StopAll(long positionSamples)
         {
-            if (track.Channel != ChannelKind.Pulse && track.Channel != ChannelKind.Triangle)
+            _enabledChannels = 0;
+            Write(positionSamples, NesRegisters.Status, _enabledChannels);
+            SilenceVolume(positionSamples, _pulseOne);
+            SilenceVolume(positionSamples, _pulseTwo);
+            SilenceVolume(positionSamples, _noise);
+        }
+
+        private void SilenceVolume(long positionSamples, NesRegisterChannel channel)
+        {
+            int control = channel.Control < 0 ? NesRegisters.LengthHaltConstantVolume : channel.Control;
+            channel.Control = control & ~NesRegisters.VolumeMask;
+            Write(positionSamples, channel.ControlAddress, (byte)channel.Control);
+        }
+
+        private void CompileEvent(ControlEvent control, ControlTrack track,
+            IReadOnlyDictionary<int, ControlInstrument> instruments)
+        {
+            if (track.Channel != ChannelKind.Pulse && track.Channel != ChannelKind.Triangle && track.Channel != ChannelKind.Noise)
             {
                 return;
             }
@@ -104,23 +133,34 @@ namespace Arpeggio.Formats.Export
                 return;
             }
             bool isOnset = control.Kind == ControlEventKind.NoteOn;
-            int timer = CalculateTimer(control, track.Channel);
             if (isOnset)
             {
                 // length load より先に有効化しないと、停止中のカウンターを再ロードできない。
                 _enabledChannels |= channel.EnableMask;
                 Write(control.PositionSamples, NesRegisters.Status, _enabledChannels);
             }
-            if (track.Channel == ChannelKind.Pulse)
+            if (track.Channel == ChannelKind.Noise)
+            {
+                WriteNoise(control, instruments[control.Note!.InstrumentId], isOnset);
+                return;
+            }
+            WriteTone(control, track.Channel, channel, isOnset);
+        }
+
+        private void WriteTone(ControlEvent control, ChannelKind kind, NesRegisterChannel channel, bool isOnset)
+        {
+            int timer = CalculateTimer(control, kind);
+            if (kind == ChannelKind.Pulse)
             {
                 WritePulseControl(control, channel, isOnset);
             }
             else if (isOnset)
             {
+                _diagnostics.InspectTriangleVolume(control);
                 Write(control.PositionSamples, NesRegisters.TriangleLinear, NesRegisters.TriangleLinearHeld);
             }
-            WriteTimer(control.PositionSamples, channel, timer, isOnset);
-            if (track.Channel == ChannelKind.Triangle && isOnset)
+            WriteTimer(control, channel, timer, isOnset);
+            if (kind == ChannelKind.Triangle && isOnset)
             {
                 // high の reload flag を即時クロックへ渡し、最初の linear counter をロードする。
                 Write(control.PositionSamples, NesRegisters.FrameCounter, NesRegisters.FiveStepInterruptDisabled);
@@ -129,6 +169,10 @@ namespace Arpeggio.Formats.Export
 
         private NesRegisterChannel SelectChannel(ControlTrack track)
         {
+            if (track.Channel == ChannelKind.Noise)
+            {
+                return _noise;
+            }
             if (track.Channel == ChannelKind.Triangle)
             {
                 return _triangle;
@@ -138,7 +182,7 @@ namespace Arpeggio.Formats.Export
 
         private void WritePulseControl(ControlEvent control, NesRegisterChannel channel, bool isOnset)
         {
-            int volume = (int)Math.Round(MaximumVolume * control.Volume, MidpointRounding.AwayFromZero);
+            int volume = _diagnostics.QuantizeVolume(control);
             int dutyBits = control.Duty - (int)DutyCycle.Percent12_5;
             int value = (dutyBits << NesRegisters.DutyShift) | NesRegisters.LengthHaltConstantVolume | volume;
             if (isOnset || channel.Control != value)
@@ -148,18 +192,45 @@ namespace Arpeggio.Formats.Export
             }
         }
 
-        private void WriteTimer(long positionSamples, NesRegisterChannel channel, int timer, bool isOnset)
+        private void WriteNoise(ControlEvent control, ControlInstrument instrument, bool isOnset)
+        {
+            int volume = _diagnostics.QuantizeVolume(control);
+            int value = NesRegisters.LengthHaltConstantVolume | volume;
+            int selection = (int)Math.Round(Math.Clamp(control.MidiNote, 0, MaximumNoiseSelection), MidpointRounding.ToEven);
+            int period = (selection & NesRegisters.NoisePeriodMask) |
+                (instrument.NoiseMode == NoiseMode.Short ? NesRegisters.NoiseShortMode : 0);
+            if (isOnset || _noise.Control != value)
+            {
+                Write(control.PositionSamples, NesRegisters.NoiseControl, (byte)value);
+                _noise.Control = value;
+            }
+            if (isOnset || _noise.TimerLow != period)
+            {
+                Write(control.PositionSamples, NesRegisters.NoisePeriod, (byte)period);
+                _noise.TimerLow = period;
+            }
+            if (isOnset)
+            {
+                Write(control.PositionSamples, NesRegisters.NoiseLength, (byte)NesRegisters.LengthIndexZero);
+            }
+        }
+
+        private void WriteTimer(ControlEvent control, NesRegisterChannel channel, int timer, bool isOnset)
         {
             int low = timer & NesRegisters.TimerLowMask;
             int high = (timer >> NesRegisters.TimerHighShift) & NesRegisters.TimerHighMask;
             if (isOnset || channel.TimerLow != low)
             {
-                Write(positionSamples, channel.TimerLowAddress, (byte)low);
+                Write(control.PositionSamples, channel.TimerLowAddress, (byte)low);
                 channel.TimerLow = low;
             }
             if (isOnset || channel.TimerHigh != high)
             {
-                Write(positionSamples, channel.TimerHighAddress, (byte)(high | NesRegisters.LengthIndexZero));
+                if (!isOnset && channel != _triangle)
+                {
+                    _diagnostics.ReportPulsePhaseRestart(control, channel.TimerHigh, high);
+                }
+                Write(control.PositionSamples, channel.TimerHighAddress, (byte)(high | NesRegisters.LengthIndexZero));
                 channel.TimerHigh = high;
             }
         }
@@ -173,26 +244,11 @@ namespace Arpeggio.Formats.Export
             double maximumFrequency = ClockRate / (divider * (MinimumTimer + 1.0));
             if (originalFrequency < minimumFrequency || originalFrequency > maximumFrequency)
             {
-                AddPitchWarning(control, clampedMidiNote);
+                _diagnostics.ReportPitchClamp(control, clampedMidiNote);
             }
             double frequency = PitchTable.GetFrequency(clampedMidiNote);
             double timer = Math.Round(ClockRate / (divider * frequency) - 1, MidpointRounding.ToEven);
             return (int)Math.Clamp(timer, MinimumTimer, MaximumTimer);
-        }
-
-        private void AddPitchWarning(ControlEvent control, double clampedMidiNote)
-        {
-            ControlNote note = control.Note!;
-            _report.AddWarning(new ConversionDiagnostic("PitchClamped", "変調後の音程を NES チャンネルの連続音域へ制限しました。")
-            {
-                SourceTrack = control.TrackIndex,
-                SourceEvent = note.SourceEvent,
-                SourceTick = note.Tick,
-                OutputTrack = control.TrackIndex,
-                Original = control.MidiNote.ToString("R", CultureInfo.InvariantCulture),
-                Converted = clampedMidiNote.ToString("R", CultureInfo.InvariantCulture),
-                MaximumError = Math.Abs(control.MidiNote - clampedMidiNote)
-            });
         }
 
         private void Write(long positionSamples, ushort address, byte value)

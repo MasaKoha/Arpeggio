@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Arpeggio.Core.Tests.Formats
 {
-    /// <summary>NES 連続音域のクランプ、strict、現ランの対象外チャンネルを検証する。</summary>
+    /// <summary>NES 連続音域のクランプ、strict、DPCM 拒否を検証する。</summary>
     public sealed class NesRegisterDiagnosticsTests
     {
         private const int PulseOneTrack = 0;
@@ -99,7 +99,10 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.NotNull(control.Timeline);
             RegisterTimeline? timeline = NesRegisterCompiler.Compile(control.Timeline, control.Report);
             Assert.NotNull(timeline);
-            ConversionDiagnostic warning = Assert.Single(control.Report.Warnings);
+            ConversionDiagnostic warning = Assert.Single(control.Report.Warnings, diagnostic => diagnostic.Code == "PitchClamped");
+            ConversionDiagnostic phaseWarning = Assert.Single(control.Report.Warnings, diagnostic => diagnostic.Code == "PulsePhaseRestarted");
+            Assert.Equal(1L, phaseWarning.OccurrenceCount);
+            Assert.Equal(2, control.Report.Warnings.Count);
             Assert.Equal(FrameTicks, warning.SourceTick);
             Assert.Equal(2L, warning.OccurrenceCount);
             Assert.Equal((ConcertNote + SecondOffset).ToString(CultureInfo.InvariantCulture), warning.Original);
@@ -137,17 +140,13 @@ namespace Arpeggio.Core.Tests.Formats
             Assert.All(timeline.Writes.Where(write => write.Address == Status), write => Assert.Equal(0, write.Value));
         }
 
-        /// <summary>現ランでは Noise と DPCM を無視し、空曲と同じレジスタ列を返す。</summary>
+        /// <summary>Noise と同時に DPCM が存在しても部分成功にせず、DPCM の元位置を報告する。</summary>
         [Fact]
-        public void NoiseAndDpcmAreIgnoredInThisRun()
+        public void NoiseAndDpcmTogetherReturnDpcmError()
         {
             const int NoiseInstrument = 3;
             const int DpcmInstrument = 4;
             Song song = SongFactory.Create(ChipKind.Nes, lengthTicks: FrameTicks * 2);
-            ControlTimelineResult emptyControl = CreateControl(song);
-            Assert.NotNull(emptyControl.Timeline);
-            RegisterTimeline? emptyTimeline = NesRegisterCompiler.Compile(emptyControl.Timeline, emptyControl.Report);
-            Assert.NotNull(emptyTimeline);
             song.Instruments.Add(new NesNoiseInstrument { Id = NoiseInstrument });
             song.Instruments.Add(new NesDpcmInstrument { Id = DpcmInstrument });
             song.Tracks[NoiseTrack].Notes.Add(new Note { DurationTicks = FrameTicks, InstrumentId = NoiseInstrument });
@@ -155,9 +154,12 @@ namespace Arpeggio.Core.Tests.Formats
             ControlTimelineResult control = CreateControl(song);
             Assert.NotNull(control.Timeline);
             RegisterTimeline? timeline = NesRegisterCompiler.Compile(control.Timeline, control.Report);
-            Assert.NotNull(timeline);
-            Assert.Equal(emptyTimeline.Writes.ToArray(), timeline.Writes.ToArray());
-            Assert.Empty(control.Report.Errors);
+            Assert.Null(timeline);
+            ConversionDiagnostic error = Assert.Single(control.Report.Errors);
+            Assert.Equal("UnsupportedDpcm", error.Code);
+            Assert.Equal(DpcmTrack, error.SourceTrack);
+            Assert.Equal(0L, error.SourceEvent);
+            Assert.Equal(0L, error.SourceTick);
         }
 
         /// <summary>GB 制御列を NES レジスタへ誤変換しない。</summary>
