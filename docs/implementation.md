@@ -1238,6 +1238,94 @@ A1 / A2 の予定コードとテストコードは追加済み。受け入れ条
 - `tests/Arpeggio.Core.Tests/Formats/NesRegisterDiagnosticsTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/RegisterTimelineTests.cs`
 
+# M3-E1 / E2 実装記録（2026-09-08）
+
+## M3-E 設計との差
+
+- 設計書は変更しない。未指定の中間 API は `MidiReader.Read(Stream, ConversionReport)` → 不変 `MidiFile`（入力エラー時 null）、`MidiNoteCollector.Collect(MidiFile, ConversionReport)` → 不変ノート列とする。診断は同じ MIDI レポートへ追記する。strict は保存可否を拒否するが、中間解析は警告後も継続し、後続の全診断を収集できるようにする。既存エラーがある場合は部分結果を返さない。
+- E1 の実時間上限を E3 待ちにしないため、安定整列した Tempo と EOT に対する checked 整数分子の時間積算だけを E1 で実装する。出力 BPM・量子化・テンポ診断・任意時刻照会は E3 に残す。
+- 「既知固定長 meta」は Sequence Number=2、Channel Prefix=1、MIDI Port=1、EOT=0、Tempo=3、SMPTE Offset=5、Time Signature=4、Key Signature=2 byte と補完する。未使用 payload は長さ検証後に読み捨て、全イベントの元番号と資源計数には含める。
+- 音量 0 の On も FIFO 対応用に保持し、完成ノートの公開時に省略する。sustain 中にキーを離した旋律も入力終端まで鳴っていれば `UnclosedNote` の対象とする。打楽器は元 Off の有無と CC120 の上限 tick を別に保持し、固定実時間 gate の確定は E5 に残す。
+
+- E2 の補完判断: 打楽器の同 tick On / Off は「元 gate を音長に使わない」専用規則を優先して保持する。同 tick CC120 は最終 gate も 0 になるため破棄する。`ControllerDuringNoteIgnored` は E2 では完成済みの旋律区間に対して確定し、同 tick 終端・ゼロ長・音量 0 を除く。打楽器は元 Off 後も固定 gate が鳴るため、固定 gate が確定する E5 で元 MIDI の CC7 / CC11 / CC121 と照合する必要がある（本ランでドラム表・実時間 gate を先行実装しない）。
+
+## M3-E1 実装・静的確認
+
+- SMF format 0 / 1、PPQN、MThd 拡張、MTrk 宣言数、未知 chunk、全 channel message 長、トラック独立 running status、SysEx / meta 後の status リセット、4 byte VLQ、既知固定長 meta、必須 EOT / 後続禁止、port 0 制約を実装した。
+- 入力はシーク不要。総 byte とチャンク残量を検証し、未使用 payload は固定 4096 byte バッファで読み捨てる。入力 32 MiB・イベント 1000000 件・正 velocity の On 250000 件・実時間 1800 秒を拒否境界にした。Stream は閉じず、I/O 例外を伝播する。
+- channel message / Tempo / EOT を不変の元位置付きイベントとして安定整列する。スキップしたイベントも資源数・元イベント番号に含める。track 0 の最初の非空名を strict UTF-8 / Latin-1 で復号する。
+- 正常・不正入力・資源上限のテストコードを追加。全 byte 切断、短い読み取り、読み取り失敗、最大許容量、同 tick の別トラック Tempo、32 bit 超の tick を含む。1800 秒の固定 VLQ は独立計算で E9 BC 00 と照合した。
+- E1 のコード・テスト作成と静的読解を先に終えてから E2 に着手した。コンパイル・テスト成功を確認済みとは扱わない。
+
+## M3-E2 実装・判断
+
+- `MidiNoteCollector` は reader の確定順を変更せず処理する。全 MTrk に共有される 16 channel の Program / CC7 / CC11 / sustain と、pitch ごとの FIFO を持つ。完成列は On の元順序で返し、次段の量子化・声割り当てに必要な出自を保つ。
+- velocity 0 は Off。同音再打鍵、別 MTrk の Off、pedal 中の解放音と押下キーを区別する。CC120 は pedal を無視して当該 channel を即停止、CC123 は全キーの Off、CC121 は CC7=100 / CC11=127 / sustain off とし Program・押下キーを維持する。
+- 旋律の未終了音は曲入力終端で閉じ、不明 Off と元ゼロ長も診断する。音量 0 の On を FIFO の途中から消さないため、後の Off が別の有音 On を停止することを防ぐ。
+- On 時点の Program / CC7 / CC11 / velocity、4 bit 化前の実効音量と整数 Volume を不変コピーする。実効音量は整数積を作ってから共通分母で割り、同じ積の発音の優先順位が浮動小数点演算順で変わることを防ぐ。
+- 発音中の CC7 / CC11 / CC121 の音量変更は次の On から適用する。完成旋律区間と CC 列を線形走査し、同 tick 終端・元ゼロ長・無音・別 channel を `ControllerDuringNoteIgnored` に誤算入しない。pan、非零 bank、中央以外の bend、非零圧力／CC1、その他の非対応 CC を規定コードで診断する。
+- 打楽器の元 Off と CC120 上限を分離し、元 Off 後に届く CC120 も最初の一回だけ保持する。元 gate の欠落に旋律用の不明 Off／未終了警告を付けない。ドラム表・音色・実時間固定 gate・DrumGateReplaced は E5 に接続する。
+- FIFO の On は一度だけ取り出す。pedal 解放・全キー Off・全音停止は対象の発音だけを処理し、全履歴を CC ごとに再走査しない。公開コレクションは独立配列の読み取り専用ビューとした。
+
+## M3-E テストコード
+
+7 テストクラス、56 メソッド／164 ケースと、入力作成・シーク不能 Stream の補助 2 型を追加した。ケース数は属性から静的集計した値であり、テストランナーの検出件数ではない。
+
+| ファイル | 検証内容 |
+|---|---|
+| MidiReaderTests | format 0 / 1、PPQN 1 / 480 / 32767、全 channel message と running status、16 channel、元イベント番号、MTrk 安定統合、拡張 header／未知 chunk、最大 VLQ・32 bit 超 tick、固定長 meta、Track Name 復号、Stream 所有権・I/O・不変性 |
+| MidiReaderInvalidInputTests | 非対応 header／division／system status、track count、5 byte VLQ、データ MSB、running status の境界、meta 長、EOT、port 非零、過大長、全 byte 切断、重複／過不足 chunk、先行エラー |
+| MidiReaderLimitsTests | 256 MTrk、32 MiB と 1 byte 超過、全 meta 込み 1000000 イベント、250000 On、1800 秒の両側、checked 実時間分子の overflow、別トラック・同 tick Tempo |
+| MidiNoteCollectorTests | 同音 FIFO、MTrk 横断、channel 独立、velocity 0、最遅 EOT、不明 Off と元位置、元ゼロ長・同 tick 順、strict の全診断、収集間の状態分離・不変性 |
+| MidiSustainTests | pedal 閾値・再打鍵・押下キーの維持、別 MTrk・最遅 EOT、CC120 他声維持、CC123、CC121 の既定値復元と Program 維持、同 tick pedal 順 |
+| MidiControllerTests | velocity 1 / 64 / 127、CC7×CC11、最低 1、無音 On の FIFO、同 tick Program／CC、完成区間に基づく警告、sustain 中 CC、pan／bank／bend／圧力／RPN 等、同音量積の完全一致 |
+| MidiDrumCollectionTests | 不明 Off／未終了の警告除外、元ゼロ gate の保持、sustain／CC123、元 Off 後の CC120 上限、同 tick 即停止 |
+
+PCM、レジスタ再合成、外部エミュレータ、ファイル保存を新規テストの経路に入れていない。アロケーション計測テストは追加していない。
+
+## M3-E 静的確認
+
+- 追加型の定義・namespace、使用する BCL の .NET 10 ローカル参照 XML、既存の xUnit 呼び出しを照合した。C# の括弧対応、summary XML、公開メンバーへの summary 隣接、ブロック namespace、末尾空白を検査した。
+- 開始時の SHA-256 と比較し、既存ファイルの変更は `docs/implementation.md` だけ。Core・設計書 2 ファイル・既存 Formats・既存テスト・プロジェクト参照を変更していない。Formats の依存は Core と BCL のまま。
+- git 操作、Unity 起動、コンパイル、`dotnet build` / `dotnet test`、PCM 生成は行っていない。開始から 30 分以内で作業を終了した。
+
+## M3-E 未完了
+
+- E1 / E2 の予定実装と上記テストコードは追加済み。受け入れの実行確認は依頼者側に残る。`dotnet build Arpeggio.slnx` のエラー・警告ゼロ、既存 812 件と追加 164 ケース（静的集計）の全成功・実際の検出件数は未確認。
+- 打楽器の固定実時間 gate 内の `ControllerDuringNoteIgnored` は E5 で確定する。E2 では元イベント・On 設定・元 Off・CC120 を保持した。上記「設計との差」に記した分担判断は依頼者の確認対象。
+- E3 の任意 tick 実時間照会・出力 BPM・テンポ診断・量子化、E4 の声割り当て、E5 の音色／ドラム固定 gate、E6 の Importer・Song 検証・JSON 保存は本ランの対象外。
+
+## M3-E 変更ファイル一覧
+
+更新:
+
+- `docs/implementation.md`
+
+新規実装:
+
+- `src/Arpeggio.Formats/Midi/MidiReader.cs`
+- `src/Arpeggio.Formats/Midi/MidiBinaryInput.cs`
+- `src/Arpeggio.Formats/Midi/MidiReadException.cs`
+- `src/Arpeggio.Formats/Midi/MidiDurationValidator.cs`
+- `src/Arpeggio.Formats/Midi/MidiMessageKind.cs`
+- `src/Arpeggio.Formats/Midi/MidiEvent.cs`
+- `src/Arpeggio.Formats/Midi/MidiFile.cs`
+- `src/Arpeggio.Formats/Midi/MidiNoteCollector.cs`
+- `src/Arpeggio.Formats/Midi/MidiChannelState.cs`
+- `src/Arpeggio.Formats/Midi/MidiPendingNote.cs`
+- `src/Arpeggio.Formats/Midi/MidiNote.cs`
+
+新規テスト・補助型:
+
+- `tests/Arpeggio.Core.Tests/Formats/MidiReaderTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiReaderInvalidInputTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiReaderLimitsTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiNoteCollectorTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiSustainTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiControllerTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiDrumCollectionTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiFileFixture.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiFragmentedStream.cs`
 # M3-C2 実装記録（2026-09-08）
 
 ## M3-C2 設計との差
