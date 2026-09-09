@@ -1,5 +1,6 @@
 using System;
 using Arpeggio.Core.Document;
+using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Tests.Analysis;
 using Xunit;
@@ -12,10 +13,12 @@ namespace Arpeggio.Core.Tests.Render
     {
         /// <summary>全チップでウォームアップ後の 1 秒間に管理ヒープを割り当てない。</summary>
         [Theory]
-        [InlineData(ChipKind.Nes)]
-        [InlineData(ChipKind.GameBoy)]
-        [InlineData(ChipKind.Snes)]
-        public void Render_OneSecondWithTransitionsAllocatesZeroBytes(ChipKind chip)
+        [InlineData(ChipKind.Nes, false)]
+        [InlineData(ChipKind.GameBoy, false)]
+        [InlineData(ChipKind.Snes, false)]
+        [InlineData(ChipKind.GameBoy, true)]
+        [InlineData(ChipKind.Snes, true)]
+        public void Render_OneSecondWithTransitionsAllocatesZeroBytes(ChipKind chip, bool useOptionalMacro)
         {
             const int SampleRate = 44100;
             const int StereoChannels = 2;
@@ -23,6 +26,20 @@ namespace Arpeggio.Core.Tests.Render
             const int SongLengthTicks = 48;
             const int LoopCount = 16;
             Song song = TestSongFactory.CreateActiveSong(chip, SongLengthTicks);
+            if (useOptionalMacro)
+            {
+                foreach (Instrument instrument in song.Instruments)
+                {
+                    if (instrument is GbPulseInstrument pulse)
+                    {
+                        pulse.DutyMacro = new Macro { Values = new[] { 1, 2, 3, 4 }, LoopIndex = 0 };
+                    }
+                    if (instrument is SnesSampleInstrument sample)
+                    {
+                        sample.VolumeMacro = new Macro { Values = new[] { 12, 8, 4, 0 }, LoopIndex = 0 };
+                    }
+                }
+            }
             var renderer = new SongRenderer(song, new RenderSettings(SampleRate, LoopCount, 0));
             var samples = new float[BufferFrames * StereoChannels];
             // 静的テーブルの初回初期化や最初のノート遷移・マクロ進行を計測区間に入れないため、1 秒ぶん先に鳴らす。

@@ -131,6 +131,43 @@ namespace Arpeggio.Core.Tests.Cli
             });
         }
 
+        /// <summary>未設定の optional デューティを指定し、部分更新後も保持して解除できる。</summary>
+        [Fact]
+        public void GameBoyDutyMacroCanBeSetPreservedAndCleared()
+        {
+            WithSong("gameboy", path =>
+            {
+                Assert.Equal(0, Run("instrument", "set", path, "--id", "1", "--duty-macro", "1,2,3,4/1"));
+                Assert.Equal(0, Run("instrument", "set", path, "--id", "1", "--name", "updated"));
+                var instrument = Assert.IsType<GbPulseInstrument>(SongSerializer.Load(path).Instruments[0]);
+                Assert.NotNull(instrument.DutyMacro);
+                Assert.Equal(new[] { 1, 2, 3, 4 }, instrument.DutyMacro.Values);
+                Assert.Equal(1, instrument.DutyMacro.LoopIndex);
+                Assert.Equal(0, Run("instrument", "set", path, "--id", "1", "--duty-macro", "null"));
+                Assert.Null(Assert.IsType<GbPulseInstrument>(SongSerializer.Load(path).Instruments[0]).DutyMacro);
+                Assert.DoesNotContain("\"dutyMacro\"", File.ReadAllText(path));
+            });
+        }
+
+        /// <summary>未設定の SNES 音量マクロを指定し、プリセット差替えと部分更新後も保持して解除できる。</summary>
+        [Fact]
+        public void SnesVolumeMacroSurvivesPresetAndCanBeCleared()
+        {
+            WithSong("snes", path =>
+            {
+                Assert.Equal(0, Run("instrument", "set", path, "--id", "1", "--volume-macro", "12,8,4,0/1"));
+                Assert.Equal(0, Run("instrument", "set", path, "--id", "1", "--preset", "strings", "--name", "updated"));
+                var instrument = Assert.IsType<SnesSampleInstrument>(SongSerializer.Load(path).Instruments[0]);
+                Assert.NotNull(instrument.VolumeMacro);
+                Assert.Equal(new[] { 12, 8, 4, 0 }, instrument.VolumeMacro.Values);
+                Assert.Equal(1, instrument.VolumeMacro.LoopIndex);
+                Assert.Equal("strings", instrument.Preset);
+                Assert.Equal(0, Run("instrument", "set", path, "--id", "1", "--volume-macro", "null"));
+                Assert.Null(Assert.IsType<SnesSampleInstrument>(SongSerializer.Load(path).Instruments[0]).VolumeMacro);
+                Assert.DoesNotContain("\"volumeMacro\"", File.ReadAllText(path));
+            });
+        }
+
         private static int Run(params string[] arguments)
         {
             return CliExecution.Run(arguments);

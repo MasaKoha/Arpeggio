@@ -48,6 +48,7 @@ namespace Arpeggio.Core.Document
                     ValidateDuty(pulse.Duty);
                     SongValidator.Require(pulse.InitialVolume >= 0 && pulse.InitialVolume <= MaximumVolume, "初期音量は 0〜15 です。");
                     SongValidator.Require(pulse.EnvelopeStepFrames >= 0, "エンベロープ間隔は 0 以上です。");
+                    ValidateMacro(pulse.DutyMacro, (int)DutyCycle.Percent12_5, (int)DutyCycle.Percent75);
                     ValidateMacro(pulse.VolumeMacro, 0, MaximumVolume);
                     ValidateMacro(pulse.ArpeggioMacro);
                     ValidateMacro(pulse.PitchMacro);
@@ -155,6 +156,7 @@ namespace Arpeggio.Core.Document
             ValidateEmbeddedSample(sample);
             ValidateMacro(sample.ArpeggioMacro);
             ValidateMacro(sample.PitchMacro);
+            ValidateMacro(sample.VolumeMacro, 0, MaximumVolume);
         }
 
         private static void ValidatePreset(SnesSampleInstrument sample)

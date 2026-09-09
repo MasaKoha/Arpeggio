@@ -2299,3 +2299,82 @@ A1 の実装上の残タスクはなし。受け入れ完了には依頼者／Cl
 - `tests/Arpeggio.Core.Tests/Sfx/SfxParameterTestJson.cs`
 - `tests/Arpeggio.Core.Tests/Sfx/SfxParameterValidatorTests.cs`
 - `docs/implementation.md`
+
+
+# SFX-A2 実装記録（2026-09-09）
+
+## SFX-A2 設計との差
+
+- CLI はシリアライズ後のキーの存在でオプション可否・kind 切替の共通項目を判定している。新マクロの null 省略により未設定状態での指定・保持が失敗するため、GbPulse の dutyMacro に限り編集用 JSON に null のキーを補う。保存形式は設計どおり省略する。通常音色パネルの全面改修は行わない。
+
+## SFX-A2 実装・テストコード
+
+- GbPulseInstrument の JSON 末尾に optional DutyMacro を追加。null は省略し、未指定・null・空列は従来 Duty を使う。既存 Validator の1〜4・LoopIndex検証、GbPulseSynthesizer、Formats ControlTrackCursor に接続した。ハードウェア包絡・位相・VGMレジスタ生成の計算順は変更していない。
+- `GameBoyDutyMacroTests`: 全4段階・先頭適用・終端保持・LoopIndex、連続位相の固定Duty PCMとの一致、両Pulseの制御値とVGM固定レジスタ値・書込時刻・再トリガー抑止、制御スナップショットの隔離。null/空列は旧波形・ハードウェア包絡の独立計算に対するPCM全バイト一致と、VGM全バイトの等価性を検証する。
+- 同テストで旧音色JSONの固定文字列との全UTF-8バイト一致、新プロパティの末尾追加・明示null省略・version1往復・独立コピー・範囲外値/LoopIndex拒否を検証する。
+- `InstrumentCommandsTests`: 未設定からの指定、名前だけの部分更新による保持、null解除。`OptionalInstrumentMacroToolsTests`: MCPのJSON全体置換・保存・再オープン。`OptionalInstrumentMacroTests`: DAWの入力コピー隔離・音色選択・名前編集・マクロ編集・Undo/Redo・正本保存。
+- `SongRendererAllocationTests` の既存3チップケースを保持し、DutyMacroありのGBケースを追加。発音・マクロ進行・有限ループを通る計測は既存の AllocationCollection 内で行う。
+
+## SFX-A2 未完了
+
+実装・テストコード作成済み。A2 の入力・合成・Formats・保存・通常編集の接続を静的確認してから A3 の実装へ進めた。ビルド・テスト・PCM/VGM実測による受け入れは未完了で、依頼者／Claude Code の実行待ち。
+
+# SFX-A3 実装記録（2026-09-09）
+
+## SFX-A3 設計との差
+
+- A2 と同じ CLI のキー存在判定を SnesSample の volumeMacro にも補完する。ApplyPreset は既存実装がマクロを変更しないため、処理は変更せず保持をテストで固定する。ADSR・DSP音量丸め・BRR・補間・ミキサー・NoteOffの計算順は変更しない。
+
+## SFX-A3 実装・テストコード
+
+- SnesSampleInstrument の JSON 末尾に null 省略の optional VolumeMacro を追加。既存 Validator の0〜15・LoopIndex検証と SnesVoiceSynthesizer の ConfigureMacros の volume 引数へ接続した。未指定・null・空列は従来音量、値ありは既存の Note.Volume／VolumeSlide と0〜15の乗算後、既存の0〜127丸め・ADSR乗算を通る。
+- `SnesVolumeMacroTests`: 全量保持ADSR=(15,0,7,0) の初回2サンプルと `[12,8,4,0]`、Note.Volume=15/9、最終0保持を独立したDSP期待値で検証。null/空列は追加前のDSP音量計算との全バイト比較。ゼロ中もサンプル位置を進め、LoopIndexで音量復帰しても位相を再開しないことと、再発音の先頭復帰を検証する。
+- 同テストで6内蔵波形・DSPノイズ・埋め込み素材・プリセットのnull/空列/全量マクロ、既存ピッチ・アルペジオ・VolumeSlide・NoteOffを含むPCM全バイト等価を44100/48000/44101 Hzで検証する。
+- `SnesVolumeMacroRenderTests`: 8tickの包絡列と終端ゼロフレームをSongRendererへ接続。トーン/DSPノイズ、tail=0/0.05、44100/48000/44101 Hz、DSPレート変換の履歴が消えた後と本体最終サンプルの0、1/733/1024フレームでの分割RenderとReset後の再生の全バイト一致。
+- `SnesVolumeMacroInstrumentTests`: 固定した旧音色JSONの全バイト不変、末尾追加・null省略・version1往復・独立コピー、0/15の受理と範囲外・null配列・不正LoopIndex拒否、全16音色のApplyPreset後のマクロ保持。
+- CLIの未設定からの指定・プリセット差替え保持・解除、MCPのJSON置換・保存・再オープン、DAWのコピー・選択・通常編集・履歴・正本保存、および既存プリセット選択テストへVolumeMacro保持を追加した。
+- `LegacySfxMacroCompatibilityTests`: 旧8プリセット×GB/SNES、44100/48000 Hz、tail=0/0.05でnullの保存往復と空列を比較し、float PCMとWAVを全バイト照合する。旧プリセットfactory自体は変更していない。
+- `SongRendererAllocationTests` にVolumeMacroありのSNESケースを追加し、NoteOn・AdvanceFrame・Render・ループの既存GC0計測へ含める。配列は計測前に用意する。
+
+## SFX-A2 / A3 静的確認
+
+- 指定設計、M2-A/SFXとSNES/Formatsの既存判断、Sfx・Instruments・VoiceModulation、CLI/MCP/DAWの入力・コピー・保存経路を参照した。
+- 追加参照型の定義・namespaceと公開APIを検索照合し、MemoryMarshal.AsBytes / JsonIgnoreCondition.WhenWritingNull と xunit のコレクション用assertのローカル参照XMLを確認した。
+- 変更17 C#ファイルの括弧対応・doc XML・public summary隣接を静的確認。新規7ファイルは1ファイル1型・ブロックnamespace。禁止省略名、Unity lifecycle API、Assert.Single(...Where(...)) の追加なし。
+- 音声側の変更は既存ConfigureMacros引数への接続だけ。Render / AdvanceFrame / NoteOnに配列生成・LINQ・追加リソース所有を持ち込んでいない。
+- 開始時のSHA-256との照合で変更禁止の3設計書、全csproj、SfxPresetFactory/カタログ、ADSR/BRR/Gaussian/ミキサー/VoiceModulation/SongRenderer本体の不変を確認した。Coreの依存、JSON version、既存テストの期待値は変更していない。
+- 作業は指定worktree内に限定。git操作・コンパイル・dotnet build/test・アプリ起動は行っていない。
+
+## SFX-A3 未完了・未実行の確認事項
+
+実装上の残タスクはなし。受け入れ完了には依頼者／Claude Codeによる次の実行確認が必要。
+
+- `dotnet build Arpeggio.slnx` のコンパイル成功・警告ゼロと、xunitアナライザを含む全既存・追加テストの成功。
+- GBの4段階PCM/制御列/VGM、SNESのADSR積・終端0・分割再生・保存編集境界、両追加マクロのGC0実測。
+- 旧8プリセット×3チップの旧エンジンで採取した基準PCM/JSONとの実測比較。今回の独立計算テストとnull/空列等価テストは追加済みだが、旧エンジンの全プリセットgoldenを採取・実行したわけではない。
+- 必要な試聴・DAW実機確認。静的確認をビルド成功・テスト成功・旧音の実測一致として扱わない。
+
+## SFX-A2 / A3 変更ファイル一覧
+
+既存更新11ファイル、新規7ファイル、計18ファイル。
+
+```text
+src/Arpeggio.Core/Instruments/GbPulseInstrument.cs
+src/Arpeggio.Core/Instruments/SnesSampleInstrument.cs
+src/Arpeggio.Core/Document/InstrumentValidator.cs
+src/Arpeggio.Core/Synthesis/GameBoy/GbPulseSynthesizer.cs
+src/Arpeggio.Core/Synthesis/Snes/SnesVoiceSynthesizer.cs
+src/Arpeggio.Formats/Export/ControlTrackCursor.cs
+src/Arpeggio.Cli/InstrumentOptions.cs
+tests/Arpeggio.Core.Tests/Formats/GameBoyDutyMacroTests.cs（新規）
+tests/Arpeggio.Core.Tests/Synthesis/Snes/SnesVolumeMacroTests.cs（新規）
+tests/Arpeggio.Core.Tests/Instruments/SnesVolumeMacroInstrumentTests.cs（新規）
+tests/Arpeggio.Core.Tests/Render/SnesVolumeMacroRenderTests.cs（新規）
+tests/Arpeggio.Core.Tests/Sfx/LegacySfxMacroCompatibilityTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/OptionalInstrumentMacroTests.cs（新規）
+tests/Arpeggio.Core.Tests/Mcp/OptionalInstrumentMacroToolsTests.cs（新規）
+tests/Arpeggio.Core.Tests/Render/SongRendererAllocationTests.cs
+tests/Arpeggio.Core.Tests/Cli/InstrumentCommandsTests.cs
+tests/Arpeggio.Core.Tests/Daw/SnesInstrumentPresenterTests.cs
+docs/implementation.md
+```
