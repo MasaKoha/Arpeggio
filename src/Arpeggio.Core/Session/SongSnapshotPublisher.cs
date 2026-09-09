@@ -20,6 +20,7 @@ namespace Arpeggio.Core.Session
             current.LoopStartTick = candidate.LoopStartTick;
             current.Instruments = PreserveInstruments(current.Instruments, candidate.Instruments);
             current.SnesEcho = candidate.SnesEcho;
+            current.Sfx = candidate.Sfx;
             if (current.Tracks.Count != candidate.Tracks.Count)
             {
                 current.Tracks = candidate.Tracks;
