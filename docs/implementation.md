@@ -2588,3 +2588,86 @@ tests/Arpeggio.Core.Tests/Sfx/SfxSnesSongCompilerTests.cs
 tests/Arpeggio.Core.Tests/Sfx/SfxCompiledAudioTests.cs
 docs/implementation.md
 ```
+
+# SFX-D1 実装記録（2026-09-09）
+
+## SFX-D1 設計との差
+
+- 公開APIの具体形は未指定のため、`SfxParameterPresetCatalog.GetAll(chip)` / `Get(kind, chip)` / `Parse(name)` と、完全初期値・対象チップを持つ専用descriptionを追加する。用途識別子だけ既存の `SfxPresetKind` を共有し、旧カタログ・factoryは変更しない。Song生成は既存 `SfxSongCompiler.Compile`、定義・指紋の付与はC2の責務を維持する。
+
+## SFX-D1 実装・静的確認
+
+- 八用途の完全初期値を固定表示順で提供。包絡のフレーム数を6桁AwayFromZeroの秒数へ変換し、hitの三チップ固有ノイズとexplosionのSNES rate18を適用する。無効レイヤーも共通初期値を保持する。
+- `SfxParameterPresetCatalogTests` に全24組み合わせの全フィールド独立期待値、Song検証・保存往復・固定長・Effects空、44100/48000Hzの有限・非無音・非クリップPCM、正式名・別名・不正入力、旧八種と十六音色の名前および旧factory呼び出しの不変を検証するコードを追加。
+- 型定義・namespace・既存公開API・括弧・表の秒数と終端長を静的照合。D1の実装とテストコード作成を完了してからD2へ進む。コンパイル・テスト・音声実測は実行していない。
+
+## SFX-D1 未完了・未実行の確認事項
+
+実装上の残タスクはなし。依存先B2/B3を含むレビュー、警告ゼロのビルド、全既存・追加テスト、旧24種の採取済みJSON/PCM基準とのバイト比較は依頼者／Claude Codeの実行待ち。
+
+## SFX-D1 変更ファイル一覧
+
+- `src/Arpeggio.Core/Sfx/SfxParameterPresetDescription.cs`（新規）
+- `src/Arpeggio.Core/Sfx/SfxParameterPresetCatalog.cs`（新規）
+- `tests/Arpeggio.Core.Tests/Sfx/SfxParameterPresetCatalogTests.cs`（新規）
+- `docs/implementation.md`
+
+# SFX-D2 実装記録（2026-09-09）
+
+## SFX-D2 設計との差
+
+- 具体APIは未指定のため、`SfxParameterRandomizer.Randomize(current, chip, category, seed)` / `Mutate(current, chip, seed, strength, locks)` を純粋な候補生成として提供する。結果は完全パラメータ、同値判定、値の変更一覧、成功時だけの乱数出自を返す。randomizeのsourcePresetだけ結果で指定し、mutateでは呼び出し側が既存sourcePresetを保持する。保存・履歴への適用は未実装のC2および後続E2/F1の責務とし、本ランでは保存形式との往復を統合テストで固定する。
+- ロックは現在チップの正規パスだけ受理し、重複は先頭を残して除く。比較はOrdinal、保存順は入力順。strengthは有限の0〜1をそのまま計算・保存し、パラメータの6桁規則はstrengthへ拡張しない。
+- チップ固有duty/dutySweepはtone、noise選択/noiseSlideはnoiseの有効性に従う。無効レイヤーやSNESの非対応スロットでも必ず一回消費する。punch補正は6桁正規化後のsustainで判定し、変更一覧に補正前の抽選値も残す。同値結果では出自更新を返さない。
+
+## SFX-D2 実装・テストコード
+
+- `SfxRandomGenerator` は独自xorshift32。uint32の13/17/5シフト、seed0の置換、2^32での除算を固定し、System.Random・日時・文字列hashを生成式に使わない。乱数とパラメータ変換はオフラインの候補生成に限定した。
+- `SfxCategoryRandomization` はカテゴリ初期値から15回、`SfxParameterMutation` は現在値から22回を固定順で消費する。anyだけ先頭で一回消費し、要求anyと選択後の正式sourcePresetを分ける。pickup/power-upは正式名へ正規化する。
+- `SfxRandomizationCandidate` が仕様Catalogの読み取り・置換・範囲・選択肢とValidatorの6桁正規化を利用する。抽選と適用の責務を分け、ロックや無効レイヤーによって乱数位置を変えない。dutyの等距離は小さい段階、整数の中間点はAwayFromZero。repeatとジャンプの0保持、有効repeatの最低一フレーム、独立したsustain/punch補正を実装した。
+- 成功時はoperation/algorithmVersion/seedと、randomizeのcategory、またはmutateのstrength/独立した読み取り専用locks/baseParametersHashを返す。同値時はChanged=false・元の正規化パラメータ参照・出自更新null。変更一覧は元値と最終値を持ち、補正した場合はCorrectedFromへ補正前の抽選値を残す。randomizeによるenabledやnoiseMode等の変更も一覧に含む。
+- `SfxRandomGeneratorTests`: seed1の22整数出力、seed0/最大値の固定先頭列、0置換と実数への正確な除算。
+- `SfxCategoryRandomizationTests`: seed1の全8×3の完全パラメータ黄金値、無効レイヤーの保持、初期値からの生成、別名、anyの追加消費・全八区間の表示順、seed端点でのカテゴリ性格、同じ結果への再適用no-op。
+- `SfxParameterMutationTests`: seed0/1/最大値の全22スロットの独立黄金値、三チップの幅、SNESの非対応スロット消費、既定強度0.1、正確なduty中間点。
+- `SfxRandomizationLocksTests`: 全72正規パスの単独ロックと後続値の一致、三チップの無効レイヤー、punch優先補正・ロック済みpunchに対するsustain補正・両ロック・両レイヤーの独立補正、全ロック/strength0/丸め後同値、ロック配列の隔離と重複除去。
+- `SfxRandomizationBoundsTests`: 離散機能の0保持、repeatの最低秒数、各種飽和、正規化後の半フレーム境界、正負整数と深さの正確な中間点、三チップの21番目のノイズ抽選、非有限strength・不正パス・不正現在値・不正チップの拒否。
+- `SfxRandomizationProvenanceTests`: 三チップ×seed端点の生成→定義付与→JSON往復→出自から再現、mutateの変更前hash・全パラメータ・生成列指紋、既存SongHistoryでのUndo/Redoスナップショットと出自復元、sourcePreset保持、手動tweak後も最後の乱数記録が履歴情報として保存可能なこと。C2のEditSessionへの自動適用を実装したテストではない。
+
+## SFX-D1 / D2 最終静的確認
+
+- 新規17 C#ファイルの型定義・namespace・公開API、括弧、doc XML、public summary隣接、1ファイル1型・ブロックnamespace、省略名・Unity lifecycle API・Assert.Single内Whereの不使用を確認した。使用するBCLとxunitのAPIをローカル参照XMLで照合した。
+- 黄金値はアプリや本実装を呼ばず、独立した整数・スカラー計算で固定した。二進数で正確な中間値となるPRNG出力からseedを逆算し、整数・duty・depthの丸めを固定する。テスト期待値を実装の乱数器から生成しない。
+- 開始時のSHA-256との照合で、既存C#・csproj・変更禁止の三設計書、計533ファイルが不変。旧八種factory、十六SNES音色と素材生成、合成・JSON保存・CLI/MCP/DAW・依存設定・既存テスト期待値を変更していない。JSON version=1、CoreはBCLのみ。
+- Render/AdvanceFrame/NoteOnへ変更・アロケーション・LINQを追加していない。既存GC0テストを維持し、オフライン候補生成へGC0を要求する新しい計測は追加していない。
+- 作業ディレクトリ外への書き込み、git操作、コンパイル、dotnet build/test、アプリ起動、PCM生成・試聴は実行していない。静的確認をコンパイル成功・警告ゼロ・テスト成功・旧音の実測一致として扱わない。
+
+## SFX-D2 未完了・未実行の確認事項
+
+D1→D2の実装・テストコード作成と静的確認は完了。実装上の残タスクはなし。受け入れ完了には依頼者／Claude Codeによる以下の実行確認が必要。
+
+- 依存先A1/B2/B3/C1を含むレビューと、`dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunitアナライザと全既存・追加テストの成功。
+- 全24パラメータプリセットのPCM（有限・非無音・非クリップ）と、旧24プリセットの採取済みJSON/PCM基準との全バイト比較、十六音色の回帰、既存GC0の実測。
+- macOS/Windowsで固定PRNG・正規化パラメータ・整数マクロ列の黄金値一致。浮動小数点のPow/Sinを含む生成決定性は実行確認待ち。
+- 保存・履歴の実運用への接続は分割表のC2/E2/F1へ申し送る。呼び出し側はChanged=falseで保存・履歴・出自更新を行わず、mutateのSourcePreset=nullでは元のsourcePresetを維持する。Randomization=nullも既存のlastRandomizationを維持する意味であり、消去要求ではない。生成診断は候補パラメータを既存SfxSongCompilerへ渡して取得する。
+
+## SFX-D2 変更ファイル一覧
+
+新規Core7ファイル、テスト7ファイル、実装記録1ファイル。D1との合計は新規Core9・テスト8・既存文書1の18ファイル。
+
+```text
+src/Arpeggio.Core/Sfx/SfxRandomGenerator.cs
+src/Arpeggio.Core/Sfx/SfxParameterRandomizer.cs
+src/Arpeggio.Core/Sfx/SfxCategoryRandomization.cs
+src/Arpeggio.Core/Sfx/SfxParameterMutation.cs
+src/Arpeggio.Core/Sfx/SfxRandomizationCandidate.cs
+src/Arpeggio.Core/Sfx/SfxParameterRandomizationResult.cs
+src/Arpeggio.Core/Sfx/SfxParameterChange.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxRandomGeneratorTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxCategoryRandomizationTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxParameterMutationTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationLocksTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationBoundsTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationProvenanceTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationTestData.cs
+docs/implementation.md
+```
