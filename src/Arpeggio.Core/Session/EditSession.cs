@@ -14,6 +14,7 @@ namespace Arpeggio.Core.Session
         {
             Notes = new NoteEditor(this);
             Instruments = new InstrumentEditor(this);
+            Sfx = new SfxEditor(this);
         }
 
         /// <summary>編集中のソング。未オープンなら null。</summary>
@@ -26,6 +27,8 @@ namespace Arpeggio.Core.Session
         public NoteEditor Notes { get; }
         /// <summary>音色編集操作。</summary>
         public InstrumentEditor Instruments { get; }
+        /// <summary>定義と生成列を一括適用する効果音編集操作。</summary>
+        public SfxEditor Sfx { get; }
 
         /// <summary>新規ソングを保存して開く。既存ファイルの上書きは拒否する。</summary>
         public void New(string path, ChipKind chip, int tempoBpm, int lengthTicks)
@@ -102,13 +105,14 @@ namespace Arpeggio.Core.Session
             return Song ?? throw new InvalidOperationException("New または Open でソングを開いてください。");
         }
 
-        internal void Change(Action<Song> edit)
+        internal void Change(Action<Song> edit, Action? beforeSave = null)
         {
             Song current = GetSong();
             Song candidate = SongSerializer.Deserialize(SongSerializer.Serialize(current));
             edit(candidate);
             // 呼び出し側が渡した音色やマクロを後から変更しても、保存済み状態を変えない。
             candidate = SongSerializer.Deserialize(SongSerializer.Serialize(candidate));
+            beforeSave?.Invoke();
             SongSerializer.Save(candidate, GetPath());
             History.Record(current);
             SongSnapshotPublisher.Apply(current, candidate);
