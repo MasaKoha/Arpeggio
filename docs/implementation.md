@@ -2588,3 +2588,72 @@ tests/Arpeggio.Core.Tests/Sfx/SfxSnesSongCompilerTests.cs
 tests/Arpeggio.Core.Tests/Sfx/SfxCompiledAudioTests.cs
 docs/implementation.md
 ```
+
+# SFX-C2 実装記録（2026-09-09）
+
+## SFX-C2 設計との差
+
+- 公開 API の具体形は未指定のため、既存の Notes / Instruments と同じ `EditSession.Sfx` に `SfxEditor` を結び付ける。Tweak / Regenerate / Detach は候補・生成診断・同期状態・現 revision と候補 revision を返す。新規候補の定義付き生成も同じ Editor の純粋な CreateCandidate にまとめ、ファイル新規作成・プリセット・CLI/MCP/UI の入口は後続ランに残す。
+- 保存直前の revision 再確認は SFX 編集から渡す EditSession.Change の保存前検証で行い、通常編集の保存規則は変更しない。呼び出しは既存どおり同一セッション内で直列化する（MCP の共有セッションロック、DAW の UI スレッド）。プロセス間の確認・置換間のロックは設計どおり保証しない。
+- Regenerate の事前確認は dry-run の候補と、全置換対象の音色・トラック・ノート件数で提供する。MissingDefinition の Detach は操作エラーとし、同期済み状態で再生成して全 JSON が同値なら保存・履歴を増やさない。未知版は Detach だけ許可し、Undo で不透明 JSON ごと復元する。
+
+## SFX-C2 実装範囲と判断
+
+- `EditSession.Sfx` の `Tweak(patch, expectedRevision?, dryRun)` は既知版・両 hash 一致だけを受理する。全 patch 検証と生成を候補上で完了し、定義・全生成領域・両 hash を一度の Change で保存→履歴→公開する。title・sourcePreset・lastRandomization は保持する。
+- `CreateCandidate` は三チップの既存 compiler に定義と指紋を付ける純粋生成。パラメータを正規化し、出自の可変 locks は保存境界のコピーで隔離する。呼び出し元の候補・生成曲線・履歴と公開ソングの可変配列を共有しない。
+- 正規化後の同値 patch は出自・指紋・保存日時・Undo/Redo を保持する。無効レイヤーの値だけの変更は生成列が同じでも定義の変更として一履歴にする。dry-run は保存せず、現 revision と候補 revision、候補同期状態、生成曲線と警告を返す。
+- `Regenerate(replaceGenerated: true, ...)` は既知版の保存意図から title 以外の全生成領域を置換し、二つの指紋を更新する。候補と置換対象件数は dry-run で取得できる。手動編集・両 hash 不一致も Undo 一回で復元する。
+- `Detach` は定義だけを除去し、既知・未知版とも通常ソングへ移行する。生成列は変更せず、Undo/Redo は不透明 JSON を含む定義と出自を復元する。
+- `SfxEditException.Code` は MissingDefinition / UnsupportedSfxVersion / GeneratedContentChanged / SavedParametersChanged / RevisionConflict。入力 patch のエラーは既存 SfxParameterException、元文書の不正は既存 SongValidationException、I/O は既存例外を維持する。
+- revision は開始時の expectedRevision 照合に加え、Change の適用対象と保存直前の公開 Song・保存先ファイルで照合する。検証・生成・保存前照合に失敗するとファイル・公開参照・Undo/Redo を変更しない。成功結果の revision は適用後の値とする。
+- `SongSnapshotPublisher.Apply` と `DawDocument.Save` に Sfx のコピーを追加した。前者はトラック数が違う早期 return より前に適用する。SongHistory、CliHistoryStore、DAW の IsDirty / HasExternalChange は既に全 Song の JSON を比較・複製しているため、本体変更なしで定義が通る。
+- DAW は作業セッションへの自動保存と Ctrl+S の正本保存を維持する。既存 CLI/MCP の legacy 入口、プリセット、renderer、Serializer の出力規則は変更していない。CLI/MCP の新コマンド・共通 JSON 表示形式と UI は分割表の後続ランで接続する。
+
+## SFX-C2 テストコード
+
+| 対象 | 追加した検証 |
+|---|---|
+| `SfxEditorTests` | 三チップの二声 patch・一保存一履歴・固定 MIDI/tick/pitch 列・保存再読込、定義/生成列/出自の Undo/Redo、返却候補/生成曲線/履歴のコピー隔離、入力 locks の非共有、無効レイヤーの定義だけの変更、全生成領域の再生成と手動編集の復元、両 hash 修復、detach 前後の float PCM 全バイト一致 |
+| `SfxEditFailureTests` | 同値 patch と同期済み再生成の no-op・保存日時と redo 保持、三操作の dry-run、途中不正・型/キー/項目間制約、title を含む revision 拒否、保存直前のファイル revision 拒否、保存パラメータ/生成列の同期拒否、明示再生成要求、定義なし、未知 schema/generator/乱数版の通常編集と detach 履歴、I/O 失敗で三操作/Undo/Redo の公開状態・履歴維持 |
+| `SfxDocumentTests` | 三チップの作業保存→正本保存→Undo/Redo→detach→再読込、未知三版の正本保持、sfx のみの dirty/外部変更検知、正本置換失敗の保存基準/通知/履歴維持・一時ファイル除去・再試行、既存 Presenter の外部変更保護 |
+| `SfxHistoryBoundaryTests` | Core の編集履歴を既存側車形式から復元して CLI の Undo/Redo へ接続、未知三版の detach 履歴、sfx のみの外部変更で側車失効、既存通常編集の履歴 I/O 失敗で改行・定義を含む元ファイル全バイト復元 |
+
+新 SFX CLI 操作のエラー JSON・dry-run での側車書込抑止・create の二ファイル失敗処理は E1/E2 の範囲であり、今回の側車テストをその受け入れ済み証拠にはしない。
+
+## SFX-C2 静的確認
+
+- 指定設計、M2-A と SFX 各ランの実装記録・未完了事項、既存 Sfx/音色/VoiceModulation、CLI/MCP/DAW の保存・履歴・外部変更経路を参照した。
+- 追加使用型の定義・namespace・公開メンバーを検索照合した。MemoryMarshal.AsBytes と xunit の例外/コレクション assert はローカル参照 XML でも確認した。
+- 変更・追加した12 C#ファイルの括弧対応、doc XML、public summary の隣接、ブロック namespace、禁止省略名、Unity lifecycle API、Assert.Single 内 Where の不使用を静的確認した。新規ファイルは1ファイル1型。
+- 開始時の SHA-256 と比較し、変更禁止の3設計書、既存合成・音色・旧プリセット/音色バンク・Serializer・全 csproj と既存テストの不変を確認した。実装記録の既存内容はバイト列を保持し、末尾へ追記した。JSON version=1、Core は BCL のみ。
+- Render / AdvanceFrame / NoteOn と合成への接続は変更していない。追加の JSON・生成・履歴処理は編集時のオフライン処理。新規購読はテストの Saved 通知だけで finally 解除し、DawDocument・fixture を using で破棄する。
+- 作業は指定 worktree 内だけ。git 操作・コンパイル・dotnet build/test・アプリ起動・音声生成は実行していない。静的確認はビルド成功、警告ゼロ、テスト成功、PCM 実測一致を意味しない。
+
+## SFX-C2 未完了・未実行の確認事項
+
+実装とテストコード作成は完了。実装上の残タスクはなし。C1/B2/B3 とその依存先を含む受け入れ確認は、依頼者／Claude Code のレビュー・実行待ち。
+
+- `dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunit アナライザを含む既存全件と追加テストの成功。
+- 三チップの保存・履歴・detach/regenerate・revision/I/O 拒否・DAW 正本保存と CLI 側車境界の実行確認。
+- detach の PCM 全バイト一致、旧8プリセット×3チップの既存 JSON/PCM 回帰、既存 GC0 テスト、macOS/Windows の保存・置換失敗挙動。
+- 必要な DAW 実機確認と試聴。SFX パラメータ UI・新 CLI/MCP 入口は後続ランの対象のまま。
+
+## SFX-C2 変更ファイル一覧
+
+既存更新4ファイル、新規9ファイル、計13ファイル。
+
+```text
+src/Arpeggio.Core/Session/EditSession.cs
+src/Arpeggio.Core/Session/SongSnapshotPublisher.cs
+src/Arpeggio.Core/Session/SfxEditor.cs（新規）
+src/Arpeggio.Core/Sfx/SfxEditException.cs（新規）
+src/Arpeggio.Core/Sfx/SfxEditResult.cs（新規）
+src/Arpeggio.Core/Sfx/SfxReplacementSummary.cs（新規）
+src/Arpeggio.Daw/Editing/DawDocument.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxEditFixture.cs（新規）
+tests/Arpeggio.Core.Tests/Sfx/SfxEditorTests.cs（新規）
+tests/Arpeggio.Core.Tests/Sfx/SfxEditFailureTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/SfxDocumentTests.cs（新規）
+tests/Arpeggio.Core.Tests/Cli/SfxHistoryBoundaryTests.cs（新規）
+docs/implementation.md
+```

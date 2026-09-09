@@ -50,6 +50,7 @@ namespace Arpeggio.Daw.Editing
             target.Instruments = Song.Instruments;
             target.Tracks = Song.Tracks;
             target.SnesEcho = Song.SnesEcho;
+            target.Sfx = Song.Sfx;
             savedSession.Save();
             savedSnapshot = SongSerializer.Serialize(Song);
             Saved?.Invoke(Path);
