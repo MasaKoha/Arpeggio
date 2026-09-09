@@ -11,7 +11,7 @@
 
 ## 状態
 
-M1（Core / CLI / MCP / DAW）と M2（効果音プリセット・音声解析・OGG 書き出し・SNES への WAV 取り込み・DAW の効果音／解析パネル）を実装済み。M3 は CLI / MCP / DAW の NSF / VGM 書き出し・MIDI 取り込みと統合回帰テストのコードを追加した。ビルド・全テスト・実画面の受け入れ確認は依頼者側の確認待ち。NSF / VGM は実機で未検証。対応範囲の正本は [M3 設計](docs/design-m3.md)、実装と未検証事項は [実装記録](docs/implementation.md) を参照。
+M1（Core / CLI / MCP / DAW）・M2（効果音プリセット・音声解析・OGG 書き出し・SNES への WAV 取り込み・DAW の効果音／解析パネル）・M3（NSF / VGM 書き出しと MIDI 取り込み、CLI / MCP / DAW すべてから利用可）を実装済み。テスト 1937 件・ビルド警告ゼロ。**NSF / VGM は実機のプレイヤーでは未検証**（自動テストは独立パーサーと限定 6502 実行器による検証）。対応範囲の正本は [M3 設計](docs/design-m3.md)、実装と未検証事項は [実装記録](docs/implementation.md) を参照。
 
 ## AI 向けの基本手順
 
