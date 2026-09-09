@@ -19,6 +19,8 @@ namespace Arpeggio.Daw.Presenters
         void ShowAnalysis(string text, bool isRunning);
         /// <summary>書き出し通知と操作可否を表示する。</summary>
         void ShowExportStatus(string text, bool isRunning, string? lastExportedPath);
+        /// <summary>MIDI 候補・操作状態の表示を更新する。</summary>
+        void ShowMidiImport();
         /// <summary>ファイル監視と保存先入力を新しい文書へ切り替える。</summary>
         void SwitchDocument(string path);
         /// <summary>非同期処理の通知を UI スレッドで実行し、完了を待つ。</summary>

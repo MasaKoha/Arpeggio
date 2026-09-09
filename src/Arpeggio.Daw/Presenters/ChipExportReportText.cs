@@ -36,7 +36,7 @@ namespace Arpeggio.Daw.Presenters
             foreach (ConversionDiagnostic diagnostic in diagnostics)
             {
                 text.AppendLine($"{label} {diagnostic.Code}: {diagnostic.Message} " +
-                    $"(track={diagnostic.SourceTrack}, tick={diagnostic.SourceTick}, event={diagnostic.SourceEvent}, " +
+                    $"(track={diagnostic.SourceTrack}, channel={diagnostic.SourceChannel}, tick={diagnostic.SourceTick}, event={diagnostic.SourceEvent}, " +
                     $"outputTrack={diagnostic.OutputTrack}, outputTick={diagnostic.OutputTick}, count={diagnostic.OccurrenceCount}) " +
                     $"{diagnostic.Original} → {diagnostic.Converted}");
             }

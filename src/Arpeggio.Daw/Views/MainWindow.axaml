@@ -35,6 +35,7 @@
         <TabItem x:Name="AnalysisTab" Header="解析"><views:AnalysisView x:Name="Analysis" /></TabItem>
         <TabItem x:Name="SfxTab" Header="SFX"><views:SfxCreationView x:Name="SfxCreation" /></TabItem>
         <TabItem x:Name="ExportTab" Header="書き出し"><views:ChipExportView x:Name="ChipExport" /></TabItem>
+        <TabItem x:Name="MidiTab" Header="MIDI"><views:MidiImportView x:Name="MidiImport" /></TabItem>
       </TabControl>
     </Grid>
     <Border Grid.Row="2" Background="{StaticResource Arpeggio.Panel}">
@@ -49,6 +50,7 @@
             </Button.Flyout>
           </Button>
           <Button x:Name="SfxButton" ContentTemplate="{StaticResource Arpeggio.Content.Sfx}" Content="SFX を作る" ToolTip.Tip="SFX を作る" />
+          <Button x:Name="MidiImportButton" Content="MIDI を取り込む" />
           <Button x:Name="ExportButton" ContentTemplate="{StaticResource Arpeggio.Content.Export}" Content="書き出し" ToolTip.Tip="Ctrl+E · WAV / OGG / NSF / VGM" />
         </StackPanel>
       </Grid>
