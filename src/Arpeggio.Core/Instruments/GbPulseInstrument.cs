@@ -36,5 +36,10 @@ namespace Arpeggio.Core.Instruments
         /// <summary>任意のピッチマクロ。</summary>
         [JsonPropertyOrder(6)]
         public Macro? PitchMacro { get; set; }
+
+        /// <summary>任意のデューティマクロ。null または空列では Duty を使う。</summary>
+        [JsonPropertyOrder(7)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Macro? DutyMacro { get; set; }
     }
 }

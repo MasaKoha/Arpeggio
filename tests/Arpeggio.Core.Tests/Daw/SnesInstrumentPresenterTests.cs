@@ -30,6 +30,7 @@ namespace Arpeggio.Core.Tests.Daw
             original.EchoSend = 1;
             original.AdsrRegisters = new SnesAdsrRegisters(0, 0, 0, 1);
             original.PitchMacro = new Macro { Values = new[] { 1, 2 }, LoopIndex = 0 };
+            original.VolumeMacro = new Macro { Values = new[] { 12, 8, 4, 0 }, LoopIndex = 1 };
             fixture.Document.Session.Instruments.Update(original);
             string before = SongSerializer.Serialize(fixture.Document.Song);
             int history = fixture.Document.Session.History.UndoCount;
@@ -50,6 +51,9 @@ namespace Arpeggio.Core.Tests.Daw
             Assert.Equal(original.Name, selected.Name);
             Assert.Equal(original.Pan, selected.Pan);
             Assert.Equal(original.PitchMacro!.Values, selected.PitchMacro!.Values);
+            Assert.NotNull(selected.VolumeMacro);
+            Assert.Equal(original.VolumeMacro!.Values, selected.VolumeMacro.Values);
+            Assert.Equal(1, selected.VolumeMacro.LoopIndex);
             Assert.Null(original.Preset);
             Assert.Equal(history + 1, fixture.Document.Session.History.UndoCount);
             fixture.Presenter.Undo();

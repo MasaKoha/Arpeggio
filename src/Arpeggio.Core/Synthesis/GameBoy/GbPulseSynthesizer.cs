@@ -20,7 +20,7 @@ namespace Arpeggio.Core.Synthesis.GameBoy
         protected override void ConfigureInstrument(Instrument instrument)
         {
             var pulse = (GbPulseInstrument)instrument;
-            ConfigureMacros(pulse.VolumeMacro, pulse.ArpeggioMacro, pulse.PitchMacro, initialDuty: (int)pulse.Duty);
+            ConfigureMacros(pulse.VolumeMacro, pulse.ArpeggioMacro, pulse.PitchMacro, pulse.DutyMacro, (int)pulse.Duty);
             _envelopeVolume = pulse.InitialVolume;
             _envelopeStepFrames = pulse.EnvelopeStepFrames;
             _envelopeDirection = pulse.EnvelopeIncreasing ? 1 : -1;

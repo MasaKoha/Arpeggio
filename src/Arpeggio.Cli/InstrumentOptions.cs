@@ -63,7 +63,7 @@ namespace Arpeggio.Cli
                 }
                 sample.ApplyPreset(selectedPreset);
             }
-            JsonObject document = ParseDocument(InstrumentJson.Serialize(replacement));
+            JsonObject document = CreateEditableDocument(replacement);
             foreach ((Option<string?> option, string propertyName, Func<string, JsonNode?> parse) in bindings)
             {
                 string? value = result.GetValue(option);
@@ -105,7 +105,7 @@ namespace Arpeggio.Cli
                 return instrument;
             }
             JsonObject previous = ParseDocument(InstrumentJson.Serialize(instrument));
-            JsonObject replacement = ParseDocument(InstrumentJson.Serialize(Create(kind)));
+            JsonObject replacement = CreateEditableDocument(Create(kind));
             foreach (KeyValuePair<string, JsonNode?> property in previous)
             {
                 if (property.Key == "kind" || !replacement.ContainsKey(property.Key))
@@ -145,6 +145,21 @@ namespace Arpeggio.Cli
         private static JsonObject ParseDocument(string json)
         {
             return JsonNode.Parse(json) as JsonObject ?? throw new ArgumentException("音色 JSON はオブジェクトです。");
+        }
+
+        private static JsonObject CreateEditableDocument(Instrument instrument)
+        {
+            JsonObject document = ParseDocument(InstrumentJson.Serialize(instrument));
+            // 保存時に省略する optional マクロも、未設定から指定・音色切替できる必要がある。
+            if (instrument is GbPulseInstrument && !document.ContainsKey("dutyMacro"))
+            {
+                document["dutyMacro"] = null;
+            }
+            if (instrument is SnesSampleInstrument && !document.ContainsKey("volumeMacro"))
+            {
+                document["volumeMacro"] = null;
+            }
+            return document;
         }
 
         private static void RequireProperty(JsonObject document, string propertyName, string optionName)
