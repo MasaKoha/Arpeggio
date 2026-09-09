@@ -18,4 +18,12 @@
 - C# 規約は `~/.claude/rules/coding-principles.md`。Unity ではないので `unity-csharp.md` の Unity 固有項目（Prefab / GetComponent / MonoBehaviour）は対象外。命名・ブレース・`None = 0` enum・省略形禁止は適用する
 - 1 ファイル 1 型。ファイルスコープ namespace は使わない（`Arpeggio.Core` を Unity ランタイムへ流用するため）
 - 合成のホットパス（`Render(Span<float>)`）ではアロケーション・LINQ 禁止。`// perf:` で意図を残す
-- 先行例は `../colors`（同じ Core + CLI + MCP + Avalonia 構成）。迷ったらそちらの流儀に合わせる
+- 先行例は `../Colors`（同じ Core + CLI + MCP + Avalonia 構成）。迷ったらそちらの流儀に合わせる
+
+## このリポジトリ固有の罠
+
+- **View に `Presenter` という名前のプロパティを作らない。** Avalonia の `ContentControl.Presenter` と衝突する（3 回踏んだ）
+- **`TextBox.Watermark` は obsolete。** `PlaceholderText` を使う
+- **xunit のアナライザは警告＝エラーになる**（`TreatWarningsAsErrors`）。`Assert.Single(x.Where(f))` ではなく `Assert.Single(x, f)`
+- **`option.Errors` は `IEnumerable`。** `.Count` はメソッドなので `Count()` と書く
+- **`.app` は Release ビルドなので `AVALON` が入らない。** Avalon で操作・観測するときは Debug 実行ファイルを使う（メールボックス方式なのでフォーカス不要）
