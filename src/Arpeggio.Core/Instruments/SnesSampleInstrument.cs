@@ -189,6 +189,11 @@ namespace Arpeggio.Core.Instruments
             }
         }
 
+        /// <summary>任意の音量マクロ。ADSR に乗算し、null または空列では従来の音量を使う。</summary>
+        [JsonPropertyOrder(17)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Macro? VolumeMacro { get; set; }
+
         internal BrrSample? PreparedPreset => _preparedPreset;
 
         /// <summary>プリセットを差し替え、素材・推奨値を再適用する。パンとマクロは保持する。</summary>

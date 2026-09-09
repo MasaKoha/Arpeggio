@@ -56,7 +56,7 @@ namespace Arpeggio.Core.Synthesis.Snes
         protected override void ConfigureInstrument(Instrument instrument)
         {
             var sample = (SnesSampleInstrument)instrument;
-            ConfigureMacros(null, sample.ArpeggioMacro, sample.PitchMacro);
+            ConfigureMacros(sample.VolumeMacro, sample.ArpeggioMacro, sample.PitchMacro);
             _hasSampleSource = sample.SampleData != null || sample.Preset != null;
             _sample = sample.SampleData != null ? sample.PreparedSample : sample.PreparedPreset;
             if (!_hasSampleSource)
