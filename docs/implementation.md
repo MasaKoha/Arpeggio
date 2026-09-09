@@ -2223,3 +2223,12 @@ G2→H3 の順で予定したコード・テストコード・README／実装記
 - `tests/Arpeggio.Core.Tests/Formats/MidiPipelineTests.cs`
 - `tests/Arpeggio.Core.Tests/Formats/MidiRenderAllocationTests.cs`
 - `tests/Arpeggio.Core.Tests/Cli/MidiOutputPipelineTests.cs`
+
+## 既知の制限（依頼者側で実測・2026-09-09）
+
+### OGG の最終 granule が入力より 1024 サンプル小さい
+
+`OggVorbisEncoder` 1.2.2 が書く最終 granule position は、入力フレーム数より**常に 1024（1 ブロック）小さい**。4410 / 22050 / 44100 / 66150 / 132300 フレームで実測し、**曲の長さに依らず一定**であることを確認した。終端のパケット排出から `OggStream.Finished` のガードを外しても変わらないため、こちらの書き出し漏れではなくライブラリの granule 計算のクセと判断した。
+
+再生側が末尾 23 ms を切るかどうかは未確認（このリポジトリに Vorbis デコーダが無いため）。`MidiPipelineTests.AssertOggEndOfStream` は実測値に合わせ、定数 `VorbisGranuleDeficit = 1024` で判定している。WAV 書き出しにはこの制限はない。
+

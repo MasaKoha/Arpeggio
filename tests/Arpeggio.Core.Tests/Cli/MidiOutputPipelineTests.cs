@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Render;
+using Arpeggio.Core.Session;
 using Arpeggio.Core.Tests.Formats;
 using Arpeggio.Mcp;
 using Xunit;
@@ -32,7 +33,7 @@ namespace Arpeggio.Core.Tests.Cli
             AssertSuccess(imported.Output);
             byte[] json = File.ReadAllBytes(fixture.SongPath);
             string mcpSong = fixture.PathFor("mcp.arpeggio.json");
-            var tools = new ArpeggioTools();
+            var tools = new ArpeggioTools(new EditSession());
             AssertSuccess(tools.ImportMidi(fixture.SourcePath, mcpSong, chipName));
             Assert.Equal(json, File.ReadAllBytes(mcpSong));
             AssertSuccess(tools.OpenSong(mcpSong));
@@ -90,7 +91,11 @@ namespace Arpeggio.Core.Tests.Cli
         private static void AssertSuccess(string response)
         {
             using JsonDocument document = JsonDocument.Parse(response);
-            Assert.False(document.RootElement.TryGetProperty("error", out _), response);
+            // 成功時も error / code は null 値として存在する契約なので、有無ではなく値で判定する。
+            if (document.RootElement.TryGetProperty("error", out JsonElement error))
+            {
+                Assert.Equal(JsonValueKind.Null, error.ValueKind);
+            }
             if (document.RootElement.TryGetProperty("exitCode", out JsonElement exitCode)) { Assert.Equal(0, exitCode.GetInt32()); }
             if (document.RootElement.TryGetProperty("written", out JsonElement written)) { Assert.True(written.GetBoolean()); }
         }
