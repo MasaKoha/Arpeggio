@@ -2299,3 +2299,78 @@ A1 の実装上の残タスクはなし。受け入れ完了には依頼者／Cl
 - `tests/Arpeggio.Core.Tests/Sfx/SfxParameterTestJson.cs`
 - `tests/Arpeggio.Core.Tests/Sfx/SfxParameterValidatorTests.cs`
 - `docs/implementation.md`
+
+# SFX-C1 実装記録（2026-09-09）
+
+## SFX-C1 設計との差
+
+- 公開 API の具体形は未指定のため、既知版 DTO と不透明 JSON を排他的に保持する `SfxDefinition`、保存境界、指紋計算、読み取り専用の同期判定を分ける。C1 では生成器や編集入口を追加せず、コピー境界・履歴・DAW 正本保存の接続は分割表どおり C2 に残す。
+- 未知版の構造を現在版で検証しないため、正の整数の schemaVersion → generatorVersion → random algorithmVersion の順で判定し、未知版に到達した時点で sfx 全体を保持する。既知版の必須キー欠落・重複・未知キー・不正 hash はドキュメントエラー。未知版の保持は JSON のキー・値・配列順を対象とし、入力の字下げや文字列エスケープの表記は保存時の整形に従う。
+- 出自の適用外項目は明示 null とし、randomize は category 必須・strength/locks/baseParametersHash は null、mutate は category=null・strength/locks/baseParametersHash 必須とする。正式名・正規ロックパスを検証する。両 hash 不一致時は SavedParametersChanged を主理由とし、GeneratedContentChanged も診断一覧へ残す。
+
+## SFX-C1 実装範囲と判断
+
+- `Song.Sfx` を末尾の optional プロパティとして追加した。未指定・null は保存時に省略し、JSON version=1、既存キー順・改行設定・音色マクロの null 表現を維持する。重複したトップレベル sfx は拒否する。
+- `SfxDefinition` は既知版 `SfxDefinitionData` と未知版 `JsonElement` を排他的に保持する。未知版は Clone で読み込み元 JsonDocument から独立させ、破棄後もキー・値・配列順を再保存できる。音声側は定義を解釈しない。
+- 既知版の保存パラメータは全正規パスの存在を先に確認し、A1 の patch 解析と Validator で型・範囲・未知/重複キー・チップ適合性・項目間制約を検証する。保存キーからチップを仮判定した後、SongValidator で Song.Chip との一致を必ず確認する。欠落を初期値で補完しない。
+- パラメータ型7ファイルに JsonPropertyOrder を付け、型の宣言順を明示した。現在チップ以外の null 設定は sfx 内でのみ省略し、noiseMode / waveform は小文字の正式名、実数は6桁 AwayFromZero・正のゼロへ正規化する。保存は元の値オブジェクトや両指紋を書き換えない。
+- 出自は sourcePreset と、operation / algorithmVersion / uint32 seed / category / strength / locks / baseParametersHash を保存する。保存済み locks は読み取り専用の配列参照にし、保存順を維持する。乱数生成・プリセット生成は追加していない。
+- `SfxHash` は parametersHash、generatedHash、後続の競合照合に使う revision を提供する。Utf8JsonWriter の2スペース・LF・BOMなし・末尾改行なしを明示する。生成指紋は Serializer の規定順から title と sfx だけを除き、revision は両方を含む。Serialize の OS 既定改行は変更しない。
+- `SfxSynchronization.Inspect` は MissingDefinition / UnsupportedSfxVersion / SavedParametersChanged / GeneratedContentChanged を返す。既知版で両指紋が一致した場合だけ editable=true と現在 parameters を返し、不一致時は savedParameters と全理由を返す。読み込み・保存・SongValidator・状態取得による生成や指紋の更新はない。
+
+## SFX-C1 テストコード
+
+- `SfxDefinitionSerializationTests`: 旧8種×3チップの sfx 省略/null、三チップの完全往復、乱数出自の seed=0/max、null 項目、正規化、キー順/CRLF入力、schema/generator/random algorithm の未知版保持、ファイル保存と一時ファイル後始末。
+- `SfxDefinitionValidationTests`: 全保存パラメータ・定義・出自の必須キー欠落、版/型/範囲/未知キー/エスケープ同値の重複、不正 hash、チップ不一致、正式名、カテゴリ生成と変異の適用外項目、ロックの不正パス、直接構築した NaN を文書エラーで拒否。
+- `SfxHashTests`: 既存 NES の正規 JSON を独立固定し UTF-8 バイト列を比較。三チップの初期パラメータと NES 生成領域の SHA-256 を独立に計算した固定期待値で検証。版・6桁丸め・無効ノイズ値・title/sourcePreset/sfx と revision の関係も検証する。
+- `SfxSynchronizationTests`: タイトルのみの変更、マクロ/ノート/効果/音色名/トラック名/ミュート/定位/空トラック/テンポ/長さ/ループ/エコー/FIR/既定音色/音色配列順の編集検出。パラメータだけの JSON 手修正と両方の不一致を区別する。既知・未知定義の保存往復で旧24プリセットの PCM が変わらないことを確認するコードを追加。
+- C1 のテスト用定義は、保存済み生成列の指紋を明示的に記録する。B2/B3 の生成器を実装した、あるいはパラメータと生成列の音響的同値性を証明したものではない。既存テストの期待値は変更していない。
+
+## SFX-C1 静的確認
+
+- 指定設計、既存 SFX・音色・VoiceModulation と保存/コピー境界、CLI/MCP/DAW の既存入口を参照した。新規参照型の定義と namespace、.NET 10 の JsonConverter / JsonElement.Clone / JsonNode / JsonWriterOptions.NewLine / SHA256 / Convert.ToHexStringLower をローカル参照 XML と照合した。
+- 変更した C# 27ファイルの括弧対応、public summary の隣接、doc XML、ブロック namespace、省略名、xunit の禁止パターンを静的確認した。コンパイルやアナライザを実行した結果ではない。
+- 開始時の SHA-256 と比較し、変更禁止の3設計書、既存合成・音色・旧プリセット/音色バンク・CLI/MCP/DAW・既存テスト・プロジェクト/依存設定の不変を確認した。実装記録の既存節もバイト列を維持し、末尾だけに C1 を追記した。
+- 生成指紋の計算は保存用キー順を継承し、SongValidator に hash 比較を入れないため再帰しない。Render / AdvanceFrame / NoteOn を変更せず、JSON・hash・正規化をホットパスへ接続していない。
+- git 操作、コンパイル、dotnet build / dotnet test、アプリ起動、PCM/WAV生成、試聴は行っていない。
+
+## SFX-C1 未完了
+
+C1 の実装上の残タスクはなし。受け入れ完了には依頼者／Claude Codeによる以下の実行確認が必要。
+
+- `dotnet build Arpeggio.slnx` のコンパイル成功・警告ゼロと xunit アナライザの確認。
+- 新規テストおよび既存テスト全件の成功。旧 JSON/PCM 不変・新形式/未知版往復・生成列を再生成しないことの実測。
+- macOS / Windows の固定 SHA-256 一致と、各 OS における従来の正規 JSON バイト列の維持。
+
+C2 への申し送り: SongSnapshotPublisher と DawDocument.Save の個別コピーは本ランで接続していない。SfxEditor・一履歴での適用・Undo/Redo・detach/regenerate・revision 拒否・DAW 正本保存を C2 で実装し、既知版・未知版の両方をコピー境界で保持すること。現段階でフロントエンドの SFX 再編集まで受け入れ済みとは扱わない。
+
+## SFX-C1 変更ファイル一覧
+
+- `src/Arpeggio.Core/Document/Song.cs`
+- `src/Arpeggio.Core/Document/SongSerializer.cs`
+- `src/Arpeggio.Core/Document/SongValidator.cs`
+- `src/Arpeggio.Core/Sfx/SfxDefinition.cs`
+- `src/Arpeggio.Core/Sfx/SfxDefinitionData.cs`
+- `src/Arpeggio.Core/Sfx/SfxDefinitionJsonConverter.cs`
+- `src/Arpeggio.Core/Sfx/SfxDefinitionValidator.cs`
+- `src/Arpeggio.Core/Sfx/SfxEditabilityReason.cs`
+- `src/Arpeggio.Core/Sfx/SfxEnvelopeParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxGameBoyParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxHash.cs`
+- `src/Arpeggio.Core/Sfx/SfxNesParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxNoiseParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterJson.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxRandomization.cs`
+- `src/Arpeggio.Core/Sfx/SfxRandomizationOperation.cs`
+- `src/Arpeggio.Core/Sfx/SfxSnesParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxSynchronization.cs`
+- `src/Arpeggio.Core/Sfx/SfxSynchronizationState.cs`
+- `src/Arpeggio.Core/Sfx/SfxToneParameters.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxCanonicalJsonExamples.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxDefinitionSerializationTests.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxDefinitionValidationTests.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxDocumentTestData.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxHashTests.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxSynchronizationTests.cs`
+- `docs/implementation.md`

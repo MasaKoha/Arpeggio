@@ -80,8 +80,14 @@ namespace Arpeggio.Core.Document
             using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
             {
                 writer.WriteStartObject();
+                bool hasSfx = false;
                 foreach (JsonProperty property in root.EnumerateObject())
                 {
+                    if (property.Name == "sfx")
+                    {
+                        SongValidator.Require(!hasSfx, "sfx は重複できません。");
+                        hasSfx = true;
+                    }
                     if (property.Name != "instruments" || property.Value.ValueKind != JsonValueKind.Array)
                     {
                         property.WriteTo(writer);

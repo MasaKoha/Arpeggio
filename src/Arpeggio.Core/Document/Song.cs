@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Sfx;
 namespace Arpeggio.Core.Document
 {
     /// <summary>編集可能なソングの正本。</summary>
@@ -50,5 +51,10 @@ namespace Arpeggio.Core.Document
         /// <summary>SNES エコー設定。</summary>
         [JsonPropertyOrder(9)]
         public SnesEchoSettings SnesEcho { get; set; } = new SnesEchoSettings();
+
+        /// <summary>任意の効果音定義。未指定の通常ソングでは保存しない。</summary>
+        [JsonPropertyOrder(10)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public SfxDefinition? Sfx { get; set; }
     }
 }
