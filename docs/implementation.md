@@ -2117,3 +2117,118 @@ H1→H2 の順で予定した実装・テストコード作成と静的確認を
 ## 提案
 
 - channelMap の JSON 解析を Formats に共通化する。CLI / MCP と今後の G2 で重複キー・数値境界の検証がずれるのを防ぐ。見積もり: 1 ラン。本ランでは実装しない。
+
+# M3-G2 / H3 実装記録（2026-09-09）
+
+## M3-G2 設計との差
+
+- 既存 SFX の文書切替準備は未保存編集を自動保存する。MIDI の「勝手に保存・破棄しない」を優先し、「開く」の直前にドラッグを確定し、未保存・外部変更確認待ち・正本の外部変更を検査して拒否する。利用者が既存の保存／再読み込み操作で解消した後に、既存 Open 経路へ渡す。新規保存ではこの準備を呼ばない。
+- 右ペインに MIDI タブを追加する。入力文字列の検証と map ファイル境界は専用 Presenter 側に置く。過去の共通 map 解析の提案は本ランでは実装せず、CLI と同じ厳密な UTF-8／重複キー検証を DAW に限定して追加する。
+- Import は CancellationToken を受けないため、開始前・終了後にキャンセルを確認し、遅い結果とキュー済み通知を抑止する。保存は MidiSongFile のキャンセル・新規移動・一時ファイル清掃に委ねる。
+
+## M3-G2 未完了
+
+- G2 の予定実装・テストコード作成と静的確認は完了した。ビルド・テスト実行・実画面確認は依頼者側に残る。受け入れ条件の実行確認が済んだという意味ではない。
+
+## M3-G2 実装・静的確認
+
+- 専用 MidiImportPresenter / View と右ペインの MIDI タブ、下部の「MIDI を取り込む」を追加した。MIDI・新規 JSON・任意 map の OS ピッカー、チップ・基準 BPM・量子化・声数不足時の処理・任意曲名・strict を共通 Import へ渡す。
+- 変換時の MidiImportResult が持つ確定済み JSON を新規保存する。元 MIDI・候補 Song・現文書の後編集を保存へ混ぜない。採用・声数不足による破棄・打ち切り・明示除外・ゼロ音量／ゼロ長と、実際の channel → 出力トラック別採用数を表示する。共通診断表示に sourceChannel を追加した。
+- 新規保存は current Song / Path / undo / redo を変更せず、側車履歴を操作しない。Open だけがドラッグ確定・未保存／外部競合の検査後に既存 Open・再生／画面／ファイル監視の切替を呼ぶ。Open の失敗でも保存成功と再試行先を保持する。
+- 確認・保存の二重開始を拒否する。設定変更・候補破棄・文書切替で旧候補を破棄し、処理中のキャンセルと終了後の遅延結果／キュー済み通知を抑止する。保存競合・I/O 失敗は候補を保持して再試行可能。確定済みファイルはキャンセル後も保持する。
+- Presenter テストに三チップの候補／JSON 一致、current と undo / redo の保持、独立 Open・未保存・外部競合・Open 読み取り失敗、strict、保存先競合、map・数値・不正 SMF、終了／キャンセル・通知破棄・文書切替を追加した。
+- 自前型の定義・namespace と Avalonia 12.1.2 のローカル参照 XML を照合し、追加 C# の括弧対応・ブロック namespace・日本語 summary XML、XAML XML、禁止省略名・禁止 API を確認した。View に Presenter というプロパティは追加していない。Assert.Single に Where を渡していない。
+- G2 のコード・テスト作成と静的確認を先に完了して H3 へ進む。コンパイル・アプリ起動・テスト実行は行っていない。
+
+## M3-H3 設計との差
+
+- 仕様変更はない。ビルド・テスト実行禁止の依頼に従い、全件・GC 回帰はテストコードの追加と静的確認までとする。設計書の受け入れ条件が求める実行成功は未確認として分離する。
+- OGG は既存エンコーダーがストリーム識別子をランダムに生成するため、フロントエンド間の全 byte 一致を要求しない。入力 PCM の非無音、コンテナ境界・EOS・最終 granule のフレーム数を検証する。Vorbis デコード後の音声比較は追加していない。
+
+## M3-H3 実装・静的確認
+
+- format 1・PPQN 480、120→60 BPM、三和音と kick、後半 A4 を含む共通 MIDI を追加した。三チップで version 1 JSON、5 採用音、144 tick／1.5 秒、全体テンポ焼き込み、候補と保存往復後の PCM 全ビット・RenderReport 一致を検証する。
+- MIDI→JSON→WAV／OGG を三チップで接続。WAV の読み戻しレート・長さ・非無音、OGG のページ境界・EOS・最終 granule を確認するテストを追加した。
+- NES／GB の MIDI→JSON→VGM は有限一／二周、独立パースの待機総和、独立レジスタ再合成の後半 A4 周波数・非無音・終端停止を検証する。NES はさらに NSF 保存→独立ロード→限定 CPU の INIT／PLAY→全トレース照合→再 INIT を接続した。
+- CLI と MCP は同じ MIDI の新規保存・明示 Open から全対応形式へ接続する。JSON・WAV・VGM・NSF の byte 一致と OGG の長さを検証する。DAW も候補確認→新規保存→明示 Open→既存 WAV／OGG および対応 VGM／NSF を通し、切り替えたチップと曲が実際の出力へ渡ることを検証する。
+- strict・対象外チップ・loops 上限・既存出力競合・キャンセル・移動先ディレクトリとの競合で、元 MIDI・保存 JSON・元 Song・既存出力を保持し、隣接一時ファイルを残さないテストを追加した。OS により IOException／UnauthorizedAccessException が異なる移動失敗は両方を認め、ファイル保持を主条件にする。
+- MidiRenderAllocationTests は AllocationCollection に所属する。三チップの保存往復・チップ変換後に二周を暖機し、次の一周の発音・音色交代・周回で Render が GC 0 byte を保つことを検証する。既存の Render／NoteOn／音色交換のアロケーションテストは変更していない。
+- README の状態・DAW 操作を更新し、MIDI→JSON→各形式の CLI 例、チップ別対応表、DAW の候補・保存・独立 Open、既知制限・実機未検証を追記した。既存 CLI／MCP のコマンド名・引数・終了コードは変更していない。
+
+## M3-G2 / H3 最終静的確認
+
+| 新規テストクラス | メソッド数 | 属性からのケース数 |
+|---|---:|---:|
+| MidiImportPresenterTests | 8 | 11 |
+| MidiImportInputTests | 6 | 22 |
+| MidiImportLifetimeTests | 4 | 6 |
+| MidiImportOutputTests | 1 | 3 |
+| MidiPipelineTests | 3 | 10 |
+| MidiRenderAllocationTests | 1 | 3 |
+| MidiOutputPipelineTests | 1 | 3 |
+| **合計** | **24** | **58** |
+
+- 件数は未実行のテスト属性の静的集計で、ランナーの検出件数・成功件数ではない。既存テストの削除・期待値の緩和はない。既存テスト補助型 FakeMainWindowView に MIDI 表示通知の記録だけを追加した。
+- 自前型の定義・namespace、Avalonia 12.1.2 と .NET 10.0.8 のローカル参照 XML、既存 xUnit API の利用例を照合した。新規 C# の括弧対応・ブロック namespace・日本語 summary XML／public への隣接・末尾空白、XAML XML を検査した。View の Presenter プロパティ、Assert.Single に Where を渡す形式、禁止 API の追加はない。
+- 編集前 SHA-256 と照合し、Core／Formats／CLI／MCP／Codecs の実装、設計書二つ、プロジェクト依存、既存テスト本体は不変。ファイル削除なし。Formats は Core と BCL のみ、NuGet と JSON version 1 は変更していない。
+- git 操作、作業ディレクトリ外への書き込み、コンパイル、dotnet build／dotnet test、アプリ／Unity 起動、音声生成は行っていない。上記のファイル生成・CPU 実行・再合成は今回作成した未実行テストコードの内容である。
+
+## M3-H3 既知の制限・実機で未検証の条件
+
+- **NSF／VGM は実機で未検証。外部プレイヤーでの互換性・聴取も未検証。** 自動テストに合格した場合でも実機検証済みとは扱わない。本ランでは自動テスト自体も未実行。
+- NSF は NTSC 基本 NES APU と標準 NSF バンク切り替え向け。NSF2／NSFe、PAL 演奏、DPCM、拡張音源、起動可能な NES ROM は対象外。PLAY 量子化・極短ノート衝突・CPU／ROM 上限があり、ASCII メタデータへの縮約を診断する。
+- VGM は v1.71 の NES APU／DMG、一ファイル一チップ。SNES VGM／SPC、VGZ、MIDI 書き出しは対象外。SNES の配布は既存 WAV／OGG を使う。NSF／VGM は 1〜16 回の有限展開で、無限ループ情報を保存しない。
+- 通常の Core PCM と実機レジスタ出力のビット一致・同音は保証しない。NES Pulse の high 書き込みによる位相再開、Triangle DAC 保持、Noise seed、GB の音量段階・再トリガー・DAC／LFSR と Wave RAM、連続パンやミキサー等に差がある。独立再合成器も限定サブセットであり、アナログ特性や全 CPU／APU サイクルを再現するものではない。
+- MIDI は SMF format 0／1・PPQN・MIDI 1.0 のファイル入力のみ。format 2、SMPTE、RMID、UMP／MIDI 2.0、ライブ入力、SysEx 実行は非対応。固定整数 BPM／48 ticks、チップ声数・音域・4 bit 音量・GM 近似音色・固定ドラム gate に変換する。元のテンポ地図・表情・和音・音色へ無損失には戻せない。SNES プリセットの既存の音程偏差とワンショット終端も維持する。
+- DAW の Import 本体は同期 API のため、実行開始後の解析計算は即時中断できない。キャンセル・終了時は結果の公開と次の保存を抑止し、保存 API へはキャンセルを渡す。保存先への移動が既に完了したファイルは取り消さず保持する。キャンセルと保存確定の競合ではファイルが存在する場合がある。
+- 実機実績の記載前に、使用機種・NSF カートリッジ／プレイヤー名と版・NTSC 動作を記録する。先頭発音、3 分以上のテンポ、4 KiB bank 越え、終了・再 INIT、Pulse high 境界、Triangle／Noise の発音・停止・聴取差を実際に確認する。GB VGM も利用プレイヤー／実機経路・機種を明記して Wave／DAC／再トリガー／routing の差を確認する。
+
+## M3-H3 未完了
+
+G2→H3 の順で予定したコード・テストコード・README／実装記録を追加した。コードの予定範囲に残作業はない。受け入れ条件の次の実行確認は依頼者側に残る。
+
+- `dotnet build Arpeggio.slnx` の警告・エラーゼロ。C#／XAML のコンパイルと xUnit アナライザを含む。
+- 既存 676 件を含む全テストと今回追加 58 ケースの成功、実際の検出件数。676 は M3 前の基準であり現在の総数ではない。
+- 既存 PCM／JSON／RenderReport と全 GC 回帰、今回の MIDI 保存往復・各出力・NSF CPU／VGM 再合成・ファイル保持・キャンセル境界の実行。M3 前の別途採取済み PCM 基準があればその比較も行う。
+- DAW 実画面での五つのタブ、低いウィンドウでのスクロール、各 OS ピッカーのキャンセル・新規パス、入力エラー・strict・候補統計・独立 Open・未保存／外部競合保護・終了時表示。MCP stdio ホスト経由の既存／新規ツール呼び出し。
+- 外部プレイヤーと実機・聴取の検証、および上記の機種・版・条件の記録。
+
+## M3-G2 / H3 変更ファイル一覧
+
+更新（8 ファイル）:
+
+- `README.md`
+- `docs/implementation.md`
+- `src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs`
+- `src/Arpeggio.Daw/Presenters/IMainWindowView.cs`
+- `src/Arpeggio.Daw/Presenters/ChipExportReportText.cs`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Daw/FakeMainWindowView.cs`
+
+新規（15 ファイル）:
+
+- `src/Arpeggio.Daw/Presenters/MidiImportInput.cs`
+- `src/Arpeggio.Daw/Presenters/MidiImportPresenter.cs`
+- `src/Arpeggio.Daw/Presenters/MidiImportChannelMapFile.cs`
+- `src/Arpeggio.Daw/Presenters/MidiImportReportText.cs`
+- `src/Arpeggio.Daw/Views/MidiImportView.axaml`
+- `src/Arpeggio.Daw/Views/MidiImportView.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Daw/MidiImportDawFixture.cs`
+- `tests/Arpeggio.Core.Tests/Daw/MidiImportPresenterTests.cs`
+- `tests/Arpeggio.Core.Tests/Daw/MidiImportInputTests.cs`
+- `tests/Arpeggio.Core.Tests/Daw/MidiImportLifetimeTests.cs`
+- `tests/Arpeggio.Core.Tests/Daw/MidiImportOutputTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiPipelineFixture.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiPipelineTests.cs`
+- `tests/Arpeggio.Core.Tests/Formats/MidiRenderAllocationTests.cs`
+- `tests/Arpeggio.Core.Tests/Cli/MidiOutputPipelineTests.cs`
+
+## 既知の制限（依頼者側で実測・2026-09-09）
+
+### OGG の最終 granule が入力より 1024 サンプル小さい
+
+`OggVorbisEncoder` 1.2.2 が書く最終 granule position は、入力フレーム数より**常に 1024（1 ブロック）小さい**。4410 / 22050 / 44100 / 66150 / 132300 フレームで実測し、**曲の長さに依らず一定**であることを確認した。終端のパケット排出から `OggStream.Finished` のガードを外しても変わらないため、こちらの書き出し漏れではなくライブラリの granule 計算のクセと判断した。
+
+再生側が末尾 23 ms を切るかどうかは未確認（このリポジトリに Vorbis デコーダが無いため）。`MidiPipelineTests.AssertOggEndOfStream` は実測値に合わせ、定数 `VorbisGranuleDeficit = 1024` で判定している。WAV 書き出しにはこの制限はない。
+

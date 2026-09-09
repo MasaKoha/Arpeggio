@@ -46,6 +46,8 @@ namespace Arpeggio.Core.Tests.Daw
         public int ExportDisplayCount { get; private set; }
         /// <summary>「フォルダを開く」に渡された最後の書き出し先。</summary>
         public string? LastExportedPath { get; private set; }
+        /// <summary>MIDI 表示の更新回数。</summary>
+        public int MidiImportDisplayCount { get; private set; }
         /// <summary>ファイル監視の切替先。</summary>
         public string DocumentPath { get; private set; } = string.Empty;
         /// <summary>UI スレッド境界を経由した通知回数。</summary>
@@ -100,6 +102,9 @@ namespace Arpeggio.Core.Tests.Daw
             LastExportedPath = lastExportedPath;
             ExportDisplayCount++;
         }
+
+        /// <summary>MIDI の通知回数を記録する。</summary>
+        public void ShowMidiImport() => MidiImportDisplayCount++;
 
         /// <summary>監視対象の切替を記録する。</summary>
         public void SwitchDocument(string path) => DocumentPath = path;

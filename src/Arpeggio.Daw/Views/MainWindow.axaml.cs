@@ -19,6 +19,7 @@ namespace Arpeggio.Daw.Views
         private const int DisplayIntervalMilliseconds = 33;
         private const int SfxTabIndex = 2;
         private const int ExportTabIndex = 3;
+        private const int MidiTabIndex = 4;
         private const int SemitonesPerOctave = 12;
         private readonly PianoRollControl pianoRoll;
         private readonly PianoRollToolbarView pianoRollToolbar;
@@ -32,6 +33,8 @@ namespace Arpeggio.Daw.Views
         private readonly NotePanelView notes;
         private readonly AnalysisView analysis;
         private readonly ChipExportView chipExport;
+        private readonly MidiImportView midiImport;
+        private readonly Button midiImportButton;
         private readonly SfxCreationView sfxCreation;
         private readonly TabControl editorTabs;
         private readonly Button sfxButton;
@@ -72,6 +75,8 @@ namespace Arpeggio.Daw.Views
             notes = Require<NotePanelView>("Notes");
             analysis = Require<AnalysisView>("Analysis");
             chipExport = Require<ChipExportView>("ChipExport");
+            midiImport = Require<MidiImportView>("MidiImport");
+            midiImportButton = Require<Button>("MidiImportButton");
             sfxCreation = Require<SfxCreationView>("SfxCreation");
             editorTabs = Require<TabControl>("EditorTabs");
             sfxButton = Require<Button>("SfxButton");
@@ -107,6 +112,8 @@ namespace Arpeggio.Daw.Views
             notes.Bind(mainPresenter.Notes, mainPresenter.Execute);
             analysis.Bind(mainPresenter.Analysis);
             chipExport.Bind(mainPresenter.Export);
+            midiImport.Bind(mainPresenter.MidiImport, this);
+            midiImportButton.Click += OnMidiImport;
             sfxCreation.Bind(mainPresenter.SfxCreation, mainPresenter.Execute);
             snesEcho.Bind(mainPresenter.SnesEcho, mainPresenter.Execute);
             instruments.WavImportRequested += OnImportWav;
@@ -187,6 +194,8 @@ namespace Arpeggio.Daw.Views
             chipExport.Refresh();
             ExportStatusChanged?.Invoke(text);
         }
+        /// <summary>MIDI の入力・診断・操作状態を更新する。</summary>
+        public void ShowMidiImport() => midiImport.Refresh();
         /// <summary>旧ファイルの監視を解放して新しい正本へ切り替える。</summary>
         public void SwitchDocument(string path)
         {
@@ -237,6 +246,8 @@ namespace Arpeggio.Daw.Views
             notes.Dispose();
             analysis.Dispose();
             chipExport.Dispose();
+            midiImportButton.Click -= OnMidiImport;
+            midiImport.Dispose();
             sfxCreation.Dispose();
             transport.Dispose();
             presenter?.Dispose();
@@ -266,6 +277,7 @@ namespace Arpeggio.Daw.Views
         private void OnTempo(string text) => MainPresenter.Execute(() => MainPresenter.Transport.SetTempo(int.Parse(text, CultureInfo.InvariantCulture)));
         private void OnLength(string text) => MainPresenter.Execute(() => MainPresenter.Transport.SetLength(int.Parse(text, CultureInfo.InvariantCulture)));
         private void OnWarnings(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.ShowWarnings);
+        private void OnMidiImport(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = MidiTabIndex;
         private void OnSfx(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = SfxTabIndex;
         private async void OnExport(object? sender, RoutedEventArgs arguments) => await ExportWithPickerAsync();
         private void OnRevealExport(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.Export.RevealLastExport);

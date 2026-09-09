@@ -36,6 +36,7 @@ namespace Arpeggio.Daw.Presenters
             Analysis = new AnalysisPresenter(document, view, RefreshStatus);
             Export = new ExportPresenter(document, view, RefreshStatus);
             SfxCreation = new SfxCreationPresenter(document, PrepareDocumentSwitch, Open);
+            MidiImport = new MidiImportPresenter(document, view, OpenImportedSong);
         }
         /// <summary>ノート操作の状態機械。</summary>
         public PianoRollPresenter PianoRoll { get; }
@@ -53,6 +54,8 @@ namespace Arpeggio.Daw.Presenters
         public ExportPresenter Export { get; }
         /// <summary>効果音プリセットの新規作成。</summary>
         public SfxCreationPresenter SfxCreation { get; }
+        /// <summary>MIDI 候補の確認・新規保存と保護付き Open。</summary>
+        public MidiImportPresenter MidiImport { get; }
         /// <summary>現在の文書の保存先。</summary>
         public string DocumentPath => document.Path;
         /// <summary>外部変更の確認待ちか。</summary>
@@ -169,8 +172,24 @@ namespace Arpeggio.Daw.Presenters
             isDisposed = true;
             Analysis.Dispose();
             Export.Dispose();
+            MidiImport.Dispose();
             playback.Dispose();
             document.Dispose();
+        }
+        private void OpenImportedSong(string path)
+        {
+            PianoRoll.EndDrag();
+            if (HasPendingExternalChange || document.HasExternalChange())
+            {
+                HasPendingExternalChange = true;
+                RefreshStatus();
+                throw new InvalidOperationException("現在の文書の外部変更を再読み込みしてから開いてください。");
+            }
+            if (document.IsDirty)
+            {
+                throw new InvalidOperationException("現在の編集を保存してから開いてください。");
+            }
+            Open(path);
         }
         private int ResolveInstrument() => Instruments.ResolveInstrumentId();
         private int TotalWarningCount => (int)Math.Min(int.MaxValue, (long)playback.WarningCount + Analysis.WarningCount);
