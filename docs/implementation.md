@@ -2513,3 +2513,78 @@ tests/Arpeggio.Core.Tests/Cli/InstrumentCommandsTests.cs
 tests/Arpeggio.Core.Tests/Daw/SnesInstrumentPresenterTests.cs
 docs/implementation.md
 ```
+
+# SFX-B2 実装記録（2026-09-09）
+
+## SFX-B2 設計との差
+
+- 具体的な公開 API は未指定のため、`SfxSongCompiler.Compile(parameters, chip, title)` と結果型を追加する。結果は新規 Song、B1 の曲線・時間情報、全トーンフレームの要求音程／要求 Hz／実効 Hz、生成警告を保持する。定義・出自・hash の Song への適用は C2、プリセットは D1、CLI/MCP/DAW の新入口は後続ランへ残す。
+- 同種の連続フレーム警告は code/path/layer ごとにまとめ、requested/actual は範囲先頭の代表値とする。ピッチの全フレーム値は別の一覧で失わず保持する。基準 Hz のパスに曲線適用後の Hz を報告する。通常の周期量子化はクランプ警告に含めない。
+- 許容される最大 slide/delta の組合せでは要求 Hz が double の上限超過または0へのアンダーフローになるため、正の double として表現できない場合だけ要求 Hz を null とし、有限の要求 MIDI 値を全フレーム一覧に保持する。実効 Hz は既存 PitchTable の結果を使い、合成処理や保存マクロを変更しない。
+
+## SFX-B2 実装・テストコード
+
+- B1 の検証・正規化・曲線を利用し、NES 5 / GB 4 トラックを SongFactory の名前・配置で生成。tone=ID1/track0、noise=ID2/track3、無効レイヤーは音色・ノートだけ省略する。音色名、tick0、volume15、Effects空、テンポ150、48 ticks/beat、各 `2(N+1)` tick の終端を固定する。
+- duty は repeat の曲線時刻を使い、12.5〜75へ飽和→四段階の最近傍（同距離は小さい比率）。noise は独立した経過時刻を使い、AwayFromZero丸め→NES0〜15/GB0〜127へ飽和→基準選択との差×100を PitchMacro にする。GB の hardware envelope は全量固定。
+- 全トーンフレームで anchor＋arpeggio＋pitch の要求値と PitchTable の実効 Hz を記録。範囲制限だけを PitchClamped とし、終端0フレーム・repeatで音域へ戻る箇所・最大300フレームも含める。警告順は B1 の診断→duty→noise→pitch。
+- 追加テストは、固定トラック・ID・名前・無効レイヤー・異なる包絡長・保存往復・入力と再生成間の可変配列隔離、全4 duty・3中間点・上下飽和・repeat、noiseの両端・GB分周グループ跨ぎ・丸め・mode/width・トーン変調からの独立、通常周期量子化・上下音域・途中クランプ・repeat範囲・最大曲線の有限診断を固定する。
+
+## SFX-B2 静的確認・未完了
+
+B2 の実装とテストコードを作成し、型定義・namespace・接続・固定期待値・括弧・doc XML・public summary隣接・禁止パターンを静的確認してから B3 へ進んだ。ビルド・テスト・音声実測は実行していない。A2/B1を含む依存先の受け入れ確認と、全テスト成功・警告ゼロは依頼者／Claude Code の実行待ち。
+
+# SFX-B3 実装記録（2026-09-09）
+
+## SFX-B3 設計との差
+
+- SNES の波形再生で参照しないメタデータ（sampleRate=44100、rootMidiNote=60、loopStart/loopEnd=0）とトーン音色の無効時 NoiseRate=31 は既存音色の既定値を維持する。ノイズ音色だけパラメータの noiseRate を適用する。Echo設定は全既定値を明示し、DelayMilliseconds=0 とする。
+- B2 と同じ compiler へ SNES の組立を接続する。WAVへの接続は通常の SongRenderer→WavWriter→WavReader を通る統合テストで固定し、新しいCLI/MCP入口や別合成器を追加しない。
+
+## SFX-B3 実装・テストコード
+
+- SNES 8ボイスを維持し、tone=ID1/voice0、noise=ID2/voice1へ独立した一回の発音を配置する。トーンは指定の pulse/sine/square/saw/triangle、ノイズは Waveform=Sine・NoiseEnabled=true・固定noiseRate・MidiNote=60・pitch/arpeggioマクロなしとする。
+- 両音色とも Loop=true、Preset/SampleData=null、Pan/EchoSend=0、PitchModulation=false。ADSR=(15,0,7,0)、秒包絡=(0,0,1,0)を固定し、B1のASDecay/punchはVolumeMacroへだけ接続する。各ノートの最終0フレームと長さをB2と共通に保つ。
+- 全音程診断はSNESのSample用PitchTableへ接続。14bit上限16383・原速4096・内蔵128サンプル周期による約999.94Hz上限を返す。1000Hz要求は基準音のセント丸めで83.21 MIDIとなり上限内へ入るため、保存列の要求値を正として警告しない。1001/12000Hzと途中slideの上限超過を別テストで固定する。
+- `SfxSnesSongCompilerTests`: 全5波形、固定8トラック・ID・名前・Notes/Effects、全31noiseRate、ADSRとマクロ、JSON往復、実際のSnesVoiceSynthesizer.PitchRegisterとの全フレーム一致、二声の独立終端、トーン変調がノイズPCMへ漏れないこと、再生成間の配列・エコー係数隔離を検証する。
+- `SfxCompiledAudioTests`: 全5波形の保存往復→SongRenderer→WAV→再解析、noiseRate端点によるPCM変化、トーン/DSPノイズのtail=0/0.05、44100/48000/44101Hz、DSPレート変換履歴後と曲最終サンプルの0、1/733/1024フレームの分割Render・Reset後の全PCMバイト一致を検証する。0.4秒decayが約8msへ短縮されず0.3秒時点でも鳴ること、3チップの二声と意図的な音量0も含める。
+- 最大曲線の診断テストを三チップ・正負両方向へ拡張し、上限超過／0へのアンダーフローでも要求MIDIと実効Hzが有限で、診断をJSONへ保存できることを固定する。
+
+## SFX-B2 / B3 静的確認
+
+- design-sfx全文、designのチップ・マクロ・ノート効果・SNES DSP仕様、M2-AとSFX各実装記録・未完了事項、Sfx/Instruments/VoiceModulation/PitchTableとCLI/MCP/DAWの既存入口を参照した。
+- 追加参照型の定義・namespace・公開シグネチャを検索照合。15新規C#ファイルの括弧対応、1ファイル1型、ブロックnamespace、doc XML、public summary隣接、禁止省略名・Unity API・Assert.Single内Whereの不使用を静的確認した。
+- 生成・診断はオフラインだけで実行し、Render/NoteOn/AdvanceFrameへ処理・確保・LINQを追加していない。新規リソースはテストのMemoryStreamのみで、usingで破棄する。GC計測テストは追加せず、A2/A3の既存計測ケースを維持する。
+- 開始時のSHA-256と照合し、既存src/testsと変更禁止の3設計書、計535ファイルが不変であることを確認した。既存合成・JSON保存・旧8プリセット・16 SNES音色・依存パッケージを変更していない。JSON version=1。git操作、コンパイル、dotnet build/test、アプリ起動は行っていない。
+- この静的確認はコンパイル・xunitアナライザ・テスト成功、または旧PCM/JSONの実測一致を意味しない。
+
+## SFX-B3 未完了・未実行の確認事項
+
+B2→B3の順で実装とテストコード作成を完了。実装上の残タスクはなし。受け入れ完了には依頼者／Claude Codeによる以下の実行確認が必要。
+
+- A1/A2/A3/B1を含む依存先と今回のコードのレビュー、`dotnet build Arpeggio.slnx` の成功・警告ゼロ、既存全件と追加テストの成功。
+- NES/GBのduty/noise制御・全軌跡音域診断、SNESの14bit上限・5波形・DSPノイズ・長いdecay・末尾ゼロ、保存往復とWAV経路・分割再生・Resetの実測。
+- 旧8プリセット×3チップの基準JSON/PCMの全バイト回帰、既存GC0テスト、およびmacOS/Windowsの丸め境界・決定性確認。既存コードの不変確認だけではこれらを実行済みとしない。
+- 必要な試聴。CLI/MCP/DAWの新パラメータ操作は分割表の後続ランのままで、今回のcompilerは既存legacy入口へ接続していない。
+
+## SFX-B2 / B3 変更ファイル一覧
+
+新規Core 9ファイル、テスト6ファイル、既存文書1ファイル、計16ファイル。
+
+```text
+src/Arpeggio.Core/Sfx/SfxSongCompiler.cs
+src/Arpeggio.Core/Sfx/SfxSongCompilationResult.cs
+src/Arpeggio.Core/Sfx/SfxPulseSongBuilder.cs
+src/Arpeggio.Core/Sfx/SfxSnesSongBuilder.cs
+src/Arpeggio.Core/Sfx/SfxDutyCurveGenerator.cs
+src/Arpeggio.Core/Sfx/SfxNoiseCurveGenerator.cs
+src/Arpeggio.Core/Sfx/SfxPitchDiagnostics.cs
+src/Arpeggio.Core/Sfx/SfxPitchFrame.cs
+src/Arpeggio.Core/Sfx/SfxFrameWarningCollector.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxCompilationTestData.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxSongCompilerTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxChipCurveTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxPitchDiagnosticsTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxSnesSongCompilerTests.cs
+tests/Arpeggio.Core.Tests/Sfx/SfxCompiledAudioTests.cs
+docs/implementation.md
+```
