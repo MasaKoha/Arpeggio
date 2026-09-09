@@ -2232,3 +2232,70 @@ G2→H3 の順で予定したコード・テストコード・README／実装記
 
 再生側が末尾 23 ms を切るかどうかは未確認（このリポジトリに Vorbis デコーダが無いため）。`MidiPipelineTests.AssertOggEndOfStream` は実測値に合わせ、定数 `VorbisGranuleDeficit = 1024` で判定している。WAV 書き出しにはこの制限はない。
 
+
+
+# SFX-A1 実装記録（2026-09-09）
+
+## SFX-A1 設計との差
+
+- API の具体形は未指定のため、C# 9 の immutable record によるパラメータ値、仕様 Catalog、Validator、部分 JSON patch の純粋適用を追加する。チップは引数で受け取り、パラメータ内へ重複保持しない。プリセット Catalog は D1、保存形式への接続は C1 へ残す。
+- 数値は丸め前に型・有限性・範囲を検証し、実数を小数点以下6桁 AwayFromZero へ正規化してから項目間の制約を検証する。範囲外を丸めで救済しない。duty の12.5は表の明示値を優先し、整数限定の選択値には含めない。
+- 保存往復で punch の可否が変わらないよう、半フレームの判定も正規化した秒数を用いる。例: 1/120秒は0.008333秒となり0フレーム、0.0083335秒は0.008334秒となり1フレーム。整数項目の12.0・1.2e1は整数値として受理するが、小数部分の丸めやアンダーフローによる救済は行わない。
+- 空 patch の境界を明確にするため、空の入れ子オブジェクトも InvalidParameter とする。キーと文字列選択値は表の正式表記に限定する。未知パス・異なるチップの項目は UnsupportedParameter、既知項目の型・値・重複・構造違反は InvalidParameter とし、正規パスを例外へ保持する。
+
+## SFX-A1 実装範囲
+
+- `SfxParameters` とトーン・ノイズ・共通包絡・NES/GB/SNES の値オブジェクトを追加。公開値は `init` のみで、部分変更は record の値比較と `with` で扱う。チップ固有設定は現在の一つだけ必須とする。
+- `SfxParameterCatalog` は共通20項目＋NES 5項目＋GB 5項目＋SNES 2項目の計32項目。パス、入力型、単位、既定値、範囲、離散選択、ゼロ無効値、UI刻み・微調整・対数軸、条件の説明とチップ適合性を共有する。値読み取り・候補への置換も同じ定義へ紐付け、Validator と patch に範囲表を複製しない。
+- `SfxParameterValidator` は非有限数、範囲外、不正 enum、欠落したオブジェクト、異なるチップの混在、全レイヤー OFF、sustain/punch、各包絡の300フレーム上限を検証する。無効レイヤーも検証し、全有効レイヤーの音量が0の場合だけ `SilentParameters` を返す。実数は6桁 AwayFromZero と正のゼロへ正規化する。
+- `SfxParameterPatch.Apply` はネスト構造・重複キーを含め全件解析し、完全な候補に対して項目間制約を検証する。省略は保持、元値は不変。正規化後に同値なら `Changed=false`。null・配列・空patch・未知項目・型違い・異なるチップの項目は、安定コードとパスを持つ `SfxParameterException` で拒否する。
+- JSON の数値解析はカルチャ非依存。整数は指数・小数表記でも数学的な整数なら受理する。double 変換で小数が消えるケースと、微小な正の repeat が0へアンダーフローして無効化されるケースを拒否する。`JsonDocument` は解析呼び出し内で破棄する。
+- 合成、Song、Serializer、保存・履歴、CLI/MCP/DAW、旧プリセット、音色バンク、csproj/slnx、依存パッケージ、JSON version は変更していない。パラメータ8プリセット・生成診断・生成器・保存形式への接続は後続ランのまま。
+
+## SFX-A1 テストコード
+
+- `SfxParameterCatalogTests`: 設計表を独立に記述した全28数値行の既定値・単位・型・両端・範囲外、32パスの一意性、三チップの可否、UI刻み、全選択肢。
+- `SfxParameterValidatorTests`: 全21実数項目への NaN/正負Infinity、不正構造・チップ・enum、無効レイヤー、全OFFと無音の区別、半フレーム前後のpunch条件、独立包絡・最大300フレーム、最短decay、repeatの離散した範囲、正負の6桁丸め・負ゼロ。
+- `SfxParameterPatchTests`: 全項目の型への写像、3チップの完全patch、順序不変、部分更新・省略保持・途中失敗時の不変、同値no-op、全パスのnull/配列/型違い、重複（エスケープ同値キーを含む）、未知キー、全離散選択値、指数表記・整数の精度落ち・アンダーフロー。
+- テスト用JSON読み取りは Catalog の内部アクセサーを呼ばず、パラメータ型を独立にシリアライズして写像を照合する。既存テストの期待値は変更していない。
+
+## SFX-A1 静的確認
+
+- 指定設計・M2-A/SFX関連の実装判断、既存SFX/音色/VoiceModulation、CLI/MCP/DAWの既存入口を参照した。
+- 既存型の定義と namespace、追加使用したBCL APIのローカル .NET 10参照XMLを照合した。
+- 新規C# 19ファイルの括弧対応・doc XML・public summaryの隣接・1ファイル1型・ブロックnamespaceを確認。禁止省略名、Unity lifecycle API、`Assert.Single(...Where(...))` の追加なし。Catalogの32パスと読み取り先の一致を確認した。
+- 開始時に採取したSHA-256と照合し、既存 `src/`・`tests/` 全ファイル、および変更禁止の3設計書が不変であることを確認した。指紋の一時ファイルは除去した。git操作は行っていない。
+- この静的確認はコンパイル・テスト成功やPCM一致の実測を意味しない。
+
+## SFX-A1 未完了
+
+A1 の実装上の残タスクはなし。受け入れ完了には依頼者／Claude Codeによる次の確認が必要。
+
+- `dotnet build Arpeggio.slnx` の警告ゼロとコンパイル成功。
+- 新規テストを含む全既存テストの成功、および xunit アナライザの確認。
+- 旧8プリセット×3チップのJSON/PCM回帰確認。合成・保存経路を変更していないことは静的に確認済みだが、音声生成・実測は未実行。
+
+依頼に従い `dotnet build` / `dotnet test` / コンパイル / アプリ起動は実行していない。
+
+## SFX-A1 変更ファイル一覧
+
+- `src/Arpeggio.Core/Sfx/SfxEnvelopeParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxGameBoyParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxNesParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxNoiseParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterCatalog.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterDescription.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterException.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterPatch.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterPatchResult.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterValidator.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterValueKind.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameterWarning.cs`
+- `src/Arpeggio.Core/Sfx/SfxParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxSnesParameters.cs`
+- `src/Arpeggio.Core/Sfx/SfxToneParameters.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxParameterCatalogTests.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxParameterPatchTests.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxParameterTestJson.cs`
+- `tests/Arpeggio.Core.Tests/Sfx/SfxParameterValidatorTests.cs`
+- `docs/implementation.md`
