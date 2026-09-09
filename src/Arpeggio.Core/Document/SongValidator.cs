@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Arpeggio.Core.Instruments;
+using Arpeggio.Core.Sfx;
 
 namespace Arpeggio.Core.Document
 {
@@ -30,6 +31,7 @@ namespace Arpeggio.Core.Document
             ValidateEcho(song.SnesEcho);
             Dictionary<int, Instrument> instruments = ValidateInstruments(song);
             ValidateTracks(song, instruments);
+            SfxDefinitionValidator.Validate(song.Sfx, song.Chip);
         }
 
         private static Dictionary<int, Instrument> ValidateInstruments(Song song)
