@@ -114,7 +114,7 @@ namespace Arpeggio.Formats.Export
                     _modulation.Configure(noise.VolumeMacro, null, noise.PitchMacro);
                     break;
                 case GbPulseInstrument pulse:
-                    _modulation.Configure(pulse.VolumeMacro, pulse.ArpeggioMacro, pulse.PitchMacro, initialDuty: (int)pulse.Duty);
+                    _modulation.Configure(pulse.VolumeMacro, pulse.ArpeggioMacro, pulse.PitchMacro, pulse.DutyMacro, (int)pulse.Duty);
                     break;
                 case GbWaveInstrument wave:
                     _modulation.Configure(null, wave.ArpeggioMacro, wave.PitchMacro);
