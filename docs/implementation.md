@@ -2738,6 +2738,120 @@ tests/Arpeggio.Core.Tests/Cli/SfxHistoryBoundaryTests.cs（新規）
 docs/implementation.md
 ```
 
+# SFX-E1 実装記録（2026-09-10）
+
+## SFX-E1 設計との差
+
+- JSON の具体的なオブジェクト配置は未指定のため、共通結果を最上位へ置き、generation の tone / noise に各包絡時間・フレーム数・trackIndex を持たせる。同期不一致では generation を null とし、保存意図を現在音の診断として返さない。schema は全 Catalog 項目に supported を添えて返す。
+- create の既定 preset は MCP と同じ jump、title 省略時は正式プリセット名とする。個別オプションは CLI 名から正規パスへの写像だけを持ち、型・範囲・可否は Core Catalog と patch 検証へ委譲する。
+- 新規保存は既存側車の置換が成功するまでを一操作とし、失敗時は自分が作った内容が未変更の場合だけ除去する。側車の原子置換前に失敗するため既存 state.json は保持され、新規の空履歴ディレクトリだけ後始末する。
+
+## SFX-E1 実装・テストコード・静的確認
+
+- create / list --editable / params / tweak を追加。旧 new の処理と引数なし list のテキストは維持。個別指定全32正規パスの写像を Catalog と静的照合した。
+- JSON 出力ではパラメータの小文字 enum と非対象チップの省略を保存形式へ揃え、現在値／保存意図・現 revision／候補 revision・生成警告を分離する。通常表示の警告は stderr。引数解析失敗も SFX 専用境界で error / exitCode / code / parameterPath に整形する。
+- CLI の既存編集境界に履歴保存要否の任意述語を追加。SFX の dry-run と同値操作は側車を書き直さず、既存コマンドは従来どおり保存する。create は隣接一時ファイルの新規移動と履歴初期化をまとめ、失敗時に作成ファイルだけを戻す。
+- テストコードは全項目の個別指定／patch 保存バイト同値（三チップ・小数点カンマのカルチャ）、stdin、schema・現在値の読み取り不変、旧 list/new、新8種×3チップ一覧、引数・入力・文書・I/O の 0/1/2/3、patch 構造違反、create dry-run・古い側車初期化・履歴失敗時の復元を追加。
+- 使用型の定義・namespace と System.CommandLine のローカル参照 XML、追加 C# の doc XML・配置・禁止パターンを確認した。E1 の実装とテスト作成を先に揃えてから E2 に進む。コンパイル・テストは実行していない。
+
+## SFX-E1 未完了・未実行の確認事項
+
+実装上の残タスクはなし。依存ランを含む受け入れは未確認。依頼者／Claude Code による警告ゼロのビルド・全件テスト・旧 JSON/PCM 比較が必要。
+
+## SFX-E1 変更ファイル一覧
+
+- `src/Arpeggio.Cli/CliExecution.cs`
+- `src/Arpeggio.Cli/SfxCommands.cs`
+- `src/Arpeggio.Cli/Sfx/CliSfxExecution.cs`
+- `src/Arpeggio.Cli/Sfx/EditableSfxCommands.cs`
+- `src/Arpeggio.Cli/Sfx/SfxFileTransaction.cs`
+- `src/Arpeggio.Cli/Sfx/SfxOutput.cs`
+- `src/Arpeggio.Cli/Sfx/SfxParameterOptions.cs`
+- `tests/Arpeggio.Core.Tests/Cli/Sfx/SfxParameterCommandsTests.cs`
+- `tests/Arpeggio.Core.Tests/Cli/Sfx/SfxCommandFailureTests.cs`
+- `docs/implementation.md`
+
+# SFX-E2 実装記録（2026-09-10）
+
+## SFX-E2 設計との差
+
+- C2 の SfxEditor には乱数操作の接続がないため Randomize / Mutate を追加し、D2 の純粋候補を既存 Complete の保存・履歴・revision 境界へ通す。変更一覧を SfxEditResult に optional 追加し、CLI 結果の changes に返す。sourcePreset / lastRandomization の同値時保持は D2 の申し送りを継承する。
+- CLI randomize の category は必須とする。省略時の既定カテゴリは設計にないため、MCP と同じ明示カテゴリの入力とする。seed / strength はカルチャ非依存に解析し、ロックは一指定一パスの反復オプションとする。
+
+## SFX-E2 実装・テストコード
+
+- randomize / mutate / regenerate / detach を新 SFX 実行境界へ登録。seed 必須、uint32 端点、strength、反復 lock、replace-generated の明示要求、expected-revision、dry-run を扱う。乱数出自は小文字の操作名と正式 sourcePreset を返す。
+- SfxEditor の Randomize / Mutate は同期済みの定義だけを受理し、純粋な D2 候補を一回の Complete で保存・履歴・公開する。変更一覧と包絡補正を返し、同値時は sourcePreset / lastRandomization・両指紋・redo を維持する。Core の依存追加はない。
+- `SfxExplorationCommandsTests`: 三チップと seed=0/1/max、any と選択結果の保存、preview→適用の revision 一致、反復ロック、変更前 hash、出自と生成列の Undo/Redo、手動 tweak 後の出自保持、同値 randomize・strength0・全ロック時の保存日時と redo 保持、引数エラーを固定。
+- `SfxTransactionCommandsTests`: tweak/randomize/mutate/regenerate/detach の全五操作で dry-run と実適用の候補一致、履歴 I/O 失敗時の CRLF を含む元バイト復元、title の外部更新と stale revision の通常／予行拒否、両 hash 不一致の表示と再生成、未知版 detach と Undo、側車未作成を固定。
+- `SfxAnalysisLoopTests`: 新8用途×3チップの create→params→revision付きtweak→analyze（20ms）→export wav（44100Hz/loops1/tail0）→analyze wav。本体長は一サンプル以内、float と16bitの RMS/peak は0.01dB以内、窓数・非無音・非クリップ・入力と履歴不変を検証するコードを追加。三チップの detach 前後の WAV 全バイト比較も含む。
+- `SfxRandomizationEditorTests`: Randomize / Mutate の保存直前の外部 revision 再確認、候補と公開ソングの隔離、一履歴 Undo/Redo、I/O 失敗時の参照・定義・履歴不変を Core セッション境界で固定。
+- E1 の静的確認を補完し、CLI からの internal メンバー参照を解消。カルチャ検証は InvariantGlobalization 環境でも利用できる、InvariantCulture の複製に小数点カンマを設定する方式とした。警告の出力先と個別オプション重複拒否もテストコードへ追加。
+
+## SFX-E1 / E2 最終静的確認
+
+- System.CommandLine 2.0.11 のローカル参照 XML で Option / ParseResult / OptionResult / Arity / Implicit / IdentifierTokenCount を照合。Core の追加参照型・namespace・公開メンバー、JSON／履歴／生成の接続をソースで照合した。
+- 追加・変更 C# の括弧対応、doc XML、public summary の隣接、1ファイル1型、ブロック namespace、禁止省略名・Assert.Single 内 Where・Unity API の不使用を確認。コンパイラ・xunit アナライザによる確認ではない。
+- 開始時の SHA-256 と比較し、既存4 C#だけが変更対象。変更禁止の三設計書、旧プリセット、16 SNES 音色、全合成・音色・Serializer、全 csproj、既存テストを含む554ファイルが不変。実装記録は既存節を保持して末尾へ追加した。
+- Render / AdvanceFrame / NoteOn は変更なし。生成・JSON・履歴は既存どおりオフライン。JSON version=1、Core は BCL のみ。新規購読・音声リソースは追加せず、テストの入力・出力・JSON文書・作業フォルダは破棄する。
+- 作業ディレクトリ外への書き込み、git 操作、コンパイル、dotnet build/test、アプリ起動、PCM/WAV生成・試聴は実行していない。
+
+## SFX-E2 未完了・未実行の確認事項
+
+E1→E2 の実装・テストコード作成と静的確認を完了。実装上の残タスクはなし。受け入れ完了には依存先を含む依頼者／Claude Code のレビューと以下の実行確認が必要。
+
+- `dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunit アナライザ、既存全件および追加テストの成功。
+- CLI の全パラメータ、bool の明示値、負数、反復 lock、引数エラー単一JSON、0/1/2/3、dry-run・同値・履歴失敗・revision の実行確認。
+- 全24新プリセットの解析／WAV許容差、detach の全バイト一致、旧8種×3チップの採取済み JSON/PCM 基準との比較、既存GC0とmacOS/Windowsの決定性・I/O回帰。
+- MCP の新ツールは E3、DAW の新操作は F1以降の予定どおり対象外。後続は SfxEditor.Randomize / Mutate と SfxEditResult.Changes を利用し、同値時の出自保持を継承する。
+
+## SFX-E1 / E2 変更ファイル一覧
+
+既存 C# 4ファイル、追加 C# 12ファイル（CLI6・テスト6）、実装記録1ファイル、計17ファイル。
+
+```text
+src/Arpeggio.Cli/CliExecution.cs
+src/Arpeggio.Cli/SfxCommands.cs
+src/Arpeggio.Cli/Sfx/CliSfxExecution.cs
+src/Arpeggio.Cli/Sfx/EditableSfxCommands.cs
+src/Arpeggio.Cli/Sfx/SfxExplorationCommands.cs
+src/Arpeggio.Cli/Sfx/SfxFileTransaction.cs
+src/Arpeggio.Cli/Sfx/SfxOutput.cs
+src/Arpeggio.Cli/Sfx/SfxParameterOptions.cs
+src/Arpeggio.Core/Session/SfxEditor.cs
+src/Arpeggio.Core/Sfx/SfxEditResult.cs
+tests/Arpeggio.Core.Tests/Cli/Sfx/SfxParameterCommandsTests.cs
+tests/Arpeggio.Core.Tests/Cli/Sfx/SfxCommandFailureTests.cs
+tests/Arpeggio.Core.Tests/Cli/Sfx/SfxExplorationCommandsTests.cs
+tests/Arpeggio.Core.Tests/Cli/Sfx/SfxTransactionCommandsTests.cs
+tests/Arpeggio.Core.Tests/Cli/Sfx/SfxAnalysisLoopTests.cs
+tests/Arpeggio.Core.Tests/Session/SfxRandomizationEditorTests.cs
+docs/implementation.md
+```
+
+## SFX-E1 / E2 Claude レビュー時の修正（実行確認）
+
+Codex 実装後、依頼者側で `dotnet build` / `dotnet test` を実行して発見した2件を修正した。
+
+- **`SfxEditException` のコンストラクタが `internal`**: 別アセンブリ `Arpeggio.Cli` の `SfxFileTransaction.cs` から
+  `new SfxEditException(...)` を呼んでおり CS1729 でビルド不可だった。`public` にし、`<summary>` を追加した。
+- **System.CommandLine 2.0.11 のオプション貪欲消費バグ**: 値未指定のオプション（`--tone-enabled` 単体、`--lock` 単体）が
+  末尾にあると、直後の兄弟オプション（`--json`）のトークンをそのまま値として飲み込み、解析エラーにならず
+  `IOException`（存在しないファイル参照）や `UnsupportedParameter`（`--json` を値扱い）として誤った終了コードになっていた。
+  同様に、`params` の `path`（`ZeroOrOne`）は未知オプション `--unknown` を正規の値として吸収し、解析エラーを起こさなかった。
+  `Arpeggio.Cli/Sfx/CliArgumentGuard.cs` を新規追加し、値が `--` から始まるトークンを解析エラーへ変換する
+  `Validator`（`Option<string>` 用と `Argument` 用の2オーバーロード）を用意して、`SfxParameterOptions` の全パラメータオプション・
+  `--lock`・`params` の `path` 引数に適用した。あわせて `CliSfxExecution.ArgumentFailure` の `--json` 判定を
+  `ParseResult` からではなく生の `arguments` 配列から行うよう変更した（トークンが飲み込まれると `--json` の
+  `OptionResult` 自体が生成されないため）。
+- 修正後、`dotnet build Arpeggio.slnx`（0警告0エラー）・`dotnet test Arpeggio.slnx`（2784件全成功）を確認した。
+
+## SFX-E1 / E2 追加変更ファイル
+
+```text
+src/Arpeggio.Cli/Sfx/CliArgumentGuard.cs（新規）
+```
+
 
 # SFX-F1 / F2 実装記録（2026-09-10）
 

@@ -21,6 +21,10 @@ namespace Arpeggio.Cli
             return Run(() =>
             {
                 var result = CommandFactory.Create().Parse(arguments);
+                if (result.Errors.Count > 0 && Sfx.CliSfxExecution.IsSfxCommand(arguments))
+                {
+                    return Sfx.CliSfxExecution.ArgumentFailure(arguments, result);
+                }
                 if (result.Errors.Count > 0 && CliConversionExecution.IsConversionCommand(arguments))
                 {
                     return CliConversionExecution.ArgumentFailure(arguments, result);
@@ -77,12 +81,16 @@ namespace Arpeggio.Cli
             }
         }
 
-        internal static int Edit(string path, Action<EditSession> action)
+        internal static int Edit(string path, Action<EditSession> action, Func<bool>? shouldSaveHistory = null)
         {
             EditSession session = Open(path);
             CliHistoryStore.Load(session);
             byte[] before = File.ReadAllBytes(path);
             action(session);
+            if (shouldSaveHistory != null && !shouldSaveHistory())
+            {
+                return Success;
+            }
             try
             {
                 CliHistoryStore.Save(session);

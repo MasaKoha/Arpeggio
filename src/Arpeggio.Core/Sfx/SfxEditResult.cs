@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Arpeggio.Core.Document;
 
 namespace Arpeggio.Core.Sfx
@@ -6,7 +8,8 @@ namespace Arpeggio.Core.Sfx
     public sealed class SfxEditResult
     {
         internal SfxEditResult(string operation, bool changed, bool dryRun, string revision,
-            Song candidate, SfxSongCompilationResult? generation, SfxReplacementSummary? replacement)
+            Song candidate, SfxSongCompilationResult? generation, SfxReplacementSummary? replacement,
+            IReadOnlyList<SfxParameterChange>? changes = null)
         {
             Operation = operation;
             Changed = changed;
@@ -17,9 +20,10 @@ namespace Arpeggio.Core.Sfx
             Synchronization = SfxSynchronization.Inspect(candidate);
             Generation = generation;
             Replacement = replacement;
+            Changes = changes ?? Array.Empty<SfxParameterChange>();
         }
 
-        /// <summary>tweak / regenerate / detach の操作名。</summary>
+        /// <summary>tweak / randomize / mutate / regenerate / detach の操作名。</summary>
         public string Operation { get; }
 
         /// <summary>候補が操作前と異なるか。dry-run では変更予定を表す。</summary>
@@ -45,5 +49,8 @@ namespace Arpeggio.Core.Sfx
 
         /// <summary>regenerate の全置換対象件数。他の操作は null。</summary>
         public SfxReplacementSummary? Replacement { get; }
+
+        /// <summary>乱数操作の値変更と包絡補正。他の操作では空。</summary>
+        public IReadOnlyList<SfxParameterChange> Changes { get; }
     }
 }
