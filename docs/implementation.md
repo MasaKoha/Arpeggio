@@ -2851,3 +2851,94 @@ Codex 実装後、依頼者側で `dotnet build` / `dotnet test` を実行して
 ```text
 src/Arpeggio.Cli/Sfx/CliArgumentGuard.cs（新規）
 ```
+
+
+# SFX-F1 / F2 実装記録（2026-09-10）
+
+## SFX-F1 設計との差
+
+- F3 まで既存 View と legacy 作成入口を維持し、新しい SfxEditorPresenter を MainWindowPresenter に併設する。候補・ジェスチャーと専用履歴は SfxEditingModel、保存済み候補の識別は SfxCandidateFile に分ける。新 UI の配線は F3 で切り替える。
+- C2 の SfxEditor は tweak/regenerate/detach のみで、D2 の乱数出自を一履歴で適用する API がない。同期済み定義を受け取る ApplyParameters を最小追加し、既存の revision・保存・履歴境界を再利用する。旧 JSON 出力と既存メソッドの動作は変えない。
+- Rx 規約に従い DAW にのみ System.Reactive 6.1.0 を追加し、通知・入力集約・試聴要求の寿命を Observable と購読で管理する。Core は BCL のみを維持する。150 ms 集約は偽時計で検証できる Presenter API とし、入力部品の接続は F3。
+
+## SFX-F1 実装・静的確認
+
+- SfxEditingModel の候補は専用 SongHistory をメモリ内に持つ。ドラッグは最後の有効値だけを更新し、確定で一履歴、取消で開始値へ戻す。現在文書の編集は確定時にだけ作業セッションへ適用し、Ctrl+S の正本保存を維持する。
+- SfxEditorPresenter は Rx の通知・150ms集約・確定／停止／Open要求を公開する。プリセット、チップ切替、固定seedのrandomize／mutate、正規パスのグループロック、Undo/Redo、regenerateの事前件数／revision確認、detachを接続した。
+- 新規保存は隣接一時ファイルから非上書き移動。保存パスとrevisionを成功後だけ記録し、候補変更後のOpenを無効化する。Openは現在文書のdirty／外部変更と保存済みファイルのrevisionを再検査し、prepareSwitchを呼ばない。
+- MainWindowPresenterに保存・Undo/Redo・読み込み・外部変更・終了の寿命を接続。新しいViewは追加していない。旧SfxCreationPresenterとlegacyテストの契約を維持した。
+- F1のテストコードと型定義／namespace／公開シグネチャを静的確認してからF2へ進む。ビルド・テスト実行による受け入れは未完了。
+
+## SFX-F1 未完了・未実行の確認事項
+
+- 実装とテストコード作成済み。警告ゼロのビルド、既存全件と新規テストの実行、正本保存・OS間のI/O失敗時の動作は依頼者／Claude Codeの確認待ち。
+- 入力部品・タブ選択・フォーカス・ショートカットからPresenterへの配線は設計のF3。150ms集約へ渡す時計はUIスレッド上で通知するISchedulerを使う。
+
+## SFX-F2 設計との差
+
+- 音声出力の所有は既存 PlaybackEngine に集約し、通常／試聴の各 IAudioOutput 接続を AudioOutputOwnership で仲裁する。試聴の停止同期は既存 Stop 契約を使う。
+- 最新世代のレンダラー準備は Rx Switch とキャンセル付き非同期生成で管理する。監視・終了はオフラインの通知経路で扱い、音声コールバックから Subject 通知や Stop／破棄を行わない。
+
+## SFX-F2 実装・静的確認
+
+- SfxPreviewPlayer は入力を複製してから既存 SongRenderer を非同期で構築する。44100 Hz／一回／tail=0／先頭開始を固定し、通常再生のtail=0.5と文書参照を引き継がない。
+- Rx Switch が旧準備の CancellationToken を取り消し、停止・新要求・文書境界・終了で世代を更新する。取消を無視した準備の完了も世代照合で拒否する。ObserveOnでSwitch内部のロックと音声所有権ロックの順序逆転を避ける。非同期完了はDAW文書や候補モデルへ書き込まない。
+- AudioOutputOwnership が一つの実デバイスを所有し、用途別の開始停止を仲裁する。試聴の準備開始時に通常再生を止め、通常再生開始時には準備待ちの試聴も失効させる。旧出力のStop完了後にだけ新出力を開始し、通常曲を自動再開しない。
+- コールバックは既存Render、試聴専用ゲイン、先頭220フレーム（約4.99ms）のモニターフェードと状態値の受け渡しだけ。生成・JSON・Reset・Rx通知・破棄はコールバック外。ゲインとフェードは保存・解析・書き出しへ渡さない。
+- 自然終了／音声障害は既存MainWindow.Poll境界で停止し、停止同期後にrenderer参照を解放する。SongRenderer自体はIDisposableではない。終了時は試聴購読とRxが所有する取消処理を終了し、PlaybackEngineから共有デバイスを一度だけ破棄する。
+
+## SFX-F1 / F2 テストコード
+
+- SfxEditorPresenterTests: 文書・正本不変、100更新の一履歴／一試聴、取消、不正入力の保持、偽時計150ms、グループロック・変異・出自とUndo、チップ切替、保存とOpen拒否の分離、保存済み候補の陳腐化、保存失敗と再試行。
+- SfxEditingModelTests: 作業保存とCtrl+S、一履歴、三種の未知版、生成列／保存パラメータの別状態、明示再生成とUndo、外部revision競合、出自付き変異、作業保存I/O失敗からの再試行。
+- SfxPreviewPlayerTests: 偽IAudioOutputによる三チップのtail0／再試聴一致、約5msのゲイン曲線、最新世代優先、取消無視の旧完了、停止・終了、準備待ちを含む通常再生との排他、スナップショット隔離、モニター音量、生成／出力失敗後の再試行。
+- SfxPreviewLifetimeTests: 自動試聴OFFと手動再生、Undo・タブ離脱・Open・外部変更での停止、MainWindow終了によるデバイス解放。SfxPreviewAllocationTestsはAllocationCollectionで三チップの発音／制御フレーム／ゲイン処理のGC0を計測するコードを追加。
+
+## SFX-F1 / F2 最終静的確認
+
+- 変更・新規C#の括弧対応、doc XML、public summary隣接、ブロックnamespace、省略名、Assert.Single内Whereの不使用を確認した。使用するCore／DAW型の定義とnamespace、RxのSubject・Switch・FromAsync・ObserveOn・HistoricalScheduler・ToTask等をローカル参照XMLで照合した。新規ファイルは機能別フォルダへ配置した。
+- 開始時のSHA-256との比較で、変更禁止の設計書3本、既存Coreの合成／音色／Render／Serializer／旧プリセット、CLI／MCP、View／AXAML、Core依存設定と既存テストの不変を確認した。追加依存はDAWのSystem.Reactiveのみ。JSON version=1を維持する。
+- 既存のPCMとJSONの生成経路は変更していないが、バイト一致を実測したわけではない。コンパイル・アナライザ・テスト実行による結果も主張しない。作業ディレクトリ外への書き込み、git操作、dotnet build/test、アプリ起動は行っていない。
+
+## SFX-F2 未完了・未実行の確認事項
+
+F1→F2の実装とテストコード作成は完了。両ランの受け入れ確認は依頼者／Claude Codeのレビュー・実行待ち。
+
+- `dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunitアナライザ、および既存全件と追加テストの成功。
+- 三チップのPCM／tail0／分割バッファ／ゲイン／GC0、保存・Undo/Redo・競合と未知版、OSごとのI/O失敗・SDLの停止同期。旧JSON／PCMの採取済み基準との全バイト比較。
+- 実機の確定→出音遅延と切替時クリック。100ms以内は設計の目標であり未測定。
+- F3では新PresenterへViewを切り替え、パラメータ部品・キー入力／フォーカス・タブ離脱を接続する。StatesはUIスケジューラーで購読する。試聴音量のアプリ設定への保存、WAV／解析への新候補の動線もF3のUI接続時に行う。旧legacy入口は本ランでは維持した。
+
+## SFX-F1 / F2 変更ファイル一覧
+
+既存更新5ファイル、新規15ファイル、計20ファイル。
+
+```text
+docs/implementation.md
+src/Arpeggio.Core/Session/SfxEditor.cs
+src/Arpeggio.Daw/Arpeggio.Daw.csproj
+src/Arpeggio.Daw/Audio/AudioOutputLease.cs（新規）
+src/Arpeggio.Daw/Audio/AudioOutputOwnership.cs（新規）
+src/Arpeggio.Daw/Audio/PlaybackEngine.cs
+src/Arpeggio.Daw/Audio/Sfx/SfxPreviewPlayer.cs（新規）
+src/Arpeggio.Daw/Audio/Sfx/SfxPreviewRequest.cs（新規）
+src/Arpeggio.Daw/Audio/Sfx/SfxPreviewState.cs（新規）
+src/Arpeggio.Daw/Editing/Sfx/SfxCandidateFile.cs（新規）
+src/Arpeggio.Daw/Editing/Sfx/SfxEditingModel.cs（新規）
+src/Arpeggio.Daw/Editing/Sfx/SfxEditingState.cs（新規）
+src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs
+src/Arpeggio.Daw/Presenters/Sfx/SfxEditorPresenter.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Audio/Sfx/PreviewAudioOutput.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Audio/Sfx/SfxPreviewAllocationTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Audio/Sfx/SfxPreviewPlayerTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Editing/Sfx/SfxEditingModelTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxEditorPresenterTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxPreviewLifetimeTests.cs（新規）
+```
+
+## SFX-F1 / F2 Claude レビュー時の修正（実行確認）
+
+- `SfxEditException` のコンストラクタが `internal` のままで、`Arpeggio.Daw` 側の `SfxEditingModel` / `SfxCandidateFile` /
+  `SfxEditorPresenter` から `new SfxEditException(...)` を呼べず CS1729 でビルド不可だった（SFX-E1/E2 と同一原因。
+  develop 未マージのため個別に踏んだ）。`public` にし `<summary>` を追加して解消した。
+- 修正後、`dotnet build Arpeggio.slnx`（0警告0エラー）・`dotnet test Arpeggio.slnx`（2728件全成功）を確認した。
