@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
 
@@ -37,18 +38,34 @@ namespace Arpeggio.Core.Session
         public SfxEditResult Tweak(string patch, string? expectedRevision = null, bool dryRun = false)
         {
             Song current = ReadCurrent(expectedRevision);
-            SfxSynchronizationState synchronization = SfxSynchronization.Inspect(current);
-            if (!synchronization.Editable)
-            {
-                throw Uneditable(synchronization.Reason);
-            }
-            SfxDefinitionData definition = RequireDefinition(current);
+            SfxDefinitionData definition = RequireEditableDefinition(current);
             SfxParameterPatchResult applied = SfxParameterPatch.Apply(definition.Parameters, current.Chip, patch);
             SfxSongCompilationResult generation = CreateCandidate(applied.Parameters, current.Chip,
                 current.Title, definition.SourcePreset, definition.LastRandomization);
             // 同値 patch では保存済み指紋や出自を正規化し直して書き換えない。
             Song candidate = applied.Changed ? generation.Song : Clone(current);
             return Complete("tweak", current, candidate, dryRun, generation);
+        }
+
+        /// <summary>カテゴリと固定シードから全レシピを入れ替え、一履歴で出自も保存する。</summary>
+        public SfxEditResult Randomize(string category, uint seed, string? expectedRevision = null, bool dryRun = false)
+        {
+            Song current = ReadCurrent(expectedRevision);
+            SfxDefinitionData definition = RequireEditableDefinition(current);
+            SfxParameterRandomizationResult randomized = SfxParameterRandomizer.Randomize(
+                definition.Parameters, current.Chip, category, seed);
+            return ApplyRandomization("randomize", current, definition, randomized, dryRun);
+        }
+
+        /// <summary>現在値へ固定シードの変異を加え、ロック・変更前指紋・全生成領域を一履歴で保存する。</summary>
+        public SfxEditResult Mutate(uint seed, double strength = SfxParameterRandomizer.DefaultStrength,
+            IReadOnlyList<string>? locks = null, string? expectedRevision = null, bool dryRun = false)
+        {
+            Song current = ReadCurrent(expectedRevision);
+            SfxDefinitionData definition = RequireEditableDefinition(current);
+            SfxParameterRandomizationResult randomized = SfxParameterRandomizer.Mutate(
+                definition.Parameters, current.Chip, seed, strength, locks);
+            return ApplyRandomization("mutate", current, definition, randomized, dryRun);
         }
 
         /// <summary>明示要求に限り保存パラメータから生成領域を全置換する。未知版は拒否する。</summary>
@@ -90,13 +107,14 @@ namespace Arpeggio.Core.Session
         }
 
         private SfxEditResult Complete(string operation, Song current, Song candidate, bool dryRun,
-            SfxSongCompilationResult? generation = null, SfxReplacementSummary? replacement = null)
+            SfxSongCompilationResult? generation = null, SfxReplacementSummary? replacement = null,
+            IReadOnlyList<SfxParameterChange>? changes = null)
         {
             string revision = SfxHash.ComputeRevision(current);
             string candidateRevision = SfxHash.ComputeRevision(candidate);
             bool changed = revision != candidateRevision;
             var result = new SfxEditResult(operation, changed, dryRun,
-                changed && !dryRun ? candidateRevision : revision, candidate, generation, replacement);
+                changed && !dryRun ? candidateRevision : revision, candidate, generation, replacement, changes);
             if (!changed || dryRun)
             {
                 return result;
@@ -113,6 +131,25 @@ namespace Arpeggio.Core.Session
                 RequireRevision(SongSerializer.Load(_session.Path!), revision);
             });
             return result;
+        }
+
+        private SfxEditResult ApplyRandomization(string operation, Song current, SfxDefinitionData definition,
+            SfxParameterRandomizationResult randomized, bool dryRun)
+        {
+            SfxSongCompilationResult generation = CreateCandidate(randomized.Parameters, current.Chip, current.Title,
+                randomized.SourcePreset ?? definition.SourcePreset, randomized.Randomization ?? definition.LastRandomization);
+            Song candidate = randomized.Changed ? generation.Song : Clone(current);
+            return Complete(operation, current, candidate, dryRun, generation, changes: randomized.Changes);
+        }
+
+        private static SfxDefinitionData RequireEditableDefinition(Song current)
+        {
+            SfxSynchronizationState synchronization = SfxSynchronization.Inspect(current);
+            if (!synchronization.Editable)
+            {
+                throw Uneditable(synchronization.Reason);
+            }
+            return RequireDefinition(current);
         }
 
         private static SfxDefinitionData RequireDefinition(Song song)
