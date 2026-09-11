@@ -79,6 +79,21 @@ namespace Arpeggio.Core.Session
             return Complete("detach", current, candidate, dryRun);
         }
 
+        /// <summary>確定した全パラメータと出自を、同期済み文書へ一履歴で適用する。</summary>
+        public SfxEditResult ApplyParameters(SfxDefinitionData definition, string expectedRevision)
+        {
+            Song current = ReadCurrent(expectedRevision);
+            SfxSynchronizationState synchronization = SfxSynchronization.Inspect(current);
+            if (!synchronization.Editable)
+            {
+                throw Uneditable(synchronization.Reason);
+            }
+            SfxSongCompilationResult generation = CreateCandidate(definition.Parameters, current.Chip,
+                current.Title, definition.SourcePreset, definition.LastRandomization);
+            bool changed = generation.Curves.Parameters != RequireDefinition(current).Parameters;
+            return Complete("parameters", current, changed ? generation.Song : Clone(current), false, generation);
+        }
+
         private Song ReadCurrent(string? expectedRevision)
         {
             Song current = Clone(_session.GetSong());

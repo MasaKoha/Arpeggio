@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Reactive.Linq;
 using System.Threading;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Render;
@@ -16,6 +17,7 @@ namespace Arpeggio.Daw.Audio
         private const int SinglePass = 1;
         private const double TailSeconds = 0.5;
         private readonly IAudioOutput audioOutput;
+        private readonly IDisposable interruptionSubscription;
         private readonly AudioCallback renderCallback;
         private readonly RenderWarning[] publishedWarnings = new RenderWarning[RenderReport.WarningCapacity];
         private Song? song;
@@ -28,10 +30,14 @@ namespace Arpeggio.Daw.Audio
         private Exception? renderFailure;
         private bool isDisposed;
 
+        internal AudioOutputOwnership OutputOwnership { get; }
+
         /// <summary>出力の寿命を引き受け、コールバックを明示的に接続する。</summary>
         public PlaybackEngine(IAudioOutput audioOutput)
         {
-            this.audioOutput = audioOutput;
+            OutputOwnership = new AudioOutputOwnership(audioOutput);
+            this.audioOutput = OutputOwnership.Playback;
+            interruptionSubscription = OutputOwnership.Playback.Interruptions.Subscribe(_ => Stop());
             renderCallback = RenderBuffer;
         }
 
@@ -79,26 +85,32 @@ namespace Arpeggio.Daw.Audio
         /// <summary>現在位置から再生する。完走後は先頭から再生する。</summary>
         public void Play()
         {
-            ObjectDisposedException.ThrowIf(isDisposed, this);
-            if (IsPlaying)
+            lock (OutputOwnership.Gate)
             {
-                return;
+                ObjectDisposedException.ThrowIf(isDisposed, this);
+                if (IsPlaying)
+                {
+                    return;
+                }
+                SongRenderer activeRenderer = RequireRenderer();
+                if (activeRenderer.IsFinished)
+                {
+                    Reset();
+                }
+                Volatile.Write(ref renderFailure, null);
+                audioOutput.Start(SampleRate, BufferFrames, renderCallback);
+                IsPlaying = true;
             }
-            SongRenderer activeRenderer = RequireRenderer();
-            if (activeRenderer.IsFinished)
-            {
-                Reset();
-            }
-            Volatile.Write(ref renderFailure, null);
-            audioOutput.Start(SampleRate, BufferFrames, renderCallback);
-            IsPlaying = true;
         }
 
         /// <summary>コールバックの完了を待って停止し、現在位置を保持する。</summary>
         public void Stop()
         {
-            audioOutput.Stop();
-            IsPlaying = false;
+            lock (OutputOwnership.Gate)
+            {
+                audioOutput.Stop();
+                IsPlaying = false;
+            }
         }
 
         /// <summary>再生回数設定を停止中に再構築し、再生中だった場合は先頭から再開する。</summary>
@@ -181,7 +193,8 @@ namespace Arpeggio.Daw.Audio
                 return;
             }
             Stop();
-            audioOutput.Dispose();
+            interruptionSubscription.Dispose();
+            OutputOwnership.Dispose();
             isDisposed = true;
         }
 

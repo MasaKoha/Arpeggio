@@ -1,9 +1,13 @@
 using System;
 using System.IO;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Daw.Audio;
+using Arpeggio.Daw.Audio.Sfx;
 using Arpeggio.Daw.Editing;
+using Arpeggio.Daw.Presenters.Sfx;
 
 namespace Arpeggio.Daw.Presenters
 {
@@ -13,6 +17,7 @@ namespace Arpeggio.Daw.Presenters
         private readonly IMainWindowView view;
         private readonly DawDocument document;
         private readonly PlaybackEngine playback;
+        private readonly CompositeDisposable sfxSubscriptions = new CompositeDisposable();
         private string message = string.Empty;
         private string statusText = string.Empty;
         private bool isDisposed;
@@ -37,6 +42,19 @@ namespace Arpeggio.Daw.Presenters
             Export = new ExportPresenter(document, view, RefreshStatus);
             SfxCreation = new SfxCreationPresenter(document, PrepareDocumentSwitch, Open);
             MidiImport = new MidiImportPresenter(document, view, OpenImportedSong);
+            SfxEditor = new SfxEditorPresenter(document);
+            SfxPreview = new SfxPreviewPlayer(playback);
+            sfxSubscriptions.Add(SfxEditor.PreviewRequests.Subscribe(SfxPreview.Play));
+            sfxSubscriptions.Add(SfxEditor.PreviewStops.Subscribe(_ => SfxPreview.Stop()));
+            sfxSubscriptions.Add(SfxEditor.OpenRequests.Subscribe(OpenImportedSong));
+            sfxSubscriptions.Add(SfxEditor.Commits.Subscribe(_ =>
+            {
+                if (!SfxEditor.Model.IsNewCandidate)
+                {
+                    playback.Load(document.Song);
+                    Refresh();
+                }
+            }));
         }
         /// <summary>ノート操作の状態機械。</summary>
         public PianoRollPresenter PianoRoll { get; }
@@ -56,6 +74,10 @@ namespace Arpeggio.Daw.Presenters
         public SfxCreationPresenter SfxCreation { get; }
         /// <summary>MIDI 候補の確認・新規保存と保護付き Open。</summary>
         public MidiImportPresenter MidiImport { get; }
+        /// <summary>候補と編集中ファイルのパラメータ SFX 編集。</summary>
+        public SfxEditorPresenter SfxEditor { get; }
+        /// <summary>通常再生と出力を共有するSFX専用試聴。</summary>
+        public SfxPreviewPlayer SfxPreview { get; }
         /// <summary>現在の文書の保存先。</summary>
         public string DocumentPath => document.Path;
         /// <summary>外部変更の確認待ちか。</summary>
@@ -66,8 +88,10 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>初期ファイルを読み、合成器を準備する。</summary>
         public void Open(string path)
         {
+            SfxEditor.Stop();
             PianoRoll.EndDrag();
             document.Open(path);
+            SfxEditor.FollowDocument();
             playback.Load(document.Song);
             Instruments.ResetSelection();
             PianoRoll.SelectTrack(0);
@@ -91,10 +115,13 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>正本を保存する。確認待ちの外部変更は上書きしない。</summary>
         public void Save()
         {
+            SfxEditor.Commit();
+            if (SfxEditor.Model.HasGesture) { return; }
             PianoRoll.EndDrag();
             if (HasPendingExternalChange || document.HasExternalChange())
             {
                 HasPendingExternalChange = true;
+                SfxEditor.ExternalChange();
                 message = "外部変更を再読み込みしてから保存してください。";
                 RefreshStatus();
                 return;
@@ -107,6 +134,7 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>一操作戻す。</summary>
         public void Undo()
         {
+            SfxEditor.Cancel();
             PianoRoll.ClearSelection();
             if (document.Session.History.UndoCount == 0) { return; }
             Transport.ChangeStructure(() => document.Session.Undo());
@@ -114,6 +142,7 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>一操作やり直す。</summary>
         public void Redo()
         {
+            SfxEditor.Cancel();
             PianoRoll.ClearSelection();
             if (document.Session.History.RedoCount == 0) { return; }
             Transport.ChangeStructure(() => document.Session.Redo());
@@ -133,6 +162,7 @@ namespace Arpeggio.Daw.Presenters
         public void ExternalFileChanged()
         {
             if (isDisposed || !document.HasExternalChange()) { return; }
+            SfxEditor.ExternalChange();
             if (document.IsDirty)
             {
                 HasPendingExternalChange = true;
@@ -151,6 +181,7 @@ namespace Arpeggio.Daw.Presenters
         {
             if (isDisposed) { return; }
             playback.Poll();
+            SfxPreview.Poll();
             RefreshTransport();
             view.ShowStatus(statusText, TotalWarningCount);
         }
@@ -160,6 +191,7 @@ namespace Arpeggio.Daw.Presenters
         /// <summary>編集通知で表示内容を更新する。</summary>
         public void Refresh()
         {
+            SfxEditor.RefreshDocument();
             Analysis.RefreshValidity();
             view.ShowSong(document.Song, PianoRoll.SelectedTrack, PianoRoll.SelectedTick);
             RefreshTransport();
@@ -170,6 +202,9 @@ namespace Arpeggio.Daw.Presenters
         {
             if (isDisposed) { return; }
             isDisposed = true;
+            SfxEditor.Dispose();
+            sfxSubscriptions.Dispose();
+            SfxPreview.Dispose();
             Analysis.Dispose();
             Export.Dispose();
             MidiImport.Dispose();
@@ -209,6 +244,7 @@ namespace Arpeggio.Daw.Presenters
             bool resume = playback.IsPlaying;
             playback.Stop();
             document.Open(document.Path);
+            if (!SfxEditor.Model.IsNewCandidate) { SfxEditor.FollowDocument(); }
             playback.Load(document.Song);
             HasPendingExternalChange = false;
             PianoRoll.SelectTrack(Math.Min(PianoRoll.SelectedTrack, document.Song.Tracks.Count - 1));

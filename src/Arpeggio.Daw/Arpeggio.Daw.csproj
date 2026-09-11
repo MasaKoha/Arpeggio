@@ -31,6 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Reactive" Version="6.1.0" />
     <PackageReference Include="SDL3-CS" Version="3.4.12.4" ExcludeAssets="analyzers" />
     <PackageReference Include="SDL3-CS.Native" Version="3.4.2" ExcludeAssets="analyzers" />
     <PackageReference Include="Avalonia" Version="12.1.2" />
