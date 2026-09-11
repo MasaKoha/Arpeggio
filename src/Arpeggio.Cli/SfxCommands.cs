@@ -13,7 +13,9 @@ namespace Arpeggio.Cli
         {
             Command command = new Command("sfx", "効果音プリセット");
             command.Subcommands.Add(CreateNew());
-            command.Subcommands.Add(CreateList());
+            command.Subcommands.Add(Sfx.EditableSfxCommands.CreateList());
+            Sfx.EditableSfxCommands.AddTo(command);
+            Sfx.SfxExplorationCommands.AddTo(command);
             return command;
         }
 
@@ -41,18 +43,5 @@ namespace Arpeggio.Cli
             return command;
         }
 
-        private static Command CreateList()
-        {
-            Command command = new Command("list", "全プリセットの名前と説明");
-            command.SetAction(_ => CliExecution.Run(() =>
-            {
-                foreach (SfxPresetDescription preset in SfxPresetCatalog.GetAll())
-                {
-                    Console.WriteLine($"{preset.Name}: {preset.Description}");
-                }
-                return CliExecution.Success;
-            }));
-            return command;
-        }
     }
 }
