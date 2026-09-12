@@ -10,10 +10,12 @@ using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
+using Arpeggio.Core.Session.Sfx;
 using Arpeggio.Core.Sfx;
 using Arpeggio.Formats;
 using Arpeggio.Formats.Export;
 using Arpeggio.Formats.Midi;
+using Arpeggio.Mcp.Sfx;
 using ModelContextProtocol.Server;
 
 namespace Arpeggio.Mcp
@@ -471,6 +473,99 @@ namespace Arpeggio.Mcp
         public string SfxPresets()
         {
             return Invoke(() => SfxPresetCatalog.GetAll());
+        }
+
+        /// <summary>定義付き効果音を新規保存し、現在のソングと履歴を維持する。</summary>
+        [McpServerTool(Name = "create_sfx", ReadOnly = false, Destructive = false)]
+        [Description("再編集できる SFX を新規保存する。現在セッションは切り替えない。編集するには続けて open_song を呼ぶ。既存の保存先は拒否する。")]
+        public string CreateSfx(
+            [Description("保存先 .arpeggio.json")] string path,
+            [Description("nes / gameboy / snes")] string chip = "nes",
+            [Description("sfx_parameter_presets のプリセット名")] string preset = "jump",
+            [Description("曲名。省略時は正式プリセット名")] string? title = null,
+            [Description("生成結果だけを返し、ファイルを作らない")] bool dryRun = false)
+        {
+            return Invoke(() => McpSfxExecution.Run("create", () => McpSfxCreation.Create(path, chip, preset, title, dryRun)));
+        }
+
+        /// <summary>パラメータプリセットの完全初期値・説明・対応チップを返す。</summary>
+        [McpServerTool(Name = "sfx_parameter_presets", ReadOnly = true, Destructive = false)]
+        [Description("パラメータ編集用の八種類について、全三チップの完全初期値と説明を返す。ソング未オープンでも利用できる。")]
+        public string SfxParameterPresets()
+        {
+            return Invoke(() => McpSfxExecution.Run("list", SfxSessionOutput.Presets));
+        }
+
+        /// <summary>現在のパラメータ・同期状態・revision、または指定チップの初期値と schema を返す。</summary>
+        [McpServerTool(Name = "sfx_parameters", ReadOnly = true, Destructive = false)]
+        [Description("現在音の値と保存意図を区別し、同期状態・revision・生成診断を返す。未オープン時は chip 必須で初期値と schema を返す。開いている Song と異なる chip は拒否する。")]
+        public string SfxParameters(
+            [Description("現在 Song の結果に全項目の単位・範囲・刻み・可否を追加する")] bool includeSchema = false,
+            [Description("nes / gameboy / snes。未オープン時は必須")] string? chip = null)
+        {
+            return Invoke(() => McpSfxExecution.Run("params", () => McpSfxInput.Parameters(session.Song, includeSchema, chip)));
+        }
+
+        /// <summary>部分パラメータを一度の保存と履歴で適用する。</summary>
+        [McpServerTool(Name = "tweak_sfx", ReadOnly = false, Destructive = false)]
+        [Description("同期済み SFX にネストした部分 JSON を適用する。省略は保持し、null・未知キー・重複キー・空 patch は拒否する。同値なら保存も履歴も増やさない。")]
+        public string TweakSfx(
+            [Description("parameters に対する部分オブジェクトの JSON 文字列。例: {\"tone\":{\"slideSemitonesPerSecond\":-12}}")] string parameters,
+            [Description("sfx_parameters が返した revision。競合時は適用を拒否する")] string? expectedRevision = null,
+            [Description("候補と診断だけを返し、保存・履歴を変更しない")] bool dryRun = false)
+        {
+            return Invoke(() => McpSfxExecution.Run("tweak", () =>
+                SfxSessionOutput.Edit(session.Sfx.Tweak(parameters, expectedRevision, dryRun))));
+        }
+
+        /// <summary>カテゴリと固定シードから全レシピを一履歴で置き換える。</summary>
+        [McpServerTool(Name = "randomize_sfx", ReadOnly = false, Destructive = false)]
+        [Description("同期済み SFX の全パラメータをカテゴリから生成する。チップと曲名は保持する。同じカテゴリ・チップ・seed は同じ結果になる。")]
+        public string RandomizeSfx(
+            [Description("jump / coin / hit / explosion / powerup / laser / blip / select / any")] string category,
+            [Description("必須の固定シード。0〜4294967295")] uint seed,
+            [Description("期待する現在 Song の revision")] string? expectedRevision = null,
+            [Description("候補だけを生成し、保存・履歴を変更しない")] bool dryRun = false)
+        {
+            return Invoke(() => McpSfxExecution.Run("randomize", () =>
+                SfxSessionOutput.Edit(session.Sfx.Randomize(category, seed, expectedRevision, dryRun))));
+        }
+
+        /// <summary>固定シードによる変異と出自を一履歴で適用する。</summary>
+        [McpServerTool(Name = "mutate_sfx", ReadOnly = false, Destructive = false)]
+        [Description("同期済み SFX の現在値へ strength に比例する変異を加える。locks の正規パスは保持する。strength=0 または同値結果では保存・履歴・出自を変更しない。")]
+        public string MutateSfx(
+            [Description("必須の固定シード。0〜4294967295")] uint seed,
+            [Description("変異の強さ。0〜1")] double strength = SfxParameterRandomizer.DefaultStrength,
+            [Description("保持する正規パス配列の JSON 文字列。例: [\"tone.baseFrequencyHz\"]")] string? locks = null,
+            [Description("期待する現在 Song の revision")] string? expectedRevision = null,
+            [Description("候補だけを生成し、保存・履歴を変更しない")] bool dryRun = false)
+        {
+            return Invoke(() => McpSfxExecution.Run("mutate", () => SfxSessionOutput.Edit(
+                session.Sfx.Mutate(seed, strength, McpSfxInput.ParseLocks(locks), expectedRevision, dryRun))));
+        }
+
+        /// <summary>保存パラメータから生成領域を明示的に置換する。</summary>
+        [McpServerTool(Name = "regenerate_sfx", ReadOnly = false, Destructive = true)]
+        [Description("保存意図から曲名以外の生成領域を全置換する。replaceGenerated=true 必須。dryRun で置換件数を確認でき、適用後も undo 一回で手動編集へ戻せる。未知版は拒否する。")]
+        public string RegenerateSfx(
+            [Description("保存パラメータから生成領域を置換する明示要求。true 必須")] bool replaceGenerated,
+            [Description("期待する現在 Song の revision")] string? expectedRevision = null,
+            [Description("置換対象と候補を返し、保存・履歴を変更しない")] bool dryRun = false)
+        {
+            return Invoke(() => McpSfxExecution.Run("regenerate", () =>
+                SfxSessionOutput.Edit(session.Sfx.Regenerate(replaceGenerated, expectedRevision, dryRun))));
+        }
+
+        /// <summary>SFX 定義だけを除去し、生成列と音を保持する。</summary>
+        [McpServerTool(Name = "detach_sfx", ReadOnly = false, Destructive = true)]
+        [Description("SFX 定義だけを除去して通常ソングにする。生成列は保持し、undo 一回で定義へ戻せる。未知版の定義にも利用できる。")]
+        public string DetachSfx(
+            [Description("期待する現在 Song の revision")] string? expectedRevision = null,
+            [Description("候補だけを返し、保存・履歴を変更しない")] bool dryRun = false)
+        {
+            return Invoke(() => McpSfxExecution.Run("detach", () =>
+                SfxSessionOutput.Edit(session.Sfx.Detach(expectedRevision, dryRun))));
         }
 
         private string ExportChip(string path, ChipExportOptions options, bool dryRun, bool overwrite)
