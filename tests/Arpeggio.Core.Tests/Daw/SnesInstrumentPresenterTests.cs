@@ -4,8 +4,8 @@ using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Instruments.Snes;
 using Arpeggio.Core.Session;
-using Arpeggio.Daw.Presenters;
 using Xunit;
+using Arpeggio.Daw.Presenters.Instrument;
 
 namespace Arpeggio.Core.Tests.Daw
 {

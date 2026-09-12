@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using Arpeggio.Core.Document;
-using Arpeggio.Daw.Presenters;
 using Xunit;
+using Arpeggio.Daw.Presenters.PianoRoll;
 
 namespace Arpeggio.Core.Tests.Daw
 {

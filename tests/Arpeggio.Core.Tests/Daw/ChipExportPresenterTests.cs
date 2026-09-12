@@ -4,10 +4,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
-using Arpeggio.Daw.Presenters;
 using Arpeggio.Formats;
 using Arpeggio.Formats.Export;
 using Xunit;
+using Arpeggio.Daw.Presenters.Export;
 
 namespace Arpeggio.Core.Tests.Daw
 {

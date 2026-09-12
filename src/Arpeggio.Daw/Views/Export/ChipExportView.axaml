@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.Export.ChipExportView" Background="{StaticResource Arpeggio.Panel}">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+  <Grid RowDefinitions="Auto,Auto" Margin="12">
+    <StackPanel Spacing="8" Margin="0,0,0,8">
+      <TextBlock Text="チップ書き出し設定" FontWeight="Bold" />
+      <TextBlock x:Name="DestinationLabel" Text="書き出しボタンで NSF / VGM の保存先を選択してください。" TextWrapping="Wrap" />
+      <StackPanel x:Name="SettingsPanel" Spacing="8" IsEnabled="False">
+        <TextBlock Text="有限再生回数（1〜16）" />
+        <TextBox x:Name="LoopsInput" Text="1" />
+        <TextBlock Text="著作者" />
+        <TextBox x:Name="AuthorInput" />
+        <StackPanel x:Name="CopyrightPanel" Spacing="8" IsVisible="False">
+          <TextBlock Text="権利表記（NSF）" />
+          <TextBox x:Name="CopyrightInput" />
+        </StackPanel>
+        <CheckBox x:Name="StrictInput" Content="strict — 変換警告があれば保存しない" />
+      </StackPanel>
+      <Button x:Name="PrepareButton" Content="変換を確認" HorizontalAlignment="Stretch" IsEnabled="False" />
+      <Button x:Name="SaveButton" Content="書き出す" HorizontalAlignment="Stretch" IsEnabled="False" />
+    </StackPanel>
+    <TextBox x:Name="ReportText" Grid.Row="1" MinHeight="220" MaxHeight="420" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+             Text="通常の再生とは位相・音量が異なります。有限回数を展開して保存します。" />
+  </Grid>
+  </ScrollViewer>
+</UserControl>

@@ -4,8 +4,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Arpeggio.Core.Document;
-using Arpeggio.Daw.Presenters;
 using Xunit;
+using Arpeggio.Daw.Presenters.Export;
 
 namespace Arpeggio.Core.Tests.Daw
 {

@@ -1,5 +1,6 @@
-using Arpeggio.Daw.Presenters;
 using Xunit;
+using Arpeggio.Daw.Presenters.PianoRoll;
+using Arpeggio.Daw.Presenters.Transport;
 
 namespace Arpeggio.Core.Tests.Daw
 {

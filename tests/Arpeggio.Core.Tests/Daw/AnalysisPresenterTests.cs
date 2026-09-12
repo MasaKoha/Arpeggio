@@ -3,8 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Arpeggio.Core.Analysis;
 using Arpeggio.Core.Document;
-using Arpeggio.Daw.Presenters;
 using Xunit;
+using Arpeggio.Daw.Presenters.Analysis;
 
 namespace Arpeggio.Core.Tests.Daw
 {
