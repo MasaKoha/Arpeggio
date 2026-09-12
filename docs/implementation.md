@@ -2943,6 +2943,79 @@ tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxPreviewLifetimeTests.cs（新規
   develop 未マージのため個別に踏んだ）。`public` にし `<summary>` を追加して解消した。
 - 修正後、`dotnet build Arpeggio.slnx`（0警告0エラー）・`dotnet test Arpeggio.slnx`（2728件全成功）を確認した。
 
+# SFX-E3 実装記録（2026-09-12）
+
+## SFX-E3 設計との差
+
+- 共通結果の整形は E1/E2 時点で CLI 内部にあるため、JSON 部分だけを Core の `Session/Sfx/SfxSessionOutput` へ移して共有する。CLI の通常表示は元の境界に残し、JSON のキー順・値・省略規則は変更しない。
+- 未オープンの `sfx_parameters` は chip の明示がなければ `InvalidParameter`（位置 chip）を返し、明示時は includeSchema にかかわらず初期値と schema を返す。revision / candidateRevision はともに null とし、CLI のファイル未指定時と揃える。
+- 新ツールの operation は CLI と同じ create / list / params / tweak / randomize / mutate / regenerate / detach。locks の JSON 構文・配列型・非文字列要素のエラー位置は locks、正規パスの可否・重複正規化は既存 Core に委譲する。既存ツールのエラー形式は維持する。
+
+## SFX-E3 実装範囲と判断
+
+- `ArpeggioTools` に create_sfx / sfx_parameter_presets / sfx_parameters / tweak_sfx / randomize_sfx / mutate_sfx / regenerate_sfx / detach_sfx を追加。既存26ツールと合わせて34ツールとし、既存の登録方法を継承する。全追加ツールを既存 Invoke の共有 EditSession ロック内で実行し、結果の JSON 文字列化もロック内で完了する。UseStructuredContent は指定しない。
+- create は既存 Core のパラメータプリセットと SfxEditor.CreateCandidate を使用し、隣接一時ファイルから非上書き移動で保存する。保存先の存在はファイル・ディレクトリとも拒否し、移動時の競合も DestinationExists。成功・予行・失敗のどの場合も現在 Song・パス・Undo/Redo・CLI側車へ触れず、開く操作は既存 open_song に分離する。
+- params は開いている Song の同期状態と revision を返す。同期切れの保存意図を現在値として表示せず、generation は null。未オープン時は明示チップの初期値と schema、オープン済みでは要求時だけ schema を追加し、異なる chip 指定を拒否する。
+- tweak / randomize / mutate / regenerate / detach は既存 SfxEditor の保存・一履歴・revision照合・no-op・dry-runをそのまま利用する。seed は必須 uint32、strength は既存定数、locks は JSON 文字列配列を Core の正規パス検証へ渡す。未知版は既存契約どおり detach だけを許可する。
+- `SfxSessionOutput` が CLI と MCP の共通結果・パラメータ表現・schema・新プリセット一覧を提供する。既存 CLI の JSON 整形本体を移し、通常表示の stdout/stderr 分離は CLI に残す。Core の生成・乱数・編集・保存・音声コードや既存 JSON の規則は変更していない。
+- `McpSfxExecution` は新ツールだけのエラー境界。Core の入力／編集拒否は exit1、文書不正は exit2、I/O は exit3 とし、operation / error / exitCode / code / parameterPath を一つの JSON 文字列にする。既存ツールのエラー戻り値は変更しない。
+
+## SFX-E3 テストコード
+
+必須として、公開契約・保存と状態遷移・入力変換・失敗時の非変更・直列実行を追加した。単純な getter や委譲メソッド単体、変更していない合成ホットパスの追加計測は冗長として追加していない。新規テストは18メソッド（コード上の静的集計）であり、実行件数・成功数ではない。
+
+| 対象 | 追加した検証 |
+|---|---|
+| ArpeggioToolsTests | 既存26名＋新8名の共存、全ツールの string 戻り値と StructuredContent 不使用 |
+| SfxCreationToolsTests | 新8用途×3チップの Core 生成JSONとの全バイト一致、予行と実保存の指紋・診断一致、未オープン維持、成功／失敗時の現在Song参照・パス・Undo/Redo・古い側車維持、保存競合・I/O分類と一時ファイル除去 |
+| SfxParameterToolsTests | 必須引数とJSON文字列入力、未オープンschema、全32パラメータのチップ別patch、create/list/params/tweakのCLI JSON全文一致、保存バイト一致、現在Songとディスクの区別、旧カタログ保持 |
+| SfxEditingToolsTests | 全五操作×三チップの予行・実適用・CLI結果一致、一操作一履歴とUndo/Redo、seed端点・any・重複locks・出自とCore値一致、手動編集後の出自保持、同値patch／strength0／全ロック／同値乱数／再生成で保存日時・redo保持 |
+| SfxFailureToolsTests | 不正patch途中の原子性、locksの構文・型・未知パス、未オープン・strength・明示置換要求、文書不正、全五操作のstale revision／外部更新／I/O拒否、両hashの同期切れと明示修復、未知三版のdetachとUndo、legacyへの暗黙定義追加の拒否 |
+| SfxConcurrencyToolsTests | 別ツールインスタンスからの全8ツールが同じセッションロックを待機、同じrevisionの同時編集で一件だけ成功し一履歴となること |
+
+## SFX-E3 静的確認
+
+- design-sfx 全文、design のチップ・マクロ・ノート効果、M2-A と SFX 各ランの判断・申し送り、既存 Sfx / Instruments / VoiceModulation と CLI / MCP / DAW の該当境界を参照した。
+- 使用する Core 型の定義・namespace・公開シグネチャを検索照合した。BCL の TaskCompletionSource / ManualResetEventSlim / Task.WaitAsync と xunit の Assert.Single(predicate) はローカル参照 XML も確認した。
+- 変更・新規15 C#ファイルの括弧対応とdoc XML、新規型のpublic summary・1ファイル1型・ブロックnamespace・省略名・Assert.Single内Where不使用を静的確認。全8入口が既存Invokeと新JSONエラー境界を通ること、公開34名の一意性を照合した。コンパイラ／アナライザによる確認ではない。
+- 追加部分を除いて再構成した ArpeggioTools と、移動先から再構成した旧CLI SfxOutput の SHA-256 が変更前と一致することを確認した。既存MCPメソッドの本文とJSON／通常表示の整形本体を維持している。
+- 変更前の指紋との比較で、変更禁止の3設計書、既存合成・音色・旧SFX・16音色・Serializer・全csproj、既存テスト（公開名一覧の更新を除く）の不変を確認。実装記録は末尾追記のみ。CoreはBCLのみ、JSON version=1。
+- Render / AdvanceFrame / NoteOn は変更なし。新規JSON・生成・ロック処理はオフラインのツール境界だけ。JSON文書はusing、テストの作業ディレクトリと同期イベントはDispose、並行タスクは完了待ちで後始末する。
+- 指定作業ディレクトリ外への書き込み、git操作、コンパイル、dotnet build/test、アプリ起動、PCM生成・試聴は行っていない。
+
+## SFX-E3 未完了・未実行の確認事項
+
+実装・テストコード作成・静的確認は完了。実装上の残タスクはなし。受け入れ完了には依存ランを含む依頼者／Claude Code のレビューと以下の実行確認が必要。
+
+- `dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunitアナライザを含む既存全件と追加テストの成功。
+- MCPホスト経由のツール発見・必須引数・JSON文字列応答、全8ツールの共有セッション直列実行、create後のopen_song、Undo/Redo、未オープンschema取得。
+- CLI/MCP/Core の保存バイト・診断一致、dry-run／競合／I/Oの拒否、macOS/Windowsでの一時ファイル除去と並行テスト。
+- 採取済み旧8用途×3チップのJSON/PCM基準、既存音声・GC0回帰。既存経路のソース不変確認は実測一致を意味しない。
+- DAWのF3接続と全体のG1受け入れは本ランの対象外のまま。
+
+## SFX-E3 変更ファイル一覧
+
+既存C#更新5ファイル、新規C#10ファイル、実装記録1ファイル、計16ファイル。
+
+```text
+src/Arpeggio.Mcp/ArpeggioTools.cs
+src/Arpeggio.Mcp/Sfx/McpSfxCreation.cs（新規）
+src/Arpeggio.Mcp/Sfx/McpSfxInput.cs（新規）
+src/Arpeggio.Mcp/Sfx/McpSfxExecution.cs（新規）
+src/Arpeggio.Core/Session/Sfx/SfxSessionOutput.cs（新規）
+src/Arpeggio.Cli/Sfx/SfxOutput.cs
+src/Arpeggio.Cli/Sfx/EditableSfxCommands.cs
+src/Arpeggio.Cli/Sfx/SfxFileTransaction.cs
+tests/Arpeggio.Core.Tests/Mcp/ArpeggioToolsTests.cs
+tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxToolFixture.cs（新規）
+tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxCreationToolsTests.cs（新規）
+tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxParameterToolsTests.cs（新規）
+tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxEditingToolsTests.cs（新規）
+tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxFailureToolsTests.cs（新規）
+tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxConcurrencyToolsTests.cs（新規）
+docs/implementation.md
+```
+
 
 # SFX-F3 実装記録（2026-09-12）
 

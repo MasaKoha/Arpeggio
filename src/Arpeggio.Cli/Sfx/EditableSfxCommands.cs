@@ -1,8 +1,8 @@
 using System;
 using System.CommandLine;
-using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
+using Arpeggio.Core.Session.Sfx;
 using Arpeggio.Core.Sfx;
 
 namespace Arpeggio.Cli.Sfx
@@ -40,19 +40,7 @@ namespace Arpeggio.Cli.Sfx
                     {
                         return new { operation = "list", editable = false, presets = SfxPresetCatalog.GetAll() };
                     }
-                    ChipKind[] chips = { ChipKind.Nes, ChipKind.GameBoy, ChipKind.Snes };
-                    return new
-                    {
-                        operation = "list", editable = true,
-                        presets = SfxParameterPresetCatalog.GetAll(ChipKind.Nes).Select(preset => new
-                        {
-                            preset.Name, preset.Description, supportedChips = chips,
-                            defaults = chips.Select(chip => new
-                            {
-                                chip, parameters = SfxOutput.Parameters(SfxParameterPresetCatalog.Get(preset.Kind, chip).Parameters)
-                            }).ToArray()
-                        }).ToArray()
-                    };
+                    return SfxSessionOutput.Presets();
                 });
             });
             return command;
@@ -87,7 +75,7 @@ namespace Arpeggio.Cli.Sfx
                 {
                     SfxFileTransaction.Create(outputPath, generation.Song);
                 }
-                return SfxOutput.Describe("create", generation.Song, generation, true, preview,
+                return SfxSessionOutput.Describe("create", generation.Song, generation, true, preview,
                     preview ? null : SfxHash.ComputeRevision(generation.Song));
             }));
             return command;
@@ -112,9 +100,9 @@ namespace Arpeggio.Cli.Sfx
                 if (sourcePath == null)
                 {
                     SfxSongCompilationResult defaults = SfxEditor.CreateCandidate(SfxParameterCatalog.CreateDefaults(selectedChip), selectedChip);
-                    var initial = SfxOutput.Describe("params", defaults.Song, defaults);
+                    var initial = SfxSessionOutput.Describe("params", defaults.Song, defaults);
                     initial["candidateRevision"] = null;
-                    initial["schema"] = SfxOutput.Schema(selectedChip);
+                    initial["schema"] = SfxSessionOutput.Schema(selectedChip);
                     return initial;
                 }
                 Song song = SongSerializer.Load(sourcePath);
@@ -126,10 +114,10 @@ namespace Arpeggio.Cli.Sfx
                 SfxSynchronizationState synchronization = SfxSynchronization.Inspect(song);
                 SfxSongCompilationResult? generation = synchronization.Editable
                     ? SfxSongCompiler.Compile(synchronization.Parameters!, song.Chip, song.Title) : null;
-                var output = SfxOutput.Describe("params", song, generation, revision: SfxHash.ComputeRevision(song));
+                var output = SfxSessionOutput.Describe("params", song, generation, revision: SfxHash.ComputeRevision(song));
                 if (result.GetValue(schema))
                 {
-                    output["schema"] = SfxOutput.Schema(song.Chip);
+                    output["schema"] = SfxSessionOutput.Schema(song.Chip);
                 }
                 return output;
             }));

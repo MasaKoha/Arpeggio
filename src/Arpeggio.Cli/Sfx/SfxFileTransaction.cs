@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
+using Arpeggio.Core.Session.Sfx;
 using Arpeggio.Core.Sfx;
 
 namespace Arpeggio.Cli.Sfx
@@ -74,7 +75,7 @@ namespace Arpeggio.Cli.Sfx
             {
                 CliExecution.Edit(path, session => { result = edit(session); },
                     () => result!.Changed && !result.DryRun);
-                return SfxOutput.Edit(result!);
+                return SfxSessionOutput.Edit(result!);
             }
             finally
             {
