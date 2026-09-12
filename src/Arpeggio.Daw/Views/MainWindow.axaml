@@ -2,6 +2,7 @@
         xmlns:pianoRoll="using:Arpeggio.Daw.Views.PianoRoll"
         xmlns:instrument="using:Arpeggio.Daw.Views.Instrument"
         xmlns:sfx="using:Arpeggio.Daw.Views.Sfx"
+        xmlns:brief="using:Arpeggio.Daw.Views.Brief"
         xmlns:transport="using:Arpeggio.Daw.Views.Transport"
         xmlns:export="using:Arpeggio.Daw.Views.Export"
         xmlns:midi="using:Arpeggio.Daw.Views.Midi"
@@ -41,6 +42,7 @@
         </TabItem>
         <TabItem x:Name="AnalysisTab" Header="解析"><analysis:AnalysisView x:Name="Analysis" /></TabItem>
         <TabItem x:Name="SfxTab" Header="SFX"><sfx:SfxCreationView x:Name="SfxCreation" /></TabItem>
+        <TabItem x:Name="BriefTab" Header="指示書"><brief:BriefCreationView x:Name="BriefCreation" /></TabItem>
         <TabItem x:Name="ExportTab" Header="書き出し"><export:ChipExportView x:Name="ChipExport" /></TabItem>
         <TabItem x:Name="MidiTab" Header="MIDI"><midi:MidiImportView x:Name="MidiImport" /></TabItem>
       </TabControl>
