@@ -2669,6 +2669,8 @@ tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationLocksTests.cs
 tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationBoundsTests.cs
 tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationProvenanceTests.cs
 tests/Arpeggio.Core.Tests/Sfx/SfxRandomizationTestData.cs
+```
+
 # SFX-C2 実装記録（2026-09-09）
 
 ## SFX-C2 設計との差
@@ -3102,3 +3104,94 @@ docs/implementation.md
   `Application.Current!.FindResource` に置き換えて解消した。
 - 修正後、`dotnet build Arpeggio.slnx`（0警告0エラー）・`dotnet test Arpeggio.slnx`（2837件全成功）を確認した。
   DAW 起動時のクラッシュも解消し、目視検証（visual-verifier）で再確認済み。
+
+# SFX-G1 実装記録（2026-09-12）
+
+## SFX-G1 設計との差
+
+- 設計変更なし。G1は既存の生成・保存・編集APIを横断する回帰テストと利用手順を追加する。設計書3本、製品コード、旧プリセットと16 SNES音色、JSON version=1、CoreのBCL依存を維持する。
+- 旧エンジンで採取した8用途×3チップのJSON／PCM基準データは、このリポジトリのtests／tools内では確認できなかった。現在のfactoryと各入口・保存往復の全バイト比較を追加するが、過去版との音保持を証明したとは扱わない。基準の採取・照合条件を下記へ明記し、依頼者側の実行待ちとする。基準値を現在実装から生成して過去版のgoldenと呼ぶことはしない。
+- 実機UI／試聴は実行禁止のため、新しい測定値・スクリーンショットは作らない。F3の過去の起動確認報告と、本ランで未実行の全体シナリオを分けて記録する。
+
+## SFX-G1 実装・テストコード
+
+READMEへ新旧SFXの入口、DAWの候補→調整→試聴→新規保存→Open→正本保存、CLIのrevision付きAI調整ループ、固定seedと変異ロック、MCPのJSON文字列入力、再生成／detach、方向別の互換性を追記した。既存のNSF／VGM書き出し説明へ接続し、sfxrファイルや旧再生エンジンとの同音互換を約束しない。
+
+既存D2の変更ファイル一覧に閉じコードフェンスが欠け、C2本文がコードブロックへ取り込まれていたため、閉じフェンスだけを補った。過去の実装判断・実行報告の本文は変更していない。
+
+追加テストは保存データ消失・入口ごとの値の食い違い・履歴復元漏れ・診断消失の回帰防止を必須として選んだ。数値の範囲表・PRNG黄金値・合成器の単体試験は既存ケースを維持し、重複追加していない。
+
+| 追加テスト | 固定する境界 |
+|---|---|
+| `SfxFrontendRegressionTests.CreateTweakSaveAndReopenMatchEveryFrontend` | 新8用途×3チップ。Core候補とCLI／MCP新規保存・DAW候補の全JSON一致。候補保存で現在曲不変、Open後のフォーム数値／ドラッグ確定、一履歴、正本保存前のディスク不変、正本保存と再読込の全バイト一致。6桁丸め・無効レイヤーの保存値・チップ固有値、paramsの全値／revision／生成指紋も比較する |
+| `SfxFrontendRegressionTests.RandomizeMutateAndHistoryMatchEveryFrontend` | 新8用途×3チップ。seed=1のカテゴリ生成→周波数ロック付きstrength=0.1変異→一操作Undo/Redo→DAW候補保存。CLI／MCP／DAWの全定義・出自・生成列・指紋の一致と、Coreのカテゴリ生成値、変異前hash、候補と現在文書の分離を検証する |
+| `LegacySfxFrontendRegressionTests` | 旧8用途×3チップ。factory／旧CLI new／旧MCP new_sfx／DAW従来雛形の正規JSON全バイト一致、Openと正本保存、パラメータ編集のMissingDefinition拒否と履歴不変。現在エンジン内で保存前後のfloat PCMとWAV全バイトを比較する |
+| `SfxExportRegressionTests` | 新8用途のNES→NSF/VGM、GB→VGMが、定義を外した同じ生成列と出力全バイト／診断一致。strict前後で診断・予定サイズを保持。laserのNsfTimingQuantized／PulsePhaseRestarted／EnvelopeRetriggeredが位置付きでCLI／MCPへ届き、strictで無出力・入力不変。SNES→NSF/VGMとGB→NSFは全8用途でUnsupportedChip拒否 |
+
+既存の`Cases()`を使う三つのTheoryは各24組、書き出しの対応／対応外Theoryは内部で全8用途を回す。これらはコード上の対象数であり、テストランナーの検出件数・成功件数ではない。CLIのConsole捕捉を使う全クラスは既存の`Collection("Cli")`へ入れる。DAWは偽View／偽音声出力を使い、自動試聴OFFで保存と値の境界を検証する。フォーム呼び出しはUI部品の有効／無効やフォーカスの実機検証を代替しない。
+
+## SFX-G1 受け入れ項目と既存回帰の対応
+
+| 受け入れ項目 | 対象コード・確認手段 | 本ランの状態 |
+|---|---|---|
+| 新8×3の保存／CLI／MCP／DAW値一致 | 上記FrontendRegressionTests、既存SfxParameterCommandsTests／SfxParameterToolsTests／SfxDocumentTests | テストコード追加・静的確認。実行待ち |
+| 新8×3の有効音・解析ループ | 既存SfxParameterPresetCatalogTests／SfxAnalysisLoopTests、SfxCompiledAudioTests、SfxOutputPresenterTests | 既存ケース維持。実行待ち |
+| 旧音保持・optional追加の回帰 | 上記LegacySfxFrontendRegressionTests、既存LegacySfxMacroCompatibilityTests／GameBoyDutyMacroTests／SnesVolumeMacroTests／SfxSynchronizationTests、SnesInstrumentBankTests | 現在エンジン内の比較コードあり。過去版基準との照合は未実施 |
+| 既知／未知版・同期不一致・再生成／detach | 既存SfxDefinitionSerializationTests／SfxDefinitionValidationTests／SfxEditorTests／SfxEditingModelTests／SfxFailureToolsTests | 既存ケース維持。実行待ち |
+| NSF／VGM既存診断 | 上記SfxExportRegressionTests、既存GameBoyDutyMacroTests／NsfFrameCompilerTests／VgmWriterTestsとチップ書き出し各テスト | テストコード追加・静的確認。実行待ち |
+| 試聴寿命・GC0 | 既存SfxPreviewPlayerTests／SfxPreviewLifetimeTests／SfxPreviewAllocationTests／SongRendererAllocationTests | ホットパス変更なし。既存ケースの実行待ち |
+| 実機UI／試聴 | 下記のmacOS／Windows確認表 | 本ランでは全項目未実行 |
+
+## SFX-G1 既知の制限
+
+- パラメータ制御は60 Hz、音量0〜15、NES／GB dutyは4段階、周期はチップ固有量子化。要求時間と実効包絡時間・終端ゼロ1フレームを含む本体長を区別する。全チップのRMS一致は保証しない。SNESの内蔵周期波形の上限は約999.94 Hzで、入力上限12000 Hzは発音保証ではない。
+- 旧8ソング雛形と新8パラメータプリセットは用途名だけを共有し、同音ではない。SNES旧Noiseは周期サンプル、新SFXはDSPノイズ。旧Songの逆推定・自動移行、NES Triangle/DPCM・GB Wave・SNES外部サンプル／16音色のパラメータ編集、チップ間変換、Phaser・直接音LPF/HPF・sfxr/Bfxrファイル互換は対象外。
+- Song version=1のままでも新ファイルの旧エンジン同音再生は保証しない。旧版はGB DutyMacroとSNES VolumeMacroを無視し、保存でsfxと新マクロを失う。detachはsfxだけを消すため旧版向け変換にはならない。同音配布はWAVを使う。未知sfx版の保持はJSONのキー・値・配列順であり、元の字下げ・エスケープ表記の保持ではない。
+- 読み込み・保存は生成列を鳴らし、保存意図から再生成しない。同期不一致ではsavedParameters表示にして通常のtweak／探索を拒否する。明示regenerateはtitle以外を全置換する。出自のseedだけでは、手動調整後の値や変更前状態を復元できない。
+- CLI／MCPのrevisionは編集競合の検査であり、プロセス間の検査と置換の隙間を完全にロックしない。SongとCLI側車の二ファイルをプロセス強制終了まで含めて原子的にはしない。MCPとCLIの履歴は共有しない。解析／WAVツールにはexpectedRevision引数がないため、併行編集時は再取得が必要。
+- DAWの候補保存は非上書きの新規保存。保存後に候補を変えた場合は別の新規保存先を使うかUndoで保存済み候補へ戻してからOpenする。現在曲のdirty／外部競合を暗黙保存して切り替えない。モニター音量と約5 msの試聴フェードは保存・解析へ入らない。100 ms以内の出音は未測定の目標で、クリック・SDL停止同期も実機未確認。
+- NSFはNTSC NESのみ、VGMはNES／GBのみ。SFX定義が付いても制約は変わらない。位相再開・GB包絡再トリガー・NSF時刻量子化の診断は維持し、WAVとのビット一致・同音は保証しない。SNESはWAV／OGGへ書き出す。OGGの短音最終granule制限により、AIループの本体長比較はtail=0のWAVを使う。
+
+## SFX-G1 実機UI・試聴の記録
+
+F3の「Claude レビュー時の修正」には0警告0エラー・2837件成功と、起動時リソース解決クラッシュの修正後に目視再確認した旨の報告がある。本ランではその結果を再実行していない。過去報告には以下の全シナリオのOS別結果・遅延実測・聴取記録はなく、G1の実機受け入れ済みとは扱わない。
+
+| 確認シナリオ | macOS | Windows | 記録する結果 |
+|---|---|---|---|
+| 1050×560／通常サイズ、125%／150%／200%、長い日本語名・-1440・12000・0.016667・seed最大値 | 未実行 | 未実行 | 固定ヘッダー／試聴／保存列、横スクロールなし、全項目到達、符号・桁・単位の欠落有無と画像 |
+| キーボードのみで候補→チップ／プリセット→全項目調整→試聴→保存→Open | 未実行 | 未実行 | 初期フォーカス、Tab、Space、Esc、左右／Shift、Home／End、Ctrl/Cmd+S・Z、ピアノロールへの入力漏れ |
+| 100更新ドラッグ、領域外で離す／capture消失、150 ms境界、キー後のドラッグ、複数不正欄、途中保存／タブ移動／取消 | 未実行 | 未実行 | 最終値、一履歴・一試聴、無効値を適用しないこと、取消復元 |
+| 自動試聴ON/OFF、手動停止、生成待ち停止、通常曲との排他、Undo・外部変更・文書切替・タブ離脱・終了 | 未実行 | 未実行 | 古い音・重ね鳴り・自動再開の有無、確定→出音の測定方法と遅延、クリックの聴取、SDL停止同期 |
+| OSピッカー取消／同名拒否／保存中編集、保存成功後Open拒否と再試行、Ctrl+Sと外部競合 | 未実行 | 未実行 | 成功済みファイル保持、現在曲保護、古い候補Open無効、履歴復元 |
+| モニター音量・反復グループの再起動後保持、設定I/O失敗、WAV／解析revision | 未実行 | 未実行 | 設定とSongの分離、出力へモニター非混入、古い解析の表示 |
+| 定義なし／同期済み／生成列変更／保存パラメータ変更／未知版、置換とUndo、detach | 未実行 | 未実行 | 表示と操作可否、保存パラメータを現在音と誤表示しないこと、音保持 |
+| 新旧8用途×3チップの試聴、GB duty sweep、SNES長いdecayとDSPノイズ、NSF/VGM再生 | 未実行 | 未実行 | OS／機種／出力デバイス／プレイヤーと版、対象ファイル、音域・末尾・クリック・変換による聴取差 |
+
+各実行記録には日付・アプリの対象revision・OS版・表示倍率・音声デバイスとバッファ条件を付ける。未実施を合格に置き換えず、実測遅延は測定方法と試行回数を併記する。
+
+## SFX-G1 静的確認
+
+- design-sfx全文、designのチップ・マクロ・ノート効果・SNES DSP仕様、M2-AとSFX各記録・未完了事項、既存のSfx／音色／VoiceModulation／CLI／MCP／DAWの保存・編集・出力境界を参照した。新しく使う型・namespace・公開APIと、xunit 2.9.2のMemberType／配列一致／述語付きContainsをソースとローカル参照XMLで照合した。
+- 新規3 C#ファイルの区切り括弧・doc XML・public summary隣接・1ファイル1型・ブロックnamespace・禁止省略名を静的確認した。Assert.Single内WhereとUnity APIの追加なし。新規ファイルはDAW Presenters/SfxとFormats/Exportの対応フォルダへ置いた。コンパイル・アナライザによる確認ではない。
+- READMEのAIループは`sh -n`で構文だけを確認し、コマンドは実行していない。README／実装記録のMarkdownフェンスとSFX見出しがコードブロックに入らないことを確認した。既存記録はD2の閉じフェンス補完を除く本文のSHA-256が作業前と一致する。
+- 作業前のSHA-256と照合し、既存627ファイル（製品src・既存テスト・依存設定・変更禁止の3設計書）が不変。変更はREADME／実装記録と新規テスト3本のみ。既存PCM・JSONの生成処理、Render／AdvanceFrame／NoteOn、Core依存、JSON versionに変更なし。
+- テストが所有するfixture・フォーム・MemoryStream・JsonDocumentはusingで解放する。実音声出力・新規の製品リソース・GC計測処理は追加していない。ビルド・テスト・アプリ起動・PCM生成／試聴・git操作・作業ディレクトリ外への書き込みは行っていない。
+
+## SFX-G1 未完了・未実行の確認事項
+
+テストコードと利用手順の追加まで完了。**G1の受け入れ完了は、依頼者／Claude Codeのレビューと以下の実行確認待ち。**
+
+1. `dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunitアナライザを含む `dotnet test Arpeggio.slnx` の全既存・追加テスト成功。本ランではどちらも実行していない。E3/F3とその依存ランの未確認も引き継ぐ。
+2. 新24組の保存／CLI／MCP／DAW値一致、探索と出自・履歴、旧24組の現在エンジン内のJSON／PCM／WAV一致、NSF／VGMの出力・診断・strict拒否を実行する。既存のGC0・BRR／補間／ADSR／ノイズ・16音色・解析許容差の期待値を緩めない。
+3. **旧エンジンとの基準比較**: SFX合成拡張前の対象版を明記し、各chip=`nes/gameboy/snes`と正式8用途の旧`sfx new`出力を採取する。ファイル名は`<chip>/<preset>.arpeggio.json`と`<chip>/<preset>.wav`。タイトルは正式名、44100 Hz・loops=1・tail=0・16 bit stereoで固定し、旧版の正規JSONとWAVのPCM全バイトを保持する。同じ条件の新アプリの旧入口出力、および旧JSONを新アプリで読込→保存した結果と比較する。SHA-256・PCMフレーム数・使用版／OS／.NET版を記録する。基準が未採取なら比較は未完了のままにし、現在版の自己比較で代用しない。
+4. macOS／Windowsで正規化パラメータ・整数マクロ列・PRNGの既存黄金値を一致確認する。Pow／Sinの丸め境界、I/O失敗後の復元と一時ファイル除去も確認する。OS間で浮動小数PCMの全ビット一致まで保証する契約には広げない。
+5. READMEのCLI例を実行し、実際のMCPホストのツール発見・JSON文字列応答・create→open・revision付き編集→解析→tail0 WAV→WAV解析を確認する。プロセス内のCLI／ArpeggioToolsテストは配布バイナリやstdioホストの実行確認を代替しない。
+6. 上記実機表の全項目と旧アプリでの新ファイル読込・新マクロ無視／再保存時の欠落を確認する。実機NSF／VGM・100 ms目標・クリックは本ランで測定していない。
+
+## SFX-G1 変更ファイル一覧
+
+- `README.md`
+- `docs/implementation.md`
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxFrontendRegressionTests.cs`（新規）
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/LegacySfxFrontendRegressionTests.cs`（新規）
+- `tests/Arpeggio.Core.Tests/Formats/Export/SfxExportRegressionTests.cs`（新規）
