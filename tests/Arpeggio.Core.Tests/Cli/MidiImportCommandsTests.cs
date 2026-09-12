@@ -6,6 +6,8 @@ using Arpeggio.Core.Session;
 using Arpeggio.Core.Tests.Formats;
 using Arpeggio.Formats.Midi;
 using Xunit;
+using Arpeggio.Core.Tests.Formats.Midi;
+using Arpeggio.Formats.Midi.Import;
 
 namespace Arpeggio.Core.Tests.Cli
 {

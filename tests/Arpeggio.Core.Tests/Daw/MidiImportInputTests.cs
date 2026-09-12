@@ -7,6 +7,10 @@ using Arpeggio.Core.Tests.Formats;
 using Arpeggio.Daw.Presenters;
 using Arpeggio.Formats.Midi;
 using Xunit;
+using Arpeggio.Core.Tests.Formats.Midi;
+using Arpeggio.Core.Tests.Formats.Midi.Import;
+using Arpeggio.Formats.Midi.Import;
+using Arpeggio.Formats.Midi.Import.Voice;
 
 namespace Arpeggio.Core.Tests.Daw
 {

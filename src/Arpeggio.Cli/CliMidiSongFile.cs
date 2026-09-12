@@ -1,6 +1,7 @@
 using System.IO;
 using Arpeggio.Core.Session;
 using Arpeggio.Formats.Midi;
+using Arpeggio.Formats.Midi.Import;
 
 namespace Arpeggio.Cli
 {

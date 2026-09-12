@@ -1,3 +1,5 @@
+using Arpeggio.Formats.Midi.Import.Voice;
+
 namespace Arpeggio.Formats.Midi
 {
     /// <summary>On 時点の状態と元 gate を保持する不変の発音。出力 tick への量子化・声割り当て前。</summary>

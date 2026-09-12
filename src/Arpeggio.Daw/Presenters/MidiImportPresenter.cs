@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Arpeggio.Daw.Editing;
 using Arpeggio.Formats;
 using Arpeggio.Formats.Midi;
+using Arpeggio.Formats.Midi.Import;
 
 namespace Arpeggio.Daw.Presenters
 {

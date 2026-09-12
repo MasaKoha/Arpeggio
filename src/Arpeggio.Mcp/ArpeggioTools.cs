@@ -19,6 +19,8 @@ using Arpeggio.Formats.Export;
 using Arpeggio.Formats.Midi;
 using Arpeggio.Mcp.Sfx;
 using ModelContextProtocol.Server;
+using Arpeggio.Formats.Midi.Import;
+using Arpeggio.Formats.Midi.Import.Voice;
 
 namespace Arpeggio.Mcp
 {
