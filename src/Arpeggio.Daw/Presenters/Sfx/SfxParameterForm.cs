@@ -5,6 +5,7 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 
 namespace Arpeggio.Daw.Presenters.Sfx
 {

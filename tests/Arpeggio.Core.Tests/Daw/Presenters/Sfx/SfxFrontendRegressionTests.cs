@@ -5,9 +5,13 @@ using System.Text.Json;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+using Arpeggio.Core.Sfx.Storage;
 using Arpeggio.Core.Tests.Cli;
 using Arpeggio.Core.Tests.Mcp.Sfx;
 using Arpeggio.Core.Tests.Sfx;
+using Arpeggio.Core.Tests.Sfx.Presets;
 using Arpeggio.Daw.Presenters.Sfx;
 using Xunit;
 

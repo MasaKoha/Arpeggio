@@ -4,8 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Arpeggio.Core.Document;
-using Arpeggio.Core.Sfx;
 using Arpeggio.Core.Session;
+using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Storage;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Cli.Sfx

@@ -3,6 +3,7 @@ using System.CommandLine;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 
 namespace Arpeggio.Cli
 {

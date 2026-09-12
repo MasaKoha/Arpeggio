@@ -8,6 +8,7 @@ using Arpeggio.Core.Document;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 using Arpeggio.Daw.Audio;
 using Arpeggio.Daw.Audio.Sfx;
 using Xunit;

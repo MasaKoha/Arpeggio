@@ -6,6 +6,11 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Compile;
+using Arpeggio.Core.Sfx.Curves;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+using Arpeggio.Core.Sfx.Storage;
 
 namespace Arpeggio.Core.Session.Sfx
 {

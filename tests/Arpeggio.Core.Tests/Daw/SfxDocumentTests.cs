@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Storage;
 using Arpeggio.Core.Tests.Sfx;
 using Arpeggio.Daw.Editing;
 using Xunit;

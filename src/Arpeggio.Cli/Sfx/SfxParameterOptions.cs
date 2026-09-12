@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 
 namespace Arpeggio.Cli.Sfx
 {

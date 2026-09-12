@@ -4,7 +4,9 @@ using System.Text.Json;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Core.Tests.Sfx;
+using Arpeggio.Core.Tests.Sfx.Presets;
 using Arpeggio.Mcp;
 using Xunit;
 

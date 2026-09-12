@@ -4,6 +4,8 @@ using System.CommandLine.Parsing;
 using System.Globalization;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
 
 namespace Arpeggio.Cli.Sfx
 {

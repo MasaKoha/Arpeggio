@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Daw.Editing;
 
 namespace Arpeggio.Daw.Presenters

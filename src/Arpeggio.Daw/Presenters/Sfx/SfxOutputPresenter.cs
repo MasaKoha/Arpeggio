@@ -9,6 +9,7 @@ using Arpeggio.Core.Analysis;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Storage;
 using Arpeggio.Daw.Audio.Sfx;
 
 namespace Arpeggio.Daw.Presenters.Sfx

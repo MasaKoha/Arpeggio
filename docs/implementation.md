@@ -3195,3 +3195,134 @@ F3の「Claude レビュー時の修正」には0警告0エラー・2837件成�
 - `tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxFrontendRegressionTests.cs`（新規）
 - `tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/LegacySfxFrontendRegressionTests.cs`（新規）
 - `tests/Arpeggio.Core.Tests/Formats/Export/SfxExportRegressionTests.cs`（新規）
+
+# フォルダリファクタ R1 実装記録（2026-09-12）
+
+## R1 変更内容
+
+Core/Sfx の54ファイルを Parameters／Curves／Compile／Presets／Storage へ移動し、入口6ファイルを直下に残した。移動した型のブロック namespace を配置先へ合わせ、リポジトリ全体の利用箇所へ必要な using を追加した。対応テストと補助データ27ファイルも同じ分類へ移動し、テスト namespace と補助型の参照を追従した。移動はプレーンな `mv` のみ。git コマンドは一切実行していない。
+
+| 配置先 | Core のファイル数 | Sfx テスト・補助データのファイル数 |
+|---|---:|---:|
+| 直下 | 6 | 5 |
+| Parameters | 19 | 6 |
+| Curves | 12 | 4 |
+| Compile | 4 | 4 |
+| Presets | 14 | 9 |
+| Storage | 5 | 4 |
+
+## R1 設計との差
+
+- 製品コードの配置は依頼の対応表どおり。一覧外の Core/Sfx ファイルはなかった。Parameters／Curves／Presets の上限10超過も、今回の明示マッピングを優先して維持した。
+
+- 名前が実装と完全一致しないテストは対象の責務へ配置した。`SfxDefinitionValidationTests` は Parameters、`SfxDefinitionSerializationTests` と固定JSON例は Storage、生成Song・PCMの検証と補助データは Compile、`LegacySfxMacroCompatibilityTests` は旧プリセットの保存・音声互換を検証するため Presets。編集入口のテスト・fixtureと共有の定義データは直下に残した。
+
+- `MainWindow.axaml.cs` の `Arpeggio.Core.Sfx.SfxPresetKind.Jump` 1箇所は、手順3に従って `Arpeggio.Core.Sfx.Presets.SfxPresetKind.Jump` へ更新した。namespace 宣言・using 以外の C# 差分はこの完全修飾参照の更新だけ。
+
+## R1 検証
+
+- 着手時の650ファイルを保存・SHA-256照合した。全602 C# ファイルについて、移動元と移動先を対応させ、namespace 宣言・using・上記完全修飾参照1件だけを正規化して本文の完全一致を確認した。ロジック、シグネチャの構成、アサーション、コメント、JSON／保存処理は変更していない。
+
+- `docs/design-sfx.md`／`docs/design.md`／`docs/design-m3.md`、プロジェクト設定、依存関係を含むその他の既存ファイルは実装記録追記前の照合ですべて不変。自前型の定義・namespace と全参照1697行を移動前に検索し、移動後の旧完全修飾参照残存なし・using 重複なし・Core/Sfx 直下6件を確認した。
+
+- 指定の通常ビルドは出力なしで進まず中断し、ビルドサーバー無効・単一ノードで再実行した。隣接 Avalon のビルド時に作業範囲外の Avalonia ログ書き込みが拒否されたため、Avalon のソースと `Directory.Build.props` を作業ディレクトリ内の一時領域へコピーした。プロジェクトファイルを編集せず `AvalonProjectPath` のコマンドライン上書きで同じ Debug 診断連携もビルドし、公式環境変数でテレメトリを停止した。
+
+```sh
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly --disable-build-servers -m:1 -p:AvalonProjectPath="$PWD/.r1-verification/Avalon/src/Avalon/Avalon.csproj"
+```
+
+ビルド成功、警告0・エラー0（.NET SDK 10.0.300、macOS arm64）。
+
+- 同じ環境指定で `dotnet test Arpeggio.slnx -nologo -v q` を実行したが、VSTest のテストホスト通信が `SocketException (13): Permission denied`（`TcpListener.Start`）でテスト開始前に中止された。これは受け入れ条件の「通常の dotnet test 全件成功」を満たした結果ではない。
+
+- 代替検証として、ビルド済みテストDLLを同梱の xUnit ランナー `Xunit.Runners.AssemblyRunner.WithoutAppDomain` で同一プロセス実行した。`TestCaseFilter`／`TypesToRun` は指定せず、既定の `AssemblyRunnerStartOptions` で全件を実行した。テスト側の runtimeconfig／deps と補助ランナーの追加depsを使用し、テストDLLと同じ出力ディレクトリから起動して既存Examplesの参照も維持した。検出3006件、実行3006件、成功3006件、失敗0件、スキップ0件、ランナー終了コード0（57.542秒）。テスト本体・期待値の変更はない。
+
+検証用の Avalon コピー・補助ランナー・比較スクリプトは検証後に削除した。通常の `dotnet test` の通信経路を検証した結果ではないため、その成功確認は下記の未実行事項として残す。
+
+追加テストは不要。理由: namespace と配置の機械的変更であり、既存テストと本文一致の検証で守る。テストの新規追加・アサーション変更はしていない。
+
+## R1 未実行の確認事項
+
+- 制限のない依頼者環境で、元の隣接 Avalon を参照する通常の `dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly` と `dotnet test Arpeggio.slnx -nologo -v q` の成功を確認する。サンドボックスの作業範囲外書き込み・ローカルTCP待受けの制限は変更していない。
+
+## R1 変更ファイル一覧
+
+製品84ファイル、テスト・補助データ59ファイル、実装記録1ファイル。以下の移動81件は移動先で数え、型やテストを追加した件数には含めない。
+
+### 移動・namespace 更新（81ファイル）
+
+- `src/Arpeggio.Core/Sfx/Parameters/`: `SfxDefinitionValidator.cs`、`SfxEnvelopeParameters.cs`、`SfxGameBoyParameters.cs`、`SfxNesParameters.cs`、`SfxNoiseParameters.cs`、`SfxParameterCatalog.cs`、`SfxParameterChange.cs`、`SfxParameterDescription.cs`、`SfxParameterException.cs`、`SfxParameterJson.cs`、`SfxParameterMutation.cs`、`SfxParameterPatch.cs`、`SfxParameterPatchResult.cs`、`SfxParameterValidator.cs`、`SfxParameterValueKind.cs`、`SfxParameterWarning.cs`、`SfxParameters.cs`、`SfxSnesParameters.cs`、`SfxToneParameters.cs`
+
+- `src/Arpeggio.Core/Sfx/Curves/`: `SfxCurveGenerationResult.cs`、`SfxCurveGenerator.cs`、`SfxDutyCurveGenerator.cs`、`SfxEnvelopeCurve.cs`、`SfxEnvelopeGenerator.cs`、`SfxFrameWarningCollector.cs`、`SfxNoiseCurveGenerator.cs`、`SfxPitchCurveGenerator.cs`、`SfxPitchDiagnostics.cs`、`SfxPitchFrame.cs`、`SfxTimeQuantizer.cs`、`SfxToneCurve.cs`
+
+- `src/Arpeggio.Core/Sfx/Compile/`: `SfxPulseSongBuilder.cs`、`SfxSnesSongBuilder.cs`、`SfxSongCompilationResult.cs`、`SfxSongCompiler.cs`
+
+- `src/Arpeggio.Core/Sfx/Presets/`: `SfxCategoryRandomization.cs`、`SfxParameterPresetCatalog.cs`、`SfxParameterPresetDescription.cs`、`SfxParameterRandomizationResult.cs`、`SfxParameterRandomizer.cs`、`SfxPresetCatalog.cs`、`SfxPresetDescription.cs`、`SfxPresetFactory.cs`、`SfxPresetFile.cs`、`SfxPresetKind.cs`、`SfxRandomGenerator.cs`、`SfxRandomization.cs`、`SfxRandomizationCandidate.cs`、`SfxRandomizationOperation.cs`
+
+- `src/Arpeggio.Core/Sfx/Storage/`: `SfxDefinitionJsonConverter.cs`、`SfxHash.cs`、`SfxReplacementSummary.cs`、`SfxSynchronization.cs`、`SfxSynchronizationState.cs`
+
+- `tests/Arpeggio.Core.Tests/Sfx/Parameters/`: `SfxDefinitionValidationTests.cs`、`SfxParameterCatalogTests.cs`、`SfxParameterMutationTests.cs`、`SfxParameterPatchTests.cs`、`SfxParameterTestJson.cs`、`SfxParameterValidatorTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Sfx/Curves/`: `SfxChipCurveTests.cs`、`SfxEnvelopeCurveTests.cs`、`SfxPitchCurveTests.cs`、`SfxPitchDiagnosticsTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Sfx/Compile/`: `SfxCompilationTestData.cs`、`SfxCompiledAudioTests.cs`、`SfxSnesSongCompilerTests.cs`、`SfxSongCompilerTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Sfx/Presets/`: `LegacySfxMacroCompatibilityTests.cs`、`SfxCategoryRandomizationTests.cs`、`SfxParameterPresetCatalogTests.cs`、`SfxPresetFactoryTests.cs`、`SfxRandomGeneratorTests.cs`、`SfxRandomizationBoundsTests.cs`、`SfxRandomizationLocksTests.cs`、`SfxRandomizationProvenanceTests.cs`、`SfxRandomizationTestData.cs`
+
+- `tests/Arpeggio.Core.Tests/Sfx/Storage/`: `SfxCanonicalJsonExamples.cs`、`SfxDefinitionSerializationTests.cs`、`SfxHashTests.cs`、`SfxSynchronizationTests.cs`
+
+
+### 参照更新のみ（62ファイル）
+
+- `src/Arpeggio.Cli/`: `SfxCommands.cs`
+
+- `src/Arpeggio.Cli/Sfx/`: `CliSfxExecution.cs`、`EditableSfxCommands.cs`、`SfxExplorationCommands.cs`、`SfxFileTransaction.cs`、`SfxParameterOptions.cs`
+
+- `src/Arpeggio.Core/Document/`: `SongValidator.cs`
+
+- `src/Arpeggio.Core/Session/`: `SfxEditor.cs`
+
+- `src/Arpeggio.Core/Session/Sfx/`: `SfxSessionOutput.cs`
+
+- `src/Arpeggio.Core/Sfx/`: `SfxDefinition.cs`、`SfxDefinitionData.cs`、`SfxEditResult.cs`
+
+- `src/Arpeggio.Daw/Editing/Sfx/`: `SfxCandidateFile.cs`、`SfxEditingModel.cs`
+
+- `src/Arpeggio.Daw/Presenters/`: `SfxCreationPresenter.cs`
+
+- `src/Arpeggio.Daw/Presenters/Sfx/`: `SfxEditorPresenter.cs`、`SfxOutputPresenter.cs`、`SfxParameterForm.cs`、`SfxParameterInput.cs`
+
+- `src/Arpeggio.Daw/Views/`: `MainWindow.axaml.cs`、`SfxCreationView.axaml.cs`
+
+- `src/Arpeggio.Daw/Views/Sfx/`: `SfxEnvelopeView.cs`、`SfxFileActions.cs`、`SfxParameterLayout.cs`、`SfxParameterPanel.cs`、`SfxParameterRow.cs`
+
+- `src/Arpeggio.Mcp/`: `ArpeggioTools.cs`
+
+- `src/Arpeggio.Mcp/Sfx/`: `McpSfxCreation.cs`、`McpSfxExecution.cs`、`McpSfxInput.cs`
+
+- `tests/Arpeggio.Core.Tests/Cli/`: `AnalysisSfxCommandsTests.cs`、`SfxHistoryBoundaryTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Cli/Sfx/`: `SfxCommandFailureTests.cs`、`SfxExplorationCommandsTests.cs`、`SfxParameterCommandsTests.cs`、`SfxTransactionCommandsTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Daw/`: `InstrumentSamplePresenterTests.cs`、`SfxCreationPresenterTests.cs`、`SfxDocumentTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Daw/Audio/Sfx/`: `SfxPreviewAllocationTests.cs`、`SfxPreviewPlayerTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Daw/Editing/Sfx/`: `SfxEditingModelTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/`: `LegacySfxFrontendRegressionTests.cs`、`SfxEditorPresenterTests.cs`、`SfxFrontendRegressionTests.cs`、`SfxOutputPresenterTests.cs`、`SfxParameterFormTests.cs`、`SfxParameterInputTests.cs`、`SfxPreviewLifetimeTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/`: `SfxExportRegressionTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Mcp/`: `AnalysisSfxToolsTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Mcp/Sfx/`: `SfxConcurrencyToolsTests.cs`、`SfxCreationToolsTests.cs`、`SfxEditingToolsTests.cs`、`SfxFailureToolsTests.cs`、`SfxParameterToolsTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Session/`: `SfxRandomizationEditorTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Sfx/`: `SfxDocumentTestData.cs`、`SfxEditFailureTests.cs`、`SfxEditFixture.cs`、`SfxEditorTests.cs`、`SfxGenerationWarningTests.cs`
+
+
+### 記録
+
+- `docs/implementation.md`（本節のみ追記）

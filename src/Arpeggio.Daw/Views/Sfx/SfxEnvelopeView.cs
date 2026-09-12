@@ -1,5 +1,6 @@
 using System;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Curves;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;

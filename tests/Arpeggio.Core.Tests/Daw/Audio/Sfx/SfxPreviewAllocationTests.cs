@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 using Arpeggio.Core.Tests.Analysis;
 using Arpeggio.Daw.Audio;
 using Arpeggio.Daw.Audio.Sfx;

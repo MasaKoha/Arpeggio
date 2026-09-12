@@ -2,10 +2,10 @@ using System;
 using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
-using Arpeggio.Daw.Views.Sfx;
 using System.Threading.Tasks;
 using Arpeggio.Core.Document;
 using Arpeggio.Daw.Presenters;
+using Arpeggio.Daw.Views.Sfx;
 using Arpeggio.Daw.Watch;
 using Avalonia;
 using Avalonia.Controls;
@@ -296,7 +296,7 @@ namespace Arpeggio.Daw.Views
         {
             if (!MainPresenter.SfxEditor.Model.Synchronization.Editable)
             {
-                MainPresenter.SfxEditor.NewCandidate(MainPresenter.PianoRoll.Song.Chip, Arpeggio.Core.Sfx.SfxPresetKind.Jump);
+                MainPresenter.SfxEditor.NewCandidate(MainPresenter.PianoRoll.Song.Chip, Arpeggio.Core.Sfx.Presets.SfxPresetKind.Jump);
             }
             editorTabs.SelectedIndex = SfxTabIndex;
             sfxCreation.EnterTab();

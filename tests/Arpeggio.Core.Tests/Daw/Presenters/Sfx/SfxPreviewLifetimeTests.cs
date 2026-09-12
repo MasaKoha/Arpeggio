@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Core.Tests.Daw.Audio.Sfx;
 using Arpeggio.Daw.Audio.Sfx;
 using Xunit;

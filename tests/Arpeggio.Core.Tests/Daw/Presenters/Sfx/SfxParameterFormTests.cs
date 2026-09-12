@@ -3,6 +3,7 @@ using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Daw.Editing.Sfx;
 using Arpeggio.Daw.Presenters.Sfx;
 using Xunit;

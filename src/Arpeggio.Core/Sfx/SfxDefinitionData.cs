@@ -1,3 +1,6 @@
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+
 namespace Arpeggio.Core.Sfx
 {
     /// <summary>保存した作成意図と生成列の指紋。再生時には解釈しない。</summary>

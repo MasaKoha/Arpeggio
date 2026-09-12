@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 using Arpeggio.Daw.Presenters.Sfx;
 using Xunit;
 
