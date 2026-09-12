@@ -61,7 +61,15 @@ namespace Arpeggio.Daw.Editing.Sfx
         /// <summary>指定チップの新規候補へ移る。候補間の変更は Undo できる。</summary>
         public bool NewCandidate(ChipKind chip, SfxPresetKind preset)
         {
-            Song candidate = CreatePreset(chip, preset);
+            return StartCandidate(CreatePreset(chip, preset));
+        }
+
+        /// <summary>従来の音を保持し、SFX定義なしの新規候補にする。</summary>
+        public bool NewLegacyCandidate(ChipKind chip, SfxPresetKind preset) =>
+            StartCandidate(SfxPresetFactory.Create(chip, preset));
+
+        private bool StartCandidate(Song candidate)
+        {
             CancelGesture();
             if (!IsNewCandidate)
             {
@@ -89,8 +97,8 @@ namespace Arpeggio.Daw.Editing.Sfx
             if (gestureStart is null)
             {
                 gestureStart = Clone(current);
+                State = SfxEditingState.Dragging;
             }
-            State = SfxEditingState.Dragging;
         }
 
         /// <summary>有効な途中値だけを候補へ反映し、不正入力は文字列と理由を保持する。</summary>

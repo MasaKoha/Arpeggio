@@ -3015,3 +3015,90 @@ tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxFailureToolsTests.cs（新規）
 tests/Arpeggio.Core.Tests/Mcp/Sfx/SfxConcurrencyToolsTests.cs（新規）
 docs/implementation.md
 ```
+
+
+# SFX-F3 実装記録（2026-09-12）
+
+## SFX-F3 設計との差
+
+- アプリ設定の既存保存口がないため、SFX のモニター音量と反復グループの展開状態だけをユーザー設定ファイルへ保存する。ソング JSON には混ぜない。実装中はアプリを起動せず設定ファイルも生成しない。
+- 数値部品の具体 API は未指定のため、常時二段（ラベル・数値・単位／スライダー）とし、Core Catalog の範囲・刻み・選択肢を使う。型アクセサーは Core 内部用のため、表示値は保存スナップショットの parameters JSON から読む。
+- 未保存候補の WAV／解析はスナップショットを直接処理する専用 Presenter に接続し、結果に revision と陳腐化表示を付ける。現在曲の解析・書き出し設定は変更しない。
+
+
+## SFX-F3 実装・確認範囲
+
+- 既存 SfxCreationView を F1 の SfxEditorPresenter／F2 の SfxPreviewPlayer へ切り替えた。固定ヘッダー・再生／停止・既定 ON の自動試聴・モニター音量と、固定フッターの保存／Open／WAV／解析を置き、中段だけを縦スクロールする。数値欄は128 DIPを確保した二段構成、ラベルと単位は折返し、Views にリテラル色は追加していない。
+- Core Catalog の全32パスから現在チップの25項目（NES／GB）または22項目（SNES）を構成する。数値・対数周波数・bool・離散選択・初期値リセット・グループ単位の変異ロックを接続。ノイズ OFF 時はノイズ入力を無効にし、理由を表示する。SNES に duty slider は置かない。
+- ドラッグは途中値と静的包絡だけを更新し、離したとき一操作で確定。数値は Enter／フォーカス離脱、キーと Home／End／ホイールの変更は最後の150ms後に確定する。UIスレッドの時計を既存 BindKeyboard に接続し、確定／新しいジェスチャーで旧タイマーを失効させた。
+- 数値欄の未確定値を一つのpatchとして保持する。別欄へフォーカスを移しても Invalid を解除せず、全欄の訂正が済むまで履歴・確定試聴を増やさない。JSON数値の整数端数と極小指数をdouble化で失わず、Coreへ検証を渡す。Escは開始値へ戻し、取消後の入力へ古い文字列を混入させない。
+- Tabで再生から入力を移動でき、左右キー／ShiftはCatalogの刻みを使う。SFX入力中はMainWindowのピアノロールショートカットを遮断。Spaceは文字入力・選択・チェック入力を妨げず試聴を切り替え、Escはジェスチャー取消または停止。Ctrl/Cmd+S と Undo/Redo、タブ離脱の確定／停止を接続する。
+- 通常／操作中／生成中／試聴中／無効入力／保存失敗／外部競合／定義なし／生成列編集済み／保存パラメータ手修正／未知版／破棄中を文字で示す。無効入力では「最後の有効値を再生」と該当欄の理由・範囲を表示する。要求包絡秒数、実効フレーム／秒数、本体長、警告のフレーム区間と要求→実効値を表示する。
+- 新規保存はOSピッカーから非上書き保存、Openは別操作の保護検査を維持。保存後に変更するとOpenを無効化して古い保存内容であることを明示する。生成列の置換は音色・トラック・ノート件数を確認したrevisionだけへ適用する。従来8雛形はfactoryの既存出力をそのまま新規候補へ取り込み、暗黙保存付きの旧作成APIは呼ばない。
+- WAV／解析は現在候補の複製を直接処理し、現在文書を変更しない。WAVは44100Hz・一回・tail0、非上書き保存。結果にrevisionを付け、編集後は古い結果と表示する。モニター音量・試聴フェードは入れない。アプリ設定の保存失敗は画面内に表示し、購読・ピッカー・非同期結果は終了時に解放／失効させる。
+
+## SFX-F3 テストコード
+
+- 必須: `SfxParameterInputTests` は周波数の半音／1cent、反復の禁止区間、整数微調整、離散選択、カルチャ非依存の複数patch、不正文字列、整数端数／極小指数の保持を検証する。
+- 必須: `SfxParameterFormTests` は複数欄の不正入力、フォーカス移動後のInvalid保持、訂正の一履歴、旧150msタイマーによる次ドラッグの途中確定防止、連続入力の集約、破棄後の確定抑止、取消後のバッファ破棄を検証する。
+- 必須: `SfxOutputPresenterTests` は三チップの候補WAVと既存Core tail0出力の全バイト比較、現在文書と正本の不変、モニター音量0の非混入、既存出力の非上書き、一時ファイル後始末、解析revisionの陳腐化判定を検証する。
+- 有用: 既存 `SfxEditorPresenterTests` に従来factoryの正規JSONと候補の一致・独立履歴とUndoを追加した。F1/F2の100更新一履歴／一試聴・保存とOpen拒否・タブ離脱・音声世代／停止のテストは維持した。
+- 冗長: 部品のgetter／単純委譲・既定値だけの追加テストは不要。理由: 今回は数値変換・編集境界・保存不変の実害がある振る舞いを守り、GUI固有の配線とレイアウトは下記の実機項目で確認する。テストコードを実行した結果ではない。
+
+## SFX-F3 静的確認
+
+- 使用するCore／DAW型・namespaceと、Avalonia 12.1.2／Rx 6.1.0の入力プロパティ・イベント購読・UIスケジューラーをローカルソース／参照XMLで照合した。XMLに記載のないAvaloniaSynchronizationContextのコンストラクタ、Polyline.Points、Points等は参照DLLのメタデータを読み取って確認した（コードの実行・コンパイルではない）。
+- AXAMLのXML構文、名前付き部品とRequire／BindButtonの参照、C#の区切り括弧・public summaryの隣接・1ファイル1型・ブロックnamespace・省略名・Assert.Single内Where不使用を静的確認した。Viewのリテラル色追加はゼロ。新規ファイルはViews/Sfx・Presenters/Sfx・Platform/Sfxと対応するテストフォルダへ置いた。
+- 作業開始時のSHA-256と照合し、変更禁止の三設計書、Core全体（合成・音色・プリセット・Serializerを含む）、CLI／MCP、プロジェクト依存設定の不変を確認した。JSON version=1、Core BCLのみ、Render／AdvanceFrameの変更なし。旧音とJSONのバイト一致を実測したという意味ではない。
+- git操作、ビルド、テスト、アプリ起動、音声生成・試聴、作業ディレクトリ外への書き込みは実行していない。
+
+## SFX-F3 未完了・未実行の確認事項
+
+実装とテストコードの作成・静的確認を完了。受け入れ完了は依頼者／Claude Codeのレビューと実行確認待ち。
+
+1. `dotnet build Arpeggio.slnx` の成功・警告ゼロ、xunitアナライザ、既存全件および今回の追加テストの成功。F1/F2を含む既存テスト結果は本ランで再確認していない。
+2. macOS／Windowsで1050×560、通常サイズ、125%／150%／200%表示を確認する。ヘッダーと試聴列・保存列が固定され、横スクロールなしで全項目へ到達できること。日本語ラベル、-1440、12000、0.016667、seed=4294967295、長いファイル名の符号・桁・単位が欠けないこと。
+3. キーボードだけで新規候補→チップ／プリセット→全項目調整→試聴→保存→Openを完遂する。初期フォーカス、Tab順、チェック／コンボのSpace、数値の文字編集、左右／Shift、Home／End、Ctrl/Cmd+S／Z、Esc、ピアノロールへの漏れを確認する。
+4. マウス／タッチの100更新ドラッグを一履歴・一試聴にすること。離す直前の値、領域外で離す、pointer capture消失、キー後のドラッグ、150ms直前の再入力、無効数値／別欄訂正、ドラッグ途中の保存／タブ移動／Escを確認する。
+5. 自動試聴ON/OFF、手動再生・停止、生成待ちの停止、通常曲との排他、Undo／外部変更／文書切替／タブ離脱／終了後に古い音が鳴らないこと。確定→出音100ms以内は未測定の目標。クリック・SDL停止同期・CPU負荷も実機で確認する。
+6. モニター音量と反復グループ展開の再起動後保持、設定I/O失敗、OSピッカー取消／同名拒否／保存中の候補変更、保存成功後のOpen拒否と再試行、保存後の候補変更・Undo、正本Ctrl+Sと外部競合を確認する。
+7. 定義なし、既知同期、生成列編集、保存パラメータ手修正、未知版の表示・可否、件数確認→生成列置換→Undo、detach後の音保持。8プリセット×3チップの旧JSON／PCM基準比較とWAV／解析の結果revision・モニター非混入も実行確認する。
+
+## SFX-F3 変更ファイル一覧
+
+本ランの変更は計21ファイル。
+
+```text
+src/Arpeggio.Daw/Platform/Sfx/SfxUserSettings.cs（新規）
+src/Arpeggio.Daw/Presenters/Sfx/SfxOutputPresenter.cs（新規）
+src/Arpeggio.Daw/Presenters/Sfx/SfxParameterForm.cs（新規）
+src/Arpeggio.Daw/Presenters/Sfx/SfxEditorPresenter.cs
+src/Arpeggio.Daw/Presenters/Sfx/SfxParameterInput.cs（新規）
+src/Arpeggio.Daw/Editing/Sfx/SfxEditingModel.cs
+src/Arpeggio.Daw/Views/MainWindow.axaml.cs
+src/Arpeggio.Daw/Views/SfxCreationView.axaml
+src/Arpeggio.Daw/Views/SfxCreationView.axaml.cs
+src/Arpeggio.Daw/Views/Sfx/SfxParameterRow.cs（新規）
+src/Arpeggio.Daw/Views/Sfx/SfxEnvelopeView.cs（新規）
+src/Arpeggio.Daw/Views/Sfx/SfxFileActions.cs（新規）
+src/Arpeggio.Daw/Views/Sfx/SfxParameterPanel.cs（新規）
+src/Arpeggio.Daw/Views/Sfx/SfxViewEvents.cs（新規）
+src/Arpeggio.Daw/Views/Sfx/SfxParameterLayout.cs（新規）
+src/Arpeggio.Daw/Themes/ArpeggioTheme.axaml
+tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxParameterInputTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxParameterFormTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxOutputPresenterTests.cs（新規）
+tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxEditorPresenterTests.cs
+docs/implementation.md
+```
+
+## SFX-F3 Claude レビュー時の修正（実行確認）
+
+- `SfxEnvelopeView` / `SfxParameterPanel` / `SfxParameterRow` が `this.FindResource(...)` をコンストラクタ内で呼んでおり、
+  未だ論理ツリーへアタッチされていない時点でテーマリソース（`Arpeggio.Sfx.EnvelopeWidth` 等）が解決できず
+  `UnsetValueType` を返し、直後の `(double)` / `(IBrush)` キャストで `InvalidCastException` となり
+  DAW 起動直後にクラッシュしていた（`SfxCreationView.Bind` → `SfxParameterPanel` ctor → `SfxEnvelopeView` ctor）。
+  `App.axaml` でテーマ辞書は Application レベルにマージ済みのため、`this.FindResource` を
+  `Application.Current!.FindResource` に置き換えて解消した。
+- 修正後、`dotnet build Arpeggio.slnx`（0警告0エラー）・`dotnet test Arpeggio.slnx`（2837件全成功）を確認した。
+  DAW 起動時のクラッシュも解消し、目視検証（visual-verifier）で再確認済み。
