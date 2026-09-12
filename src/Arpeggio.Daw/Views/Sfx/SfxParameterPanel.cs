@@ -40,7 +40,7 @@ namespace Arpeggio.Daw.Views.Sfx
             this.editor = editor;
             this.form = form;
             this.settings = settings;
-            Spacing = (double)this.FindResource("Arpeggio.Space.Section")!;
+            Spacing = (double)Application.Current!.FindResource("Arpeggio.Space.Section")!;
         }
 
         internal IObservable<Unit> SettingsChanges => settingsChanges.AsObservable();
@@ -100,7 +100,7 @@ namespace Arpeggio.Daw.Views.Sfx
 
         private Expander CreateGroup(string name, SfxParameterDescription[] descriptions)
         {
-            var content = new StackPanel { Spacing = (double)this.FindResource("Arpeggio.Space.Large")! };
+            var content = new StackPanel { Spacing = (double)Application.Current!.FindResource("Arpeggio.Space.Large")! };
             var expander = new Expander
             {
                 Header = name, Content = content, IsExpanded = name != "音程変化・反復" || settings.RepeatExpanded,

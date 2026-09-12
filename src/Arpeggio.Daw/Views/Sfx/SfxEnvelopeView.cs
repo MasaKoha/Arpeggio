@@ -18,10 +18,10 @@ namespace Arpeggio.Daw.Views.Sfx
 
         internal SfxEnvelopeView()
         {
-            graphWidth = (double)this.FindResource("Arpeggio.Sfx.EnvelopeWidth")!;
-            graphHeight = (double)this.FindResource("Arpeggio.Sfx.EnvelopeHeight")!;
-            curve.Stroke = (IBrush)this.FindResource("Arpeggio.Accent")!;
-            curve.StrokeThickness = (double)this.FindResource("Arpeggio.Sfx.EnvelopeStroke")!;
+            graphWidth = (double)Application.Current!.FindResource("Arpeggio.Sfx.EnvelopeWidth")!;
+            graphHeight = (double)Application.Current!.FindResource("Arpeggio.Sfx.EnvelopeHeight")!;
+            curve.Stroke = (IBrush)Application.Current!.FindResource("Arpeggio.Accent")!;
+            curve.StrokeThickness = (double)Application.Current!.FindResource("Arpeggio.Sfx.EnvelopeStroke")!;
             var canvas = new Canvas { Width = graphWidth, Height = graphHeight };
             canvas.Children.Add(curve);
             var panel = new StackPanel();

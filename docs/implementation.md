@@ -3018,3 +3018,14 @@ tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxOutputPresenterTests.cs（新規
 tests/Arpeggio.Core.Tests/Daw/Presenters/Sfx/SfxEditorPresenterTests.cs
 docs/implementation.md
 ```
+
+## SFX-F3 Claude レビュー時の修正（実行確認）
+
+- `SfxEnvelopeView` / `SfxParameterPanel` / `SfxParameterRow` が `this.FindResource(...)` をコンストラクタ内で呼んでおり、
+  未だ論理ツリーへアタッチされていない時点でテーマリソース（`Arpeggio.Sfx.EnvelopeWidth` 等）が解決できず
+  `UnsetValueType` を返し、直後の `(double)` / `(IBrush)` キャストで `InvalidCastException` となり
+  DAW 起動直後にクラッシュしていた（`SfxCreationView.Bind` → `SfxParameterPanel` ctor → `SfxEnvelopeView` ctor）。
+  `App.axaml` でテーマ辞書は Application レベルにマージ済みのため、`this.FindResource` を
+  `Application.Current!.FindResource` に置き換えて解消した。
+- 修正後、`dotnet build Arpeggio.slnx`（0警告0エラー）・`dotnet test Arpeggio.slnx`（2837件全成功）を確認した。
+  DAW 起動時のクラッシュも解消し、目視検証（visual-verifier）で再確認済み。

@@ -181,6 +181,6 @@ namespace Arpeggio.Daw.Views.Sfx
             ? string.Join(" / ", description.Choices.Select(SfxParameterInput.Format))
             : FormattableString.Invariant($"範囲: {(description.AllowsZero ? "0 または " : string.Empty)}{description.Minimum:0.######}〜{description.Maximum:0.######} {description.Unit}");
 
-        private TResource Resource<TResource>(string key) => (TResource)this.FindResource(key)!;
+        private static TResource Resource<TResource>(string key) => (TResource)Application.Current!.FindResource(key)!;
     }
 }
