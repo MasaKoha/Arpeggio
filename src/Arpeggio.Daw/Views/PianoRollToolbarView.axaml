@@ -1,8 +1,0 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Arpeggio.Daw.Views.PianoRollToolbarView">
-  <StackPanel Orientation="Horizontal" Spacing="{StaticResource Arpeggio.Space.Medium}" Margin="{StaticResource Arpeggio.Margin.Small}">
-    <TextBlock Text="スナップ" VerticalAlignment="Center" Foreground="{StaticResource Arpeggio.TextSecondary}" />
-    <ComboBox x:Name="SnapInput" Width="{StaticResource Arpeggio.Width.PianoRollSnap}" ToolTip.Tip="Alt を押している間はスナップ解除" />
-    <TextBlock Text="Ctrl＋ドラッグ 選択 · 右ドラッグ 削除" VerticalAlignment="Center" Foreground="{StaticResource Arpeggio.TextSecondary}" />
-  </StackPanel>
-</UserControl>

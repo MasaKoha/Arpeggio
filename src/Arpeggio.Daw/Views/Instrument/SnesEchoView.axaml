@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:presenters="using:Arpeggio.Daw.Presenters.Instrument" x:Class="Arpeggio.Daw.Views.Instrument.SnesEchoView">
+  <StackPanel Spacing="{StaticResource Arpeggio.Space.Medium}" Width="{StaticResource Arpeggio.Width.EchoPanel}">
+    <TextBlock Text="SNES エコー" Classes="heading" />
+    <TextBlock Text="遅延（ms・0 は無効）" />
+    <NumericUpDown x:Name="DelayInput" Minimum="0" Maximum="{x:Static presenters:SnesEchoPresenter.MaximumDelayMillisecondsInput}"
+                   Increment="{x:Static presenters:SnesEchoPresenter.DelayStepMillisecondsInput}" FormatString="0" />
+    <TextBlock Text="フィードバック（-1 より大きく 1 未満）" />
+    <TextBox x:Name="FeedbackInput" Classes="numeric" />
+    <TextBlock Text="音量（0〜1）" />
+    <TextBox x:Name="VolumeInput" Classes="numeric" />
+    <TextBlock Text="FIR プリセット" />
+    <ComboBox x:Name="FirSelector" HorizontalAlignment="Stretch" PlaceholderText="カスタム（現在の係数を保持）" />
+    <TextBlock Text="再生中は先頭から再開します。" Classes="secondary" />
+    <Button x:Name="ApplyButton" Content="エコーを適用" Classes="primary" HorizontalAlignment="Stretch"
+            ContentTemplate="{StaticResource Arpeggio.Content.Save}" />
+  </StackPanel>
+</UserControl>

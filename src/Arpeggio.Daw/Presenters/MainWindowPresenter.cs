@@ -8,6 +8,12 @@ using Arpeggio.Daw.Audio;
 using Arpeggio.Daw.Audio.Sfx;
 using Arpeggio.Daw.Editing;
 using Arpeggio.Daw.Presenters.Sfx;
+using Arpeggio.Daw.Presenters.Analysis;
+using Arpeggio.Daw.Presenters.Export;
+using Arpeggio.Daw.Presenters.Instrument;
+using Arpeggio.Daw.Presenters.Midi;
+using Arpeggio.Daw.Presenters.PianoRoll;
+using Arpeggio.Daw.Presenters.Transport;
 
 namespace Arpeggio.Daw.Presenters
 {

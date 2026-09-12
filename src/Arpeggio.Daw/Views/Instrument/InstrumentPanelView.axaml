@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Arpeggio.Daw.Views.Instrument"
+             x:Class="Arpeggio.Daw.Views.Instrument.InstrumentPanelView" Background="{StaticResource Arpeggio.Panel}">
+    <StackPanel Margin="12" Spacing="8">
+      <TextBlock Text="音色" Classes="heading" />
+      <Grid x:Name="PresetPanel" ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="False">
+        <TextBlock Text="プリセット" VerticalAlignment="Center" Classes="secondary" ToolTip.Tip="SNES 内蔵音色バンク" />
+        <ComboBox Grid.Column="1" x:Name="PresetSelector" HorizontalAlignment="Stretch" />
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <TextBlock x:Name="KindLabel" Foreground="{StaticResource Arpeggio.Background}" Padding="8,4" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" x:Name="InstrumentSelector" HorizontalAlignment="Stretch" />
+      </Grid>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="AddButton" ContentTemplate="{StaticResource Arpeggio.Content.Add}" Content="音色を追加" ToolTip.Tip="このチャンネルに音色を追加" />
+        <Button x:Name="RemoveButton" ContentTemplate="{StaticResource Arpeggio.Content.Remove}" Classes="danger" Content="音色を削除" ToolTip.Tip="未使用の音色を削除" />
+      </StackPanel>
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <TextBlock Text="名前" VerticalAlignment="Center" Classes="secondary" />
+        <TextBox Grid.Column="1" x:Name="NameInput" />
+      </Grid>
+      <views:SnesDspView x:Name="SnesDsp" IsVisible="False" />
+      <StackPanel x:Name="SampleImportPanel" Spacing="8" IsVisible="False">
+        <TextBlock x:Name="SampleSummary" Classes="numeric" TextWrapping="Wrap" />
+        <Button x:Name="ClearSampleButton" Content="埋め込みサンプルを解除" Classes="danger"
+                ContentTemplate="{StaticResource Arpeggio.Content.Remove}" IsVisible="False"
+                ToolTip.Tip="埋め込み WAV を解除します。Undo で復元できます。" />
+        <TextBlock Text="WAV のルート音名" />
+        <TextBox x:Name="RootNoteInput" Classes="numeric" Text="C4" />
+        <CheckBox x:Name="LoopSampleInput" Content="サンプル全体をループ" IsChecked="False" />
+        <Button x:Name="ImportWavButton" ContentTemplate="{StaticResource Arpeggio.Content.Import}" Content="WAV を取り込む" HorizontalAlignment="Stretch" ToolTip.Tip="WAV を取り込む" />
+      </StackPanel>
+      <StackPanel x:Name="ParameterPanel" Spacing="8" />
+      <TextBlock Text="マクロ：15,14,12/2（/以降は0始まりループ位置）。空欄で解除。"
+                 TextWrapping="Wrap" Classes="secondary" />
+      <Button x:Name="ApplyButton" ContentTemplate="{StaticResource Arpeggio.Content.Save}" Classes="primary" Content="音色を適用" HorizontalAlignment="Stretch" ToolTip.Tip="音色を適用" />
+      <TextBlock Text="編集した音色を使うすべてのノートに反映されます。"
+                 TextWrapping="Wrap" Classes="secondary" />
+    </StackPanel>
+</UserControl>

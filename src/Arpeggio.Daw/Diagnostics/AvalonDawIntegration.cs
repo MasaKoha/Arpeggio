@@ -6,6 +6,8 @@ using Arpeggio.Daw.Editing;
 using Arpeggio.Daw.Presenters;
 using Arpeggio.Daw.Views;
 using Avalon;
+using Arpeggio.Daw.Presenters.PianoRoll;
+using Arpeggio.Daw.Views.PianoRoll;
 
 namespace Arpeggio.Daw.Diagnostics
 {

@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Arpeggio.Daw.Presenters;
 using Arpeggio.Formats.Midi;
 using Xunit;
 using Arpeggio.Formats.Midi.Import;
+using Arpeggio.Daw.Presenters.Midi;
 
 namespace Arpeggio.Core.Tests.Daw
 {

@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Arpeggio.Daw.Presenters;
 using Xunit;
+using Arpeggio.Daw.Presenters.Export;
 
 namespace Arpeggio.Core.Tests.Daw
 {

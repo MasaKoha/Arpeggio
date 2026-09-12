@@ -3449,3 +3449,133 @@ VSTest のテストホスト通信が `SocketException (13): Permission denied`�
 ### 記録
 
 - `docs/implementation.md`（本節のみ追記）
+
+# フォルダリファクタ R3 実装記録（2026-09-12）
+
+## R3 変更内容
+
+Daw/Presenters の29ファイル、Views の24ファイルを指定のサブフォルダへプレーンな `mv` で移動した。Presenters 直下は `MainWindowPresenter.cs` と `IMainWindowView.cs` の2ファイル、Views 直下は MainWindow／TrackListView の AXAML・コードビハインドと `AudioFilePicker.cs` の5ファイル。既存の Presenters/Sfx と Views/Sfx のファイルは維持し、SfxCreation の Presenter・View を合流した。git コマンドは一切実行していない。
+
+移動した C# のブロック namespace、参照元の using、AXAML の x:Class と XML namespace を更新した。MainWindow の子 View の接頭辞、InstrumentPanelView の子 View の namespace、SNES 画面の x:Static が参照する Presenter の namespace も追従した。Arpeggio.Daw.csproj に移動対象の明示的な Compile／AvaloniaResource パス指定はなく、プロジェクトファイルの変更は不要だった。
+
+| 配置先 | Presenters 直下のファイル数 | Views 直下のファイル数 |
+|---|---:|---:|
+| ルート | 2 | 5 |
+| PianoRoll | 7 | 8 |
+| PianoRoll/Selection | 6 | — |
+| Instrument | 6 | 6 |
+| Sfx | 5 | 8 |
+| Transport | 1 | 2 |
+| Export | 3 | 2 |
+| Midi | 4 | 2 |
+| Analysis | 1 | 2 |
+
+## R3 設計との差
+
+- `CLAUDE.md` の木にない `Analysis/` は、解析画面の Presenter と View を他画面と同じ単位で配置するため追加した。
+- `CLAUDE.md` の木にない `Presenters/PianoRoll/Selection/` は、選択・クリップボード・一括編集の6型をまとめ、PianoRoll 直下のファイル数を上限以内にするため追加した。
+- `Instrument` namespace が `Arpeggio.Core.Instruments.Instrument` 型と衝突するため、InstrumentPanelPresenter・InstrumentParameterEditor・InstrumentPanelView に namespace 内の using エイリアスを追加した。Views 直下の AudioFilePicker では同名エイリアスも子 namespace と衝突するため、既存のローカル変数の型参照1箇所を `Arpeggio.Core.Instruments.Instrument?` と完全修飾した。namespace／using／x:Class 宣言だけでは解消できない名前解決の追従であり、型・処理は不変。
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/` 配下は既に対応済みの Sfx テスト7ファイルのみで、Views 配下は存在しなかったためテストの移動はない。Daw 直下のテストは手順5の指定ディレクトリ外かつ他フォルダの移動禁止範囲として配置を維持し、16ファイルの using のみ更新した。
+- 製品コードに指定一覧外のファイルはなかった。
+
+## R3 検証
+
+- 着手時のリポジトリ651ファイルを保存し、移動元・移動先を対応させて比較した。全602 C# ファイルは namespace 宣言・using・空行と上記1箇所の完全修飾だけを正規化した本文が完全一致した。ロジック・シグネチャの意味・コメント・アサーションは不変。
+- 全15 AXAML は型の namespace を正規化した XML ツリーが完全一致した。レイアウト・バインディング・スタイル参照は不変。x:Class を持つ全13ファイル（移動10組、MainWindow・TrackListView・App）はコードビハインドの namespace／型名との一致を確認し、変更箇所も差分で目視確認した。
+- 移動型の参照413行をリポジトリ全体から抽出し、using を追従した。旧完全修飾型名の残存なし、using 重複なし、ブロック namespace 維持、移動元の残存なし、全移動先と指定 namespace の一致を確認した。
+- `docs/design-sfx.md`／`docs/design.md`／`docs/design-m3.md`、既存 Sfx サブフォルダ内の全ファイル、プロジェクト設定を含む他の既存ファイルは不変。実装記録は本節の追記のみ。
+- R2 と同様、隣接 Avalon への書き込みを避けるためソースと Directory.Build.props を作業ディレクトリ内の検証用領域へコピーし、コマンドラインの AvalonProjectPath 上書きで同じ Debug 診断連携を含めてビルドした。
+
+```sh
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly --disable-build-servers -m:1 -p:AvalonProjectPath="$PWD/.r3-verification/Avalon/src/Avalon/Avalon.csproj"
+```
+
+ビルド成功、警告0・エラー0（6.86秒）。AXAML の XamlIl コンパイルを含む。
+
+```sh
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet test Arpeggio.slnx -nologo -v q --disable-build-servers -m:1 -p:AvalonProjectPath="$PWD/.r3-verification/Avalon/src/Avalon/Avalon.csproj"
+```
+
+VSTest のテストホスト通信が `SocketException (13): Permission denied`（`TcpListener.Start`）でテスト開始前に中止された。通常の `dotnet test` 全件成功という受け入れ条件は未確認。
+
+- 代替として、同梱の `Xunit.Runners.AssemblyRunner.WithoutAppDomain` でビルド済みテスト DLL を同一プロセス実行した。フィルターなし・既定の AssemblyRunnerStartOptions で検出3006件、実行3006件、成功3006件、失敗0件、スキップ0件、終了コード0（59.7581727秒）。テスト側の runtimeconfig／deps と補助ランナーの追加depsを使用し、テスト本体や期待値は変更していない。
+- Avalon コピー、補助ランナー、比較用ファイルは検証後に削除した。通常のビルド・テスト成果物以外に一時ファイルは残していない。
+
+追加テストは不要。理由: 配置と名前解決のみの機械的変更であり、本文一致の検査と既存3006件のテストで検証した。新規テストは追加していない。
+
+## R3 未実行の確認事項
+
+- 制限のない依頼者環境で、元の隣接 Avalon を参照する通常の `dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly` と `dotnet test Arpeggio.slnx -nologo -v q` の成功を確認する。代替ランナーの全件成功は VSTest の通信経路の成功確認を代替しない。
+- DAW を起動して全画面を表示する実行時確認は未実施。AXAML はビルド時コンパイルと x:Class／コードビハインドの一致まで確認した。
+
+## R3 変更ファイル一覧
+
+製品58ファイル、テスト16ファイル、実装記録1ファイル。移動53件（Presenters 29件、Views 24件）は移動先で数える。
+
+
+### 移動・namespace 更新（53ファイル）
+
+
+- `src/Arpeggio.Daw/Presenters/Analysis/`: `AnalysisPresenter.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/Export/`: `ChipExportReportText.cs`、`ExportFileTypes.cs`、`ExportPresenter.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/Instrument/`: `InstrumentMacroText.cs`、`InstrumentPanelPresenter.cs`、`InstrumentParameter.cs`、`InstrumentParameterEditor.cs`、`SnesEchoPresenter.cs`、`SnesInstrumentInput.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/Midi/`: `MidiImportChannelMapFile.cs`、`MidiImportInput.cs`、`MidiImportPresenter.cs`、`MidiImportReportText.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/PianoRoll/`: `NotePanelPresenter.cs`、`PianoRollDragMode.cs`、`PianoRollGesture.cs`、`PianoRollPresenter.cs`、`SnapGrid.cs`、`SnapResolution.cs`、`VelocityLanePresenter.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/PianoRoll/Selection/`: `NoteBatchEditor.cs`、`NoteClipboard.cs`、`NoteEditGesture.cs`、`NotePointerModifiers.cs`、`NoteSelection.cs`、`NoteSelectionRectangle.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/Sfx/`: `SfxCreationPresenter.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/Transport/`: `TransportPresenter.cs`
+
+
+- `src/Arpeggio.Daw/Views/Analysis/`: `AnalysisView.axaml`、`AnalysisView.axaml.cs`
+
+
+- `src/Arpeggio.Daw/Views/Export/`: `ChipExportView.axaml`、`ChipExportView.axaml.cs`
+
+
+- `src/Arpeggio.Daw/Views/Instrument/`: `InstrumentPanelView.axaml`、`InstrumentPanelView.axaml.cs`、`SnesDspView.axaml`、`SnesDspView.axaml.cs`、`SnesEchoView.axaml`、`SnesEchoView.axaml.cs`
+
+
+- `src/Arpeggio.Daw/Views/Midi/`: `MidiImportView.axaml`、`MidiImportView.axaml.cs`
+
+
+- `src/Arpeggio.Daw/Views/PianoRoll/`: `KeyboardStripControl.cs`、`NotePanelView.axaml`、`NotePanelView.axaml.cs`、`PianoRollControl.cs`、`PianoRollToolbarView.axaml`、`PianoRollToolbarView.axaml.cs`、`TimeRulerControl.cs`、`VelocityLaneControl.cs`
+
+
+- `src/Arpeggio.Daw/Views/Sfx/`: `SfxCreationView.axaml`、`SfxCreationView.axaml.cs`
+
+
+- `src/Arpeggio.Daw/Views/Transport/`: `TransportView.axaml`、`TransportView.axaml.cs`
+
+
+### 参照更新のみ（21ファイル）
+
+
+- `src/Arpeggio.Daw/Diagnostics/`: `AvalonDawIntegration.cs`
+
+
+- `src/Arpeggio.Daw/Presenters/`: `MainWindowPresenter.cs`
+
+
+- `src/Arpeggio.Daw/Views/`: `AudioFilePicker.cs`、`MainWindow.axaml`、`MainWindow.axaml.cs`
+
+
+- `tests/Arpeggio.Core.Tests/Daw/`: `AnalysisPresenterTests.cs`、`ChipExportLifetimeTests.cs`、`ChipExportPresenterTests.cs`、`ExportPresenterTests.cs`、`ExportRevealTests.cs`、`MidiImportDawFixture.cs`、`MidiImportInputTests.cs`、`MidiImportLifetimeTests.cs`、`NotePanelPresenterTests.cs`、`PianoRollClipboardTests.cs`、`PianoRollEditingTests.cs`、`PianoRollInitialPitchTests.cs`、`PianoRollPresenterTests.cs`、`PianoRollSelectionTests.cs`、`SnesInstrumentPresenterTests.cs`、`TransportPresenterTests.cs`
+
+
+### 記録
+
+- `docs/implementation.md`（本節のみ追記）

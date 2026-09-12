@@ -13,6 +13,13 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Arpeggio.Daw.Presenters.PianoRoll;
+using Arpeggio.Daw.Views.Analysis;
+using Arpeggio.Daw.Views.Export;
+using Arpeggio.Daw.Views.Instrument;
+using Arpeggio.Daw.Views.Midi;
+using Arpeggio.Daw.Views.PianoRoll;
+using Arpeggio.Daw.Views.Transport;
 
 namespace Arpeggio.Daw.Views
 {

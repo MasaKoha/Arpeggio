@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.Midi.MidiImportView" Background="{StaticResource Arpeggio.Panel}">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="12" Spacing="8">
+      <TextBlock Text="MIDI を取り込む" FontWeight="Bold" />
+      <StackPanel x:Name="SettingsPanel" Spacing="8">
+        <TextBlock Text="MIDI 入力（SMF format 0 / 1）" />
+        <TextBox x:Name="SourceInput" PlaceholderText="入力 .mid / .midi" />
+        <Button x:Name="SourceButton" Content="MIDI を選択" HorizontalAlignment="Stretch" />
+        <TextBlock Text="新規保存先（既存ファイルは保護）" />
+        <TextBox x:Name="DestinationInput" PlaceholderText="出力 .arpeggio.json" />
+        <Button x:Name="DestinationButton" Content="新規保存先を選択" HorizontalAlignment="Stretch" />
+        <TextBlock Text="出力チップ" />
+        <ComboBox x:Name="ChipInput" HorizontalAlignment="Stretch" />
+        <TextBlock Text="基準テンポ（空欄は MIDI、1〜1000）" />
+        <TextBox x:Name="TempoInput" PlaceholderText="MIDI の先頭有効テンポ" />
+        <TextBlock Text="量子化幅（48 の正の約数）" />
+        <TextBox x:Name="QuantizeInput" Text="1" />
+        <TextBlock Text="声数不足時の処理" />
+        <ComboBox x:Name="PolyphonyInput" HorizontalAlignment="Stretch" />
+        <TextBlock Text="channel-map（任意の UTF-8 JSON）" />
+        <TextBox x:Name="MapInput" PlaceholderText="空欄は自動割り当て" />
+        <Button x:Name="MapButton" Content="map ファイルを選択" HorizontalAlignment="Stretch" />
+        <TextBlock Text="曲名（任意）" />
+        <TextBox x:Name="TitleInput" />
+        <CheckBox x:Name="StrictInput" Content="strict: 警告があれば保存しない" />
+      </StackPanel>
+      <Button x:Name="PrepareButton" Content="変換を確認" HorizontalAlignment="Stretch" />
+      <Button x:Name="SaveButton" Content="新規保存" HorizontalAlignment="Stretch" IsEnabled="False" />
+      <Button x:Name="OpenButton" Content="開く" HorizontalAlignment="Stretch" IsEnabled="False" />
+      <Button x:Name="CancelButton" Content="キャンセル・候補を破棄" HorizontalAlignment="Stretch" />
+      <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" />
+      <TextBox x:Name="ReportText" MinHeight="220" MaxHeight="420" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -7,6 +7,7 @@ using Arpeggio.Formats;
 using Arpeggio.Daw.Presenters;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Arpeggio.Daw.Presenters.Export;
 
 namespace Arpeggio.Daw.Views
 {
@@ -80,7 +81,7 @@ namespace Arpeggio.Daw.Views
             isPicking = true;
             try
             {
-                Instrument? instrument = presenter.Instruments.CurrentInstrument;
+                Arpeggio.Core.Instruments.Instrument? instrument = presenter.Instruments.CurrentInstrument;
                 IReadOnlyList<IStorageFile> files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
                     Title = "SNES 音色へ WAV を取り込む", AllowMultiple = false, FileTypeFilter = new[] { wavType }

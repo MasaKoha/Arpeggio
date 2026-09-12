@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.Sfx.SfxCreationView" Background="{StaticResource Arpeggio.Panel}">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="{StaticResource Arpeggio.Margin.Small}">
+    <StackPanel Spacing="{StaticResource Arpeggio.Space.Small}">
+      <TextBlock x:Name="HeaderText" Classes="heading" Text="SFX" TextWrapping="Wrap" />
+      <TextBlock x:Name="StateText" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,Auto">
+        <Button x:Name="PlayButton" Content="再生" Classes="primary" HorizontalAlignment="Stretch" />
+        <Button x:Name="StopButton" Grid.Column="1" Content="停止" />
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*">
+        <CheckBox x:Name="AutoPreviewToggle" Content="自動試聴" IsChecked="True" />
+        <StackPanel Grid.Column="1">
+          <TextBlock x:Name="MonitorLabel" Text="試聴音量" Classes="secondary" />
+          <Slider x:Name="MonitorVolume" Classes="sfx-monitor" Minimum="0" Maximum="1" SmallChange="0.01" />
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="{StaticResource Arpeggio.Space.Medium}">
+        <TextBlock Text="パラメータプリセット" Classes="heading" />
+        <ComboBox x:Name="PresetSelector" HorizontalAlignment="Stretch" />
+        <TextBlock x:Name="PresetDescription" TextWrapping="Wrap" Classes="secondary" />
+        <WrapPanel>
+          <Button x:Name="NewCandidateButton" Content="新規候補" />
+          <Button x:Name="FollowDocumentButton" Content="現在曲を表示" />
+          <Button x:Name="RandomizeButton" Content="ランダム" />
+          <Button x:Name="MutateButton" Content="変異" />
+          <Button x:Name="UndoButton" Content="元に戻す" />
+          <Button x:Name="RedoButton" Content="やり直す" />
+        </WrapPanel>
+        <Expander Header="ランダム・変異の詳細" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <StackPanel Spacing="{StaticResource Arpeggio.Space.Small}">
+            <TextBlock Text="カテゴリ（ランダムはロックを適用しません）" TextWrapping="Wrap" />
+            <ComboBox x:Name="CategorySelector" HorizontalAlignment="Stretch" />
+            <TextBlock Text="seed（0〜4294967295）" />
+            <TextBox x:Name="SeedInput" Text="0" Classes="numeric" />
+            <TextBlock Text="変異の強さ（0〜1）" />
+            <TextBox x:Name="StrengthInput" Text="0.1" Classes="numeric" />
+            <Button x:Name="RepeatRandomButton" Content="同じ seed で再生成" />
+            <TextBlock Text="seed の再生成はカテゴリ生成です。変異の再現には元の値も必要です。" TextWrapping="Wrap" Classes="secondary" />
+          </StackPanel>
+        </Expander>
+        <Expander Header="従来のソング雛形" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <StackPanel Spacing="{StaticResource Arpeggio.Space.Small}">
+            <ComboBox x:Name="LegacySelector" HorizontalAlignment="Stretch" />
+            <TextBlock Text="従来の音を新規候補として作成します。パラメータ編集はできません。保存と開くは別操作です。" TextWrapping="Wrap" Classes="secondary" />
+            <Button x:Name="LegacyButton" Content="従来の雛形から新規候補" />
+          </StackPanel>
+        </Expander>
+        <TextBlock Text="候補のチップ（現在曲は変換しません）" TextWrapping="Wrap" />
+        <ComboBox x:Name="ChipSelector" HorizontalAlignment="Stretch" />
+        <ContentControl x:Name="ParameterHost" HorizontalContentAlignment="Stretch" />
+        <TextBlock x:Name="DiagnosticsText" TextWrapping="Wrap" />
+        <Expander Header="診断の詳細" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <TextBlock x:Name="DiagnosticsDetail" TextWrapping="Wrap" />
+        </Expander>
+        <StackPanel x:Name="RegenerationPanel" IsVisible="False" Spacing="{StaticResource Arpeggio.Space.Small}">
+          <TextBlock Text="表示値は保存パラメータです。現在の音を表す値ではありません。" TextWrapping="Wrap" />
+          <Button x:Name="InspectRegenerationButton" Content="生成列の置換内容を確認" Classes="danger" />
+          <TextBlock x:Name="ReplacementText" TextWrapping="Wrap" />
+          <Button x:Name="ConfirmRegenerationButton" Content="保存パラメータから生成列を置換" Classes="danger" IsEnabled="False" />
+        </StackPanel>
+        <TextBlock x:Name="OperationMessage" TextWrapping="Wrap" Foreground="{StaticResource Arpeggio.Danger}" />
+        <TextBlock x:Name="OutputStatus" TextWrapping="Wrap" />
+        <Expander x:Name="OutputDetails" Header="解析・書き出し結果" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <TextBox x:Name="OutputText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" />
+        </Expander>
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="2" Spacing="{StaticResource Arpeggio.Space.Small}">
+      <TextBlock x:Name="SaveStateText" Classes="secondary" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,*">
+        <Button x:Name="SaveButton" Content="新規保存" HorizontalAlignment="Stretch" />
+        <Button x:Name="OpenSavedButton" Grid.Column="1" HorizontalAlignment="Stretch"><TextBlock Text="保存したSFXを開く" TextWrapping="Wrap" /></Button>
+      </Grid>
+      <WrapPanel>
+        <Button x:Name="DetachButton" Content="通常ソングとして編集" IsVisible="False" />
+        <Button x:Name="ExportWavButton" Content="WAV 書き出し" />
+        <Button x:Name="AnalyzeButton" Content="解析" />
+      </WrapPanel>
+    </StackPanel>
+  </Grid>
+</UserControl>
