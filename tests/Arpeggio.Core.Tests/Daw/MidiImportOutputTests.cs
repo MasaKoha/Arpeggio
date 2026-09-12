@@ -7,6 +7,9 @@ using Arpeggio.Core.Tests.Formats;
 using Arpeggio.Formats;
 using Arpeggio.Formats.Export;
 using Xunit;
+using Arpeggio.Core.Tests.Formats.Export.Nsf;
+using Arpeggio.Core.Tests.Formats.Export.Vgm;
+using Arpeggio.Core.Tests.Formats.Midi.Import;
 
 namespace Arpeggio.Core.Tests.Daw
 {

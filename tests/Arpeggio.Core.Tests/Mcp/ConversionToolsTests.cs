@@ -11,6 +11,7 @@ using Arpeggio.Formats;
 using Arpeggio.Formats.Export;
 using Arpeggio.Mcp;
 using Xunit;
+using Arpeggio.Core.Tests.Formats.Midi;
 
 namespace Arpeggio.Core.Tests.Mcp
 {

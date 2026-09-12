@@ -2,6 +2,11 @@ using System;
 using System.IO;
 using System.Threading;
 using Arpeggio.Core.Document;
+using Arpeggio.Formats.Export.Control;
+using Arpeggio.Formats.Export.GameBoy;
+using Arpeggio.Formats.Export.Nes;
+using Arpeggio.Formats.Export.Nsf;
+using Arpeggio.Formats.Export.Vgm;
 
 namespace Arpeggio.Formats.Export
 {

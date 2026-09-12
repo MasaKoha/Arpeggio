@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Arpeggio.Formats.Midi.Import.Voice;
 
 namespace Arpeggio.Daw.Views
 {

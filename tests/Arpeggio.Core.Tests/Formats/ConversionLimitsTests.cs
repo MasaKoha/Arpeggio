@@ -3,6 +3,8 @@ using Arpeggio.Formats;
 using Arpeggio.Formats.Export;
 using Arpeggio.Formats.Midi;
 using Xunit;
+using Arpeggio.Formats.Midi.Import;
+using Arpeggio.Formats.Midi.Import.Voice;
 
 namespace Arpeggio.Core.Tests.Formats
 {

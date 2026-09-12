@@ -1,5 +1,6 @@
 using Arpeggio.Core.Document;
 using Arpeggio.Formats.Midi;
+using Arpeggio.Formats.Midi.Import.Voice;
 
 namespace Arpeggio.Daw.Presenters
 {

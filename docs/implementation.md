@@ -3326,3 +3326,126 @@ AVALONIA_TELEMETRY_OPTOUT=1 dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsO
 ### 記録
 
 - `docs/implementation.md`（本節のみ追記）
+
+# フォルダリファクタ R2 実装記録（2026-09-12）
+
+## R2 変更内容
+
+Formats/Export の36ファイルと Midi の22ファイルを指定のサブフォルダへ移動した。入口・SMF 読み込みの正本は直下に残し、Export 直下5ファイル、Midi 直下10ファイルとした。対応テスト・補助型79ファイルも実装の責務に対応するフォルダへ移動し、ブロック namespace とリポジトリ全体の using を追従した。移動にはプレーンな `mv` のみを使用し、git コマンドは一切実行していない。
+
+| 製品コードの配置先 | 直下の C# ファイル数 |
+|---|---:|
+| Export | 5 |
+| Export/Control | 10 |
+| Export/Nes | 4 |
+| Export/GameBoy | 4 |
+| Export/Nsf | 16 |
+| Export/Vgm | 2 |
+| Midi | 10 |
+| Midi/Import | 10 |
+| Midi/Import/Tempo | 2 |
+| Midi/Import/Voice | 10 |
+
+## R2 設計との差
+
+- `CLAUDE.md` の木にない `Export/Control/` は、制御列の10型をまとめて直下の10ファイル超過を避ける最小の区分として追加した。
+- 依頼の一覧外にあった `MidiAllocatedNote.cs` は声割り当て結果を保持する型なので `Midi/Import/Voice/` へ配置した。
+- `Export/Nsf/` の16ファイルは NSF ドライバ生成のまとまった責務として、依頼どおり再分割しなかった。
+- 補助型を含むテストは検証対象の責務へ配置した。MIDI のコントローラー・sustain・打楽器収集・声割り当ては Import/Voice、取り込み統合と音色マップは Import、独立6502・NSFローダー・量子化済みNSF列のVGM化 fixture は Export/Nsf、独立VGMパーサーは Export/Vgm、共有レジスタ再合成基盤は Export。共通診断の ConversionLimitsTests／ConversionReportTests は Formats 直下に残した。
+
+## R2 検証
+
+- 着手時の651ファイルを保存し、移動元と移動先を対応させて比較した。全602 C# ファイルは namespace 宣言・using 文と先頭の空行だけを除去した本文が完全一致した。ロジック・シグネチャの構成・コメント・アサーション・NSF/VGM生成処理・MIDIパース処理は変更していない。
+- 移動前にリポジトリ全体の型参照2293行を `rg` で検索した。移動後の旧完全修飾型参照の残存なし、using 重複なし、ブロック namespace 維持を確認した。
+- `docs/design-sfx.md`／`docs/design.md`／`docs/design-m3.md`、プロジェクト設定、依存関係を含む他の既存ファイルは不変。実装記録は本節の追記のみ。
+- R1 で確認済みの作業範囲外書き込みを避け、隣接 Avalon のソースと Directory.Build.props を作業ディレクトリ内の検証用領域へコピーした。プロジェクトファイルを変更せず、コマンドラインの AvalonProjectPath 上書きで同じ Debug 診断連携を含めてビルドした。
+
+```sh
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly --disable-build-servers -m:1 -p:AvalonProjectPath="$PWD/.r2-verification/Avalon/src/Avalon/Avalon.csproj"
+```
+
+ビルド成功、警告0・エラー0（14.50秒）。
+
+```sh
+AVALONIA_TELEMETRY_OPTOUT=1 dotnet test Arpeggio.slnx -nologo -v q --disable-build-servers -m:1 -p:AvalonProjectPath="$PWD/.r2-verification/Avalon/src/Avalon/Avalon.csproj"
+```
+
+VSTest のテストホスト通信が `SocketException (13): Permission denied`（`TcpListener.Start`）でテスト開始前に中止された。通常の `dotnet test` 全件成功という受け入れ条件は未確認。
+
+- 代替として、同梱の `Xunit.Runners.AssemblyRunner.WithoutAppDomain` でビルド済みテストDLLを同一プロセス実行した。フィルターなし・既定の AssemblyRunnerStartOptions で検出3006件、実行3006件、成功3006件、失敗0件、スキップ0件、終了コード0（57.5250041秒）。テスト側の runtimeconfig／deps と補助ランナーの追加depsを使用した。テスト本体や期待値は変更していない。
+- Avalon コピー、補助ランナー、比較用ファイルは検証後に削除した。ビルド・テストの成果物以外に一時ファイルは残していない。
+
+追加テストは不要。理由: 配置と namespace・using の機械的変更であり、本文一致の検査と既存3006件のテストで検証した。新規テストは追加していない。
+
+## R2 未実行の確認事項
+
+- 制限のない依頼者環境で、元の隣接 Avalon を参照する通常の `dotnet build Arpeggio.slnx -nologo -v q -clp:ErrorsOnly` と `dotnet test Arpeggio.slnx -nologo -v q` の成功を確認する。代替ランナーでの全件成功は VSTest の通信経路の成功確認を代替しない。
+
+## R2 変更ファイル一覧
+
+製品67ファイル、テスト・補助型89ファイル、実装記録1ファイル。移動137件（製品58件、テスト・補助型79件）は移動先で数え、新しい型やテストの追加には含めない。
+
+### 移動・namespace 更新（137ファイル）
+
+- `src/Arpeggio.Formats/Export/Control/`: `ControlBoundaries.cs`、`ControlEvent.cs`、`ControlEventKind.cs`、`ControlInstrument.cs`、`ControlNote.cs`、`ControlTimeline.cs`、`ControlTimelineBuilder.cs`、`ControlTimelineResult.cs`、`ControlTrack.cs`、`ControlTrackCursor.cs`
+
+- `src/Arpeggio.Formats/Export/GameBoy/`: `GameBoyRegisterChannel.cs`、`GameBoyRegisterCompiler.cs`、`GameBoyRegisterValues.cs`、`GameBoyRegisters.cs`
+
+- `src/Arpeggio.Formats/Export/Nes/`: `NesConversionDiagnostics.cs`、`NesRegisterChannel.cs`、`NesRegisterCompiler.cs`、`NesRegisters.cs`
+
+- `src/Arpeggio.Formats/Export/Nsf/`: `NsfCodeBuilder.cs`、`NsfCycleAnalyzer.cs`、`NsfDataEncoder.cs`、`NsfDataFormat.cs`、`NsfDriverBuilder.cs`、`NsfDriverImage.cs`、`NsfDriverInstruction.cs`、`NsfEncodedData.cs`、`NsfFrameCompiler.cs`、`NsfFrameTimeline.cs`、`NsfInstructionSet.cs`、`NsfMetadata.cs`、`NsfOpcode.cs`、`NsfRegisterWrite.cs`、`NsfTiming.cs`、`NsfWriter.cs`
+
+- `src/Arpeggio.Formats/Export/Vgm/`: `Gd3Tag.cs`、`VgmWriter.cs`
+
+- `src/Arpeggio.Formats/Midi/Import/`: `MidiDrumControllerDiagnostics.cs`、`MidiDrumDefinition.cs`、`MidiDrumPriority.cs`、`MidiImportOptions.cs`、`MidiImportResult.cs`、`MidiImporter.cs`、`MidiInstrumentMap.cs`、`MidiInstrumentMapper.cs`、`MidiQuantizedNote.cs`、`MidiTickQuantizer.cs`
+
+- `src/Arpeggio.Formats/Midi/Import/Tempo/`: `MidiTempoMap.cs`、`MidiTempoSegment.cs`
+
+- `src/Arpeggio.Formats/Midi/Import/Voice/`: `MidiAllocatedNote.cs`、`MidiChannelCandidates.cs`、`MidiChannelState.cs`、`MidiNoteCollector.cs`、`MidiPendingNote.cs`、`MidiPitchRange.cs`、`MidiPolyphonyMode.cs`、`MidiVoiceAllocator.cs`、`MidiVoiceNote.cs`、`MidiVoiceTrack.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/`: `ChipExportServiceTests.cs`、`IRegisterTraceChip.cs`、`RegisterTimelineTests.cs`、`RegisterTraceAssertions.cs`、`RegisterTraceRenderer.cs`、`RegisterTraceRendererTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/Control/`: `ControlIsolationTests.cs`、`ControlModulationTests.cs`、`ControlTimelineTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/GameBoy/`: `GameBoyDutyMacroTests.cs`、`GameBoyEnvelopeRegisterTests.cs`、`GameBoyNoiseRegisterTests.cs`、`GameBoyRegisterCompilerTests.cs`、`GameBoyRegisterDiagnosticsTests.cs`、`GameBoyRegisterResynthesisTests.cs`、`GameBoyRegisterRetriggerTests.cs`、`GameBoyRegisterTestData.cs`、`GameBoyRegisterTraceChip.cs`、`GameBoyRegisterTraceChipTests.cs`、`GameBoyRegisterTransitionTests.cs`、`GameBoyVgmTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/Nes/`: `NesConversionDiagnosticsTests.cs`、`NesDpcmRejectionTests.cs`、`NesEffectRegisterTests.cs`、`NesNoiseRegisterTests.cs`、`NesRegisterCompilerTests.cs`、`NesRegisterDiagnosticsTests.cs`、`NesRegisterGateModel.cs`、`NesRegisterResynthesisTests.cs`、`NesRegisterTerminationTests.cs`、`NesRegisterTraceChip.cs`、`NesRegisterTraceChipTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/Nsf/`: `IndependentNsfLoader.cs`、`IndependentNsfLoaderTests.cs`、`Limited6502.cs`、`Limited6502Memory.cs`、`Limited6502Tests.cs`、`NsfBankExecutionTests.cs`、`NsfDataEncoderTests.cs`、`NsfDriverBuilderTests.cs`、`NsfDriverExecutionTests.cs`、`NsfExecutionFixture.cs`、`NsfFrameCompilerTests.cs`、`NsfMetadataTests.cs`、`NsfWriterContractTests.cs`、`NsfWriterFixture.cs`、`NsfWriterTests.cs`、`QuantizedNesVgmFixture.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Export/Vgm/`: `IndependentVgmParser.cs`、`IndependentVgmParserTests.cs`、`ParsedVgm.cs`、`VgmMetadataTests.cs`、`VgmTestStream.cs`、`VgmWriterContractTests.cs`、`VgmWriterTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Midi/`: `MidiFileFixture.cs`、`MidiFragmentedStream.cs`、`MidiReaderInvalidInputTests.cs`、`MidiReaderLimitsTests.cs`、`MidiReaderTests.cs`、`MidiSongFileTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Midi/Import/`: `MidiDrumMappingTests.cs`、`MidiImporterTests.cs`、`MidiInstrumentMapperTests.cs`、`MidiMappingFixture.cs`、`MidiPipelineFixture.cs`、`MidiPipelineTests.cs`、`MidiRenderAllocationTests.cs`、`MidiTickQuantizerTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Midi/Import/Tempo/`: `MidiTempoMapTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/Midi/Import/Voice/`: `MidiChannelMapTests.cs`、`MidiControllerTests.cs`、`MidiDrumCollectionTests.cs`、`MidiNoteCollectorTests.cs`、`MidiPitchRangeTests.cs`、`MidiPolyphonyTests.cs`、`MidiSustainTests.cs`、`MidiVoiceAllocatorTests.cs`、`MidiVoiceFixture.cs`
+
+
+### 参照更新のみ（19ファイル）
+
+- `src/Arpeggio.Cli/`: `CliMidiSongFile.cs`、`MidiImportCommands.cs`
+
+- `src/Arpeggio.Daw/Presenters/`: `MidiImportInput.cs`、`MidiImportPresenter.cs`
+
+- `src/Arpeggio.Daw/Views/`: `MidiImportView.axaml.cs`
+
+- `src/Arpeggio.Formats/Export/`: `ChipExportService.cs`
+
+- `src/Arpeggio.Formats/Midi/`: `MidiNote.cs`、`MidiSongFile.cs`
+
+- `src/Arpeggio.Mcp/`: `ArpeggioTools.cs`
+
+- `tests/Arpeggio.Core.Tests/Cli/`: `ChipExportCommandsTests.cs`、`MidiImportCommandsTests.cs`、`MidiOutputPipelineTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Daw/`: `MidiImportDawFixture.cs`、`MidiImportInputTests.cs`、`MidiImportLifetimeTests.cs`、`MidiImportOutputTests.cs`、`MidiImportPresenterTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Formats/`: `ConversionLimitsTests.cs`
+
+- `tests/Arpeggio.Core.Tests/Mcp/`: `ConversionToolsTests.cs`
+
+### 記録
+
+- `docs/implementation.md`（本節のみ追記）

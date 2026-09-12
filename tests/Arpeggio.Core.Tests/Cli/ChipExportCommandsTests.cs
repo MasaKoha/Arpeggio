@@ -4,6 +4,8 @@ using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Tests.Formats;
 using Xunit;
+using Arpeggio.Core.Tests.Formats.Export.Nsf;
+using Arpeggio.Core.Tests.Formats.Export.Vgm;
 
 namespace Arpeggio.Core.Tests.Cli
 {

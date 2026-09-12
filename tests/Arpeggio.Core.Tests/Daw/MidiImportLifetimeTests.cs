@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Arpeggio.Daw.Presenters;
 using Arpeggio.Formats.Midi;
 using Xunit;
+using Arpeggio.Formats.Midi.Import;
 
 namespace Arpeggio.Core.Tests.Daw
 {

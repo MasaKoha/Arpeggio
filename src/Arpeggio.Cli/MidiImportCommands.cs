@@ -4,6 +4,8 @@ using System.IO;
 using Arpeggio.Core.Document;
 using Arpeggio.Formats;
 using Arpeggio.Formats.Midi;
+using Arpeggio.Formats.Midi.Import;
+using Arpeggio.Formats.Midi.Import.Voice;
 
 namespace Arpeggio.Cli
 {
