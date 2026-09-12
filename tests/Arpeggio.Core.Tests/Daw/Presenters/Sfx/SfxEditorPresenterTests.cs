@@ -140,6 +140,25 @@ namespace Arpeggio.Core.Tests.Daw.Presenters.Sfx
             Assert.Equal(path, fixture.Document.Path);
         }
 
+        /// <summary>従来の雛形は生成音と定義なしの形式を維持して候補へ入り、Undoで戻せる。</summary>
+        [Fact]
+        public void LegacyCandidateKeepsFactoryBytesAndIndependentHistory()
+        {
+            using var fixture = new DawPresenterFixture();
+            var presenter = fixture.Presenter.SfxEditor;
+            presenter.AutoPreview = false;
+            presenter.NewCandidate(ChipKind.Nes, SfxPresetKind.Jump);
+            string before = SongSerializer.Serialize(presenter.Model.Snapshot());
+            string documentBefore = SongSerializer.Serialize(fixture.Document.Song);
+            presenter.NewLegacyCandidate(ChipKind.GameBoy, SfxPresetKind.Coin);
+            Assert.Equal(SongSerializer.Serialize(SfxPresetFactory.Create(ChipKind.GameBoy, SfxPresetKind.Coin)),
+                SongSerializer.Serialize(presenter.Model.Snapshot()));
+            Assert.False(presenter.Model.Synchronization.Editable);
+            Assert.Equal(documentBefore, SongSerializer.Serialize(fixture.Document.Song));
+            presenter.Undo();
+            Assert.Equal(before, SongSerializer.Serialize(presenter.Model.Snapshot()));
+        }
+
         /// <summary>チップ切替をUndoでき、保存失敗で成功済みのパスを失わない。</summary>
         [Fact]
         public void ChipChangeIsUndoableAndSaveFailureKeepsPreviousSavedPath()

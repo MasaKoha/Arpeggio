@@ -1,5 +1,8 @@
 using System;
 using System.Globalization;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
+using Arpeggio.Daw.Views.Sfx;
 using System.Threading.Tasks;
 using Arpeggio.Core.Document;
 using Arpeggio.Daw.Presenters;
@@ -47,6 +50,8 @@ namespace Arpeggio.Daw.Views
         private readonly TextBlock statusLabel;
         private readonly Button warningsButton;
         private readonly TextBox warningsText;
+        private readonly CompositeDisposable sfxSubscriptions = new CompositeDisposable();
+        private int previousEditorTabIndex;
         private readonly DispatcherTimer displayTimer = new DispatcherTimer();
         private MainWindowPresenter? presenter;
         private Action pollPlayback = null!;
@@ -114,10 +119,18 @@ namespace Arpeggio.Daw.Views
             chipExport.Bind(mainPresenter.Export);
             midiImport.Bind(mainPresenter.MidiImport, this);
             midiImportButton.Click += OnMidiImport;
-            sfxCreation.Bind(mainPresenter.SfxCreation, mainPresenter.Execute);
+            sfxCreation.Bind(mainPresenter);
+            previousEditorTabIndex = editorTabs.SelectedIndex;
+            sfxSubscriptions.Add(SfxViewEvents.Observe(editorTabs, TabControl.SelectionChangedEvent).Subscribe(arguments =>
+            {
+                if (arguments.Source != editorTabs || editorTabs.SelectedIndex == previousEditorTabIndex) { return; }
+                if (previousEditorTabIndex == SfxTabIndex) { sfxCreation.LeaveTab(); }
+                previousEditorTabIndex = editorTabs.SelectedIndex;
+                if (previousEditorTabIndex == SfxTabIndex) { sfxCreation.EnterTab(); }
+            }));
             snesEcho.Bind(mainPresenter.SnesEcho, mainPresenter.Execute);
             instruments.WavImportRequested += OnImportWav;
-            sfxButton.Click += OnSfx;
+            sfxSubscriptions.Add(SfxViewEvents.Observe(sfxButton, Button.ClickEvent).Subscribe(arguments => OnSfx(sfxButton, arguments)));
             exportButton.Click += OnExport;
             revealExportButton.Click += OnRevealExport;
             tracks.TrackSelected += OnTrackSelected;
@@ -155,6 +168,7 @@ namespace Arpeggio.Daw.Views
             }
             snesEcho.Refresh();
             notes.Refresh();
+            sfxCreation.Refresh();
             analysis.ShowTracks(current);
             SynchronizeViewport();
         }
@@ -201,7 +215,7 @@ namespace Arpeggio.Daw.Views
         {
             watcher?.Dispose();
             watcher = new SongFileWatcher(path, () => Dispatcher.UIThread.Post(OnExternalChange));
-            sfxCreation.ResetDestination();
+            sfxCreation.Refresh();
             editorTabs.SelectedIndex = 0;
             ResetViewport();
         }
@@ -234,7 +248,6 @@ namespace Arpeggio.Daw.Views
             SizeChanged -= OnSizeChanged;
             warningsButton.Click -= OnWarnings;
             instruments.WavImportRequested -= OnImportWav;
-            sfxButton.Click -= OnSfx;
             exportButton.Click -= OnExport;
             revealExportButton.Click -= OnRevealExport;
             Opened -= OnOpened;
@@ -248,6 +261,7 @@ namespace Arpeggio.Daw.Views
             chipExport.Dispose();
             midiImportButton.Click -= OnMidiImport;
             midiImport.Dispose();
+            sfxSubscriptions.Dispose();
             sfxCreation.Dispose();
             transport.Dispose();
             presenter?.Dispose();
@@ -278,7 +292,15 @@ namespace Arpeggio.Daw.Views
         private void OnLength(string text) => MainPresenter.Execute(() => MainPresenter.Transport.SetLength(int.Parse(text, CultureInfo.InvariantCulture)));
         private void OnWarnings(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.ShowWarnings);
         private void OnMidiImport(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = MidiTabIndex;
-        private void OnSfx(object? sender, RoutedEventArgs arguments) => editorTabs.SelectedIndex = SfxTabIndex;
+        private void OnSfx(object? sender, RoutedEventArgs arguments)
+        {
+            if (!MainPresenter.SfxEditor.Model.Synchronization.Editable)
+            {
+                MainPresenter.SfxEditor.NewCandidate(MainPresenter.PianoRoll.Song.Chip, Arpeggio.Core.Sfx.SfxPresetKind.Jump);
+            }
+            editorTabs.SelectedIndex = SfxTabIndex;
+            sfxCreation.EnterTab();
+        }
         private async void OnExport(object? sender, RoutedEventArgs arguments) => await ExportWithPickerAsync();
         private void OnRevealExport(object? sender, RoutedEventArgs arguments) => MainPresenter.Execute(MainPresenter.Export.RevealLastExport);
         private async void OnImportWav(string rootNote, bool loop) => await filePicker.ImportAsync(MainPresenter, rootNote, loop);
@@ -319,6 +341,11 @@ namespace Arpeggio.Daw.Views
         }
         private void OnShortcut(object? sender, KeyEventArgs arguments)
         {
+            if (sfxCreation.IsKeyboardFocusWithin)
+            {
+                sfxCreation.HandleShortcut(arguments);
+                return;
+            }
             bool control = arguments.KeyModifiers.HasFlag(KeyModifiers.Control);
             bool shift = arguments.KeyModifiers.HasFlag(KeyModifiers.Shift);
             bool isParameterInput = FocusManager?.GetFocusedElement() is TextBox or ComboBox or ListBox or ListBoxItem or Button or Slider or NumericUpDown;

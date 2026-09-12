@@ -77,11 +77,19 @@ namespace Arpeggio.Daw.Presenters.Sfx
         }
 
         /// <summary>ドラッグ・数値入力の開始値を保持する。</summary>
-        public void BeginGesture() => Run(() => { Model.BeginGesture(); return false; });
+        public void BeginGesture()
+        {
+            inputResets.OnNext(Unit.Default);
+            Run(() => { Model.BeginGesture(); return false; });
+        }
         /// <summary>途中値をメモリ内だけへ反映する。</summary>
         public void UpdatePatch(string patch) => Run(() => { Model.UpdatePatch(patch); return false; });
         /// <summary>有効な最終値を一履歴・一試聴へ確定する。</summary>
-        public bool Commit() => Run(Model.CommitGesture, preview: true);
+        public bool Commit()
+        {
+            inputResets.OnNext(Unit.Default);
+            return Run(Model.CommitGesture, preview: true);
+        }
         /// <summary>開始値へ戻し、保留中のキー確定と試聴を取り消す。</summary>
         public void Cancel()
         {
@@ -98,6 +106,12 @@ namespace Arpeggio.Daw.Presenters.Sfx
                 locks.RemoveWhere(path => !Parameters.Any(description => description.Path == path));
                 return changed;
             }, preview: true);
+        }
+        /// <summary>従来の生成音を変更せず、新規候補として読み込む。</summary>
+        public void NewLegacyCandidate(ChipKind chip, SfxPresetKind preset)
+        {
+            Stop();
+            Run(() => Model.NewLegacyCandidate(chip, preset), preview: true);
         }
         /// <summary>現在チップのプリセットを一操作で適用する。</summary>
         public void SelectPreset(SfxPresetKind preset) => Run(() => Model.SelectPreset(preset), preview: true);
@@ -160,7 +174,13 @@ namespace Arpeggio.Daw.Presenters.Sfx
         public void FollowDocument()
         {
             Stop();
-            Run(() => { Model.FollowDocument(); locks.Clear(); return false; });
+            Run(() =>
+            {
+                Model.FollowDocument();
+                locks.Clear();
+                Seed = Model.Snapshot().Sfx?.Known?.LastRandomization?.Seed ?? 0;
+                return false;
+            });
         }
         /// <summary>通常編集で文書の revision が変わった場合だけ、表示と試聴を無効化する。</summary>
         public void RefreshDocument()
