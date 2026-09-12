@@ -15,7 +15,8 @@ namespace Arpeggio.Mcp
             builder.Logging.ClearProviders();
             builder.Logging.AddConsole(options => { options.LogToStandardErrorThreshold = LogLevel.Trace; });
             builder.Services.AddSingleton<EditSession>();
-            builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<ArpeggioTools>();
+            builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<ArpeggioTools>()
+                .WithTools<Brief.McpBriefTools>();
             using IHost host = builder.Build();
             await host.RunAsync();
         }

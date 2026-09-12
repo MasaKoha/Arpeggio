@@ -3579,3 +3579,52 @@ VSTest のテストホスト通信が `SocketException (13): Permission denied`�
 ### 記録
 
 - `docs/implementation.md`（本節のみ追記）
+
+
+## Brief-A 実装記録（2026-09-12）
+
+### 設計との差
+
+実装前に不足を以下の最小判断で補う。設計書は変更しない。
+
+- 決定事項の「拍子」はデータ構造表に対応フィールドがないため、確定したフィールド表を優先し追加しない。空フォームは作成時だけ Title を「無題」で補い、明示的な空白 Title は拒否する。
+- BPM の具体的範囲は未定義のため、既存 Song と同じ正の int（1〜int.MaxValue）とする。Chip は null または Nes / GameBoy / Snes のみ。文字数は string.Length（UTF-16 コード単位）で数える。
+- 部分編集の省略は維持、自由記述の空文字は解除。chip / tempo の設定と clear の併用、および変更項目のない tweak は InvalidParameter。CLI の同一値オプション重複も拒否する。
+- Song JSON は version・title・chip 等を共有するため、Brief の未知キー・重複キーを拒否して Song の誤読み込みと上書きを防ぐ。既存 SFX の厳密な保存スキーマ検証に合わせる。
+- 保存済み JSON の構造・値不正は InvalidBrief / exitCode 2、操作の入力検証は InvalidParameter / 1、既存宛先への create は DestinationExists / 1、I/O は InputOutputError / 3。位置は camelCase のフィールド名（文書全体は document）。読み込み時は version の欠損・重複・未対応値を拒否する。
+- create / tweak にも --json を用意し、成功は {operation, path, brief}。show --json と MCP brief_show は保存形式の JSON、show の既定と text / brief_text は整形テキスト。text の --json はエラー表示にだけ適用し、成功時はテキストのみ。Notes の見出しは「メモ」、チップ表記は NES / Game Boy / SNES、整形用改行は LF とする。空白だけの自由記述は見出しごと省略し、値のある入力本文の改行・空白は保持する。
+- *.brief.json は保存先の慣例とし、既存 Song 保存と同様に拡張子を強制しない。新規保存は上書き禁止、通常保存は同一ディレクトリ内の一時ファイルから置換する。MCP は別の McpBriefTools を登録し、既存ツールと同じ共有 EditSession をロック対象だけに使う。
+
+### 実装・確認
+
+- Core: 不変の CompositionBrief、code / parameterPath を持つ例外、保存前・読み込み後の検証、version 1 の JSON、自由記述の null 正規化、日本語テキスト整形を追加。保存は BOM なし UTF-8、一時ファイル→Move、create は上書き禁止。失敗時は一時ファイルを除去する。Core への外部パッケージ追加なし。
+- CLI: brief create / tweak / show / text を登録。全9種類の値オプション（create でも使う title / chip を含む）を ExactlyOne と CliArgumentGuard で保護。位置引数もガードする。引数解析エラーは生の --json を検出し、標準出力の単一 JSON と 0/1/2/3 の終了コードへ接続した。
+- MCP: brief_create / brief_tweak / brief_show / brief_text を独立したツール型としてホストへ登録。全操作の読み込み・更新・保存・返却を共有 EditSession のロック内で実行し、現在の Song・保存先・Undo/Redo を変更しない。
+- テストコード: 7テストクラス＋1ファイル用 fixture を追加。Fact 17件、Theory 11件（InlineData 計73ケース）、合計90ケース分を記述。保存往復・null 正規化・不正 JSON / version / キー拒否・全項目の文字数境界・原本維持・一時ファイル削除・出力整形・CLI 解析失敗・MCP 直列実行と競合を対象とした。実行件数ではない。
+- テスト判断: 保存や文書形式の破損、誤編集、CLI の後続フラグ誤消費、MCP の更新消失は必須の回帰防止として実装した。getter / setter、定数だけの対応、薄い委譲のみのテストは追加していない。
+- 静的確認: 新規20 C# ファイルの括弧・文字列区切り、1ファイル1型、ブロック namespace、public の日本語 summary、末尾空白を確認。独自型の定義と namespace を照合し、ローカル NuGet の XML API 定義で ParseResult / Option / WithTools を確認した。ParseResult の名前空間は System.CommandLine として修正済み。これはコンパイル確認の代替ではない。
+- 変更範囲: 作業開始時の SHA-256 と比較し、既存ファイルの変更は CLI 登録・CLI 実行境界・MCP 登録・この記録の4ファイルのみ。指定された設計書4件と Core の Sfx / Document の計82ファイルは不変。既存 Song 関連の実装・既存テスト・プロジェクト設定を変更していない。
+- このランでは dotnet build / dotnet test / アプリ起動を一切実行していない。作業は指定 worktree 内で完了し、比較用の一時ファイルは除去した。
+
+### 変更ファイル一覧
+
+新規20ファイル、既存4ファイルの変更。
+
+- `src/Arpeggio.Core/Brief/`: `CompositionBrief.cs`、`CompositionBriefException.cs`、`CompositionBriefValidator.cs`、`CompositionBriefFile.cs`、`CompositionBriefTextRenderer.cs`
+- `src/Arpeggio.Cli/Brief/`: `BriefCommands.cs`、`BriefCreateCommand.cs`、`BriefTweakCommand.cs`、`BriefParameterOptions.cs`、`CliBriefExecution.cs`
+- `src/Arpeggio.Mcp/Brief/`: `McpBriefTools.cs`、`McpBriefExecution.cs`
+- `tests/Arpeggio.Core.Tests/Brief/`: `BriefFileFixture.cs`、`CompositionBriefFileTests.cs`、`CompositionBriefValidatorTests.cs`、`CompositionBriefTextRendererTests.cs`
+- `tests/Arpeggio.Core.Tests/Cli/Brief/`: `BriefCommandsTests.cs`、`BriefCommandFailureTests.cs`
+- `tests/Arpeggio.Core.Tests/Mcp/Brief/`: `BriefToolsTests.cs`、`BriefConcurrencyToolsTests.cs`
+- 既存の登録・境界: `src/Arpeggio.Cli/CommandFactory.cs`、`src/Arpeggio.Cli/CliExecution.cs`、`src/Arpeggio.Mcp/Program.cs`
+- 実装記録: `docs/implementation.md`
+
+### 未実行の確認事項
+
+依頼者側で次を確認する。受け入れ条件のビルド警告ゼロ・既存テスト全件成功は未確認。
+
+- `dotnet build Arpeggio.slnx` の警告0・エラー0。
+- `dotnet test Arpeggio.slnx` による既存全件と新規テストの成功。CLI 値未指定11パターン、MCP 4操作の共有ロック待機と同時編集も含む。
+- 実 CLI の `brief create / tweak / show --json / text` の表示とパイプ出力、および stdio MCP ホストでの4ツールの検出・呼び出し。
+
+実装上の残タスクはなし。Brief-B の DAW はこのランの対象外。
