@@ -15,8 +15,7 @@
 ## フォルダ構成
 
 `~/.claude/rules/coding-principles.md` の §2.5 に従う（**原則 8・上限 10**、値型だけなら 12）。
-2026-09-09 時点で `Core/Sfx/` 48・`Formats/Export/` 41・`Formats/Midi/` 32・`Daw/Presenters/` 31 と大きく超えており、
-**下記の木へ移行する**。新規ファイルは最初からこの木に沿って置く。
+2026-09-12 に下記の木へ移行済み（PR #40〜#42）。新規ファイルは最初からこの木に沿って置く。
 
 ```
 src/Arpeggio.Core/
@@ -29,21 +28,27 @@ src/Arpeggio.Core/
     Nes/ GameBoy/ Snes/    チップ別の合成器とミキサー
   Render/         レンダラー・WAV 読み書き
   Analysis/       FFT・音声解析・レポート
-  Sfx/            効果音
+  Sfx/            効果音（直下は入口の型のみ）
     Parameters/   パラメータ型・Catalog・Validator・patch
     Curves/       包絡・ピッチ・デューティ・ノイズの曲線生成
     Compile/      Song 組み立て（チップ別）
     Presets/      プリセットとランダム化
     Storage/      保存形式・hash・同期状態
+  Brief/          作曲指示書（Composition Brief）。Song 非依存の独立文書
   Session/        編集セッション・履歴・バッチ操作
 src/Arpeggio.Formats/
   Export/         共通の診断・制御列・レジスタ列
+    Control/      制御イベント・タイムライン
     Nes/ GameBoy/     チップ別のレジスタ変換
     Nsf/ Vgm/         ファイル書き出し
-  Midi/           SMF 読み込み
-    Import/       取り込み（テンポ・声割り当て・音色マップ）
+  Midi/           SMF 読み込み（直下は生の読み込み）
+    Import/       取り込みの入口・音色マップ
+      Tempo/      テンポ変換
+      Voice/      声割り当て
 src/Arpeggio.Daw/
-  Presenters/     画面ごとに分ける（PianoRoll/ Instrument/ Sfx/ Transport/ Export/ Midi/）
+  Presenters/     画面ごとに分ける（直下は MainWindowPresenter 等の入口のみ）
+    PianoRoll/    Selection/ に選択・クリップボード
+    Instrument/ Sfx/ Transport/ Export/ Midi/ Analysis/ Brief/
   Views/          同上
   Audio/ Editing/ Themes/ Watch/ Platform/
 ```

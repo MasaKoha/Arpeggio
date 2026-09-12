@@ -21,6 +21,10 @@ namespace Arpeggio.Cli
             return Run(() =>
             {
                 var result = CommandFactory.Create().Parse(arguments);
+                if (result.Errors.Count > 0 && Brief.CliBriefExecution.IsBriefCommand(arguments))
+                {
+                    return Brief.CliBriefExecution.ArgumentFailure(arguments, result);
+                }
                 if (result.Errors.Count > 0 && Sfx.CliSfxExecution.IsSfxCommand(arguments))
                 {
                     return Sfx.CliSfxExecution.ArgumentFailure(arguments, result);
