@@ -12,6 +12,8 @@ using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Session.Sfx;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Formats;
 using Arpeggio.Formats.Export;
 using Arpeggio.Formats.Midi;

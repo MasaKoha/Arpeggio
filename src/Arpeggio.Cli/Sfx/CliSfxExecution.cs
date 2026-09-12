@@ -6,6 +6,7 @@ using System.Linq;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 
 namespace Arpeggio.Cli.Sfx
 {

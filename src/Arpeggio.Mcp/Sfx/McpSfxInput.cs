@@ -4,6 +4,9 @@ using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Session.Sfx;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Compile;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Storage;
 
 namespace Arpeggio.Mcp.Sfx
 {

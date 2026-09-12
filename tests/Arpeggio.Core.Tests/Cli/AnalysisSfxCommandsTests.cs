@@ -5,7 +5,9 @@ using Arpeggio.Cli;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Core.Tests.Sfx;
+using Arpeggio.Core.Tests.Sfx.Presets;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Cli

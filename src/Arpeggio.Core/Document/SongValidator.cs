@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 
 namespace Arpeggio.Core.Document
 {

@@ -1,6 +1,10 @@
 using System.Collections.Generic;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Compile;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+using Arpeggio.Core.Sfx.Storage;
 
 namespace Arpeggio.Core.Session
 {

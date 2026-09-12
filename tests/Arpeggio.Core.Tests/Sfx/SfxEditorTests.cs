@@ -7,6 +7,10 @@ using Arpeggio.Core.Instruments;
 using Arpeggio.Core.Render;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Compile;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+using Arpeggio.Core.Sfx.Storage;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Sfx

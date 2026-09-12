@@ -7,6 +7,9 @@ using System.Text.Json;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Session;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+using Arpeggio.Core.Sfx.Storage;
 using Arpeggio.Mcp;
 using Xunit;
 

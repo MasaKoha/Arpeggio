@@ -1,4 +1,5 @@
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
 
 namespace Arpeggio.Daw.Views.Sfx
 {

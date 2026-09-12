@@ -1,6 +1,9 @@
 using System.Text.Json.Nodes;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
+using Arpeggio.Core.Sfx.Storage;
 
 namespace Arpeggio.Core.Tests.Sfx
 {

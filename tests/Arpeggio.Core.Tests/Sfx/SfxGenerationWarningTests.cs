@@ -1,6 +1,8 @@
 using System;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Curves;
+using Arpeggio.Core.Sfx.Parameters;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Sfx

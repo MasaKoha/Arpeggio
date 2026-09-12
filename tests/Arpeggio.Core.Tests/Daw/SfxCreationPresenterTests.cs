@@ -1,6 +1,7 @@
 using System.IO;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Presets;
 using Xunit;
 
 namespace Arpeggio.Core.Tests.Daw

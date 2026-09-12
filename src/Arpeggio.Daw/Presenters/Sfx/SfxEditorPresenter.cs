@@ -10,6 +10,8 @@ using System.Reactive.Subjects;
 using System.Security.Cryptography;
 using Arpeggio.Core.Document;
 using Arpeggio.Core.Sfx;
+using Arpeggio.Core.Sfx.Parameters;
+using Arpeggio.Core.Sfx.Presets;
 using Arpeggio.Daw.Editing;
 using Arpeggio.Daw.Editing.Sfx;
 
