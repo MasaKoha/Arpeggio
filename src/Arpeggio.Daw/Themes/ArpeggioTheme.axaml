@@ -387,6 +387,11 @@
         </ControlTemplate>
       </Setter>
     </Style>
+    <Style Selector="TabControl#EditorTabs TabItem">
+      <!-- 右パネル幅 340px に6タブの見出しを折り返さず収めるため、既定より詰める。 -->
+      <Setter Property="FontSize" Value="{StaticResource Arpeggio.FontSize.Caption}" />
+      <Setter Property="Padding" Value="{StaticResource Arpeggio.Margin.Small}" />
+    </Style>
     <Style Selector="TabItem:selected">
       <Setter Property="Foreground" Value="{StaticResource Arpeggio.TextPrimary}" />
       <Setter Property="BorderBrush" Value="{StaticResource Arpeggio.Accent}" />

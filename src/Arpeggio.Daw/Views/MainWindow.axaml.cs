@@ -15,6 +15,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Arpeggio.Daw.Presenters.PianoRoll;
 using Arpeggio.Daw.Views.Analysis;
+using Arpeggio.Daw.Views.Brief;
 using Arpeggio.Daw.Views.Export;
 using Arpeggio.Daw.Views.Instrument;
 using Arpeggio.Daw.Views.Midi;
@@ -28,8 +29,9 @@ namespace Arpeggio.Daw.Views
     {
         private const int DisplayIntervalMilliseconds = 33;
         private const int SfxTabIndex = 2;
-        private const int ExportTabIndex = 3;
-        private const int MidiTabIndex = 4;
+        private const int BriefTabIndex = 3;
+        private const int ExportTabIndex = 4;
+        private const int MidiTabIndex = 5;
         private const int SemitonesPerOctave = 12;
         private readonly PianoRollControl pianoRoll;
         private readonly PianoRollToolbarView pianoRollToolbar;
@@ -46,6 +48,7 @@ namespace Arpeggio.Daw.Views
         private readonly MidiImportView midiImport;
         private readonly Button midiImportButton;
         private readonly SfxCreationView sfxCreation;
+        private readonly BriefCreationView briefCreation;
         private readonly TabControl editorTabs;
         private readonly Button sfxButton;
         private readonly Button exportButton;
@@ -90,6 +93,7 @@ namespace Arpeggio.Daw.Views
             midiImport = Require<MidiImportView>("MidiImport");
             midiImportButton = Require<Button>("MidiImportButton");
             sfxCreation = Require<SfxCreationView>("SfxCreation");
+            briefCreation = Require<BriefCreationView>("BriefCreation");
             editorTabs = Require<TabControl>("EditorTabs");
             sfxButton = Require<Button>("SfxButton");
             exportButton = Require<Button>("ExportButton");
@@ -127,6 +131,7 @@ namespace Arpeggio.Daw.Views
             midiImport.Bind(mainPresenter.MidiImport, this);
             midiImportButton.Click += OnMidiImport;
             sfxCreation.Bind(mainPresenter);
+            briefCreation.Bind(mainPresenter.BriefEditor);
             previousEditorTabIndex = editorTabs.SelectedIndex;
             sfxSubscriptions.Add(SfxViewEvents.Observe(editorTabs, TabControl.SelectionChangedEvent).Subscribe(arguments =>
             {
@@ -270,6 +275,7 @@ namespace Arpeggio.Daw.Views
             midiImport.Dispose();
             sfxSubscriptions.Dispose();
             sfxCreation.Dispose();
+            briefCreation.Dispose();
             transport.Dispose();
             presenter?.Dispose();
         }
@@ -348,6 +354,11 @@ namespace Arpeggio.Daw.Views
         }
         private void OnShortcut(object? sender, KeyEventArgs arguments)
         {
+            if (editorTabs.SelectedIndex == BriefTabIndex && editorTabs.IsKeyboardFocusWithin)
+            {
+                briefCreation.HandleShortcut(arguments);
+                return;
+            }
             if (sfxCreation.IsKeyboardFocusWithin)
             {
                 sfxCreation.HandleShortcut(arguments);

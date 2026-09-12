@@ -3628,3 +3628,60 @@ VSTest のテストホスト通信が `SocketException (13): Permission denied`�
 - 実 CLI の `brief create / tweak / show --json / text` の表示とパイプ出力、および stdio MCP ホストでの4ツールの検出・呼び出し。
 
 実装上の残タスクはなし。Brief-B の DAW はこのランの対象外。
+
+
+## Brief-B 実装記録（2026-09-12）
+
+### 設計との差
+
+実装前に不足を以下の最小判断で補う。設計書・Core Brief は変更しない。
+
+- 指示書の「UI」節は実文書の「DAW UI」節を指すものとして扱う。タイトル未入力は空白のみも含め `CompositionBrief.DefaultTitle` へ補完する。テンポは Core の正の int に従い、既存 SFX の数値 TextBox と同じ入力方式で空欄・整数を検証する。整数へ変換できない途中入力は View に残し、修正まで保存とコピーを拒否する。
+- 既存 SFX にコピー用の一時成功メッセージはないため、成功通知を Rx の切替可能な 3 秒タイマーで表示する。保存・読み込み・コピーの成功を同じ表示へ送り、エラーは別欄で修正まで表示する。
+- 保存は初回に *.brief.json の保存ダイアログ（上書き確認あり）、以後は保持したパスへ CompositionBriefFile.Save で原子的に上書きする。開く操作は選択ファイルの Load 成功後だけ編集内容と保存先を置換する。Core が送出する I/O 例外と OS のピッカー／クリップボード失敗も表示対象とする。
+- 指示書フォーム内では Song 用ショートカットへ流さない。Ctrl/Cmd+S は指示書の保存へ接続し、通常のテキスト編集キーは入力部品へ渡す。タブ追加でずれる既存の書き出し・MIDI の選択番号も追従する。
+- 右ペインは幅 340 固定で、新タブを加えると全見出しの必要幅が増えるため、EditorTabs の見出しパネルを WrapPanel にする。順序とタブ内容を保ち、既存の書き出し・MIDI も選べるよう折り返す。
+
+### 実装・確認
+
+- Presenter: CompositionBrief を with 更新で保持し、編集ごとに Core Validator で検証する。空タイトルを既定値へ補完し、テンポの空欄・正の整数・変換不能な途中入力を扱う。Save / Load / Render は Brief-A の実 API を呼び、失敗時は修正位置付きのエラーを通知する。保存・読み込み成功時だけ保存先を更新する。
+- View: タイトル、指定なしを含むチップ選択、空欄可の数値 TextBox、6つの複数行 TextBox、保存・開く・コピーの3ボタンを追加。フォームはスクロールし、下部の操作とエラー表示は固定する。配色・余白は既存テーマのトークンを参照し、PlaceholderText を使う。
+- 保存先選択は初回のみ。ピッカーとクリップボードの実行中はフォーム・操作を無効にして二重操作を防ぐ。キャンセルは文書を変更せず、IStorageFile は全経路で破棄する。View の購読は SetEvent に集約し、ウィンドウ終了時に一時表示のタイマーと入力購読を解放する。
+- コピー: Presenter が Render の結果を一回の OS 書き込み境界へ渡す。View は Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync を使用する。成功表示は書き込み完了後だけ発火し、Rx Switch と UI スケジューラーで3秒後に消す。連続操作は古い消去予約を取り消し、破棄後の非同期完了も無視する。
+- MainWindow: SFX の隣へ作曲指示書を追加し、所有・Bind・Dispose を接続した。既存の書き出し・MIDI 選択番号を追従し、指示書のフォーム／タブ見出しにフォーカスがあるときは Song 用キー操作へ流さない。ピアノロール等へフォーカスを戻したときは既存操作を維持する。
+- テストコード: Fact 8件、Theory 3件（InlineData 11件）、合計19ケース分を追加。空フォーム保存、6項目の改行と空白の往復、不変スナップショット、チップ・テンポ解除、不正テンポの保存／コピー拒否、文字数境界、読み込み失敗時の入力維持、I/O 失敗と再試行、コピー待機・失敗・表示期限の更新・Dispose、Song/SFX/履歴の隔離を対象とした。実行件数ではない。
+- テスト判断: 保存データの破損・不正入力の黙認・編集内容の消失・コピー失敗の成功誤表示・破棄後通知を防ぐ振る舞いだけを対象とし、単純な getter / setter や薄い委譲のテストは追加していない。
+- 静的確認: 新規 C# の型定義と namespace、public の日本語 summary、区切り・末尾空白を確認した。Avalonia / Rx のローカル NuGet XML API 定義で ClipboardExtensions / IClipboard / TextBox / ItemsPanel / AddDisposableHandler / Scheduler を照合した。XAML の XML 構文、部品名の参照、テーマトークン、6複数行欄・3ボタン、タブ順と選択番号の一致を確認した。コンパイル確認の代替ではない。
+- 変更範囲: 作業開始時の SHA-256 と照合し、変更は下記8ファイルのみ。設計書4件、Core Brief 全5ファイル、その他の既存実装・既存テスト・プロジェクト設定は不変。git 操作・dotnet build・dotnet test・アプリ起動は行っていない。
+
+### 変更ファイル一覧
+
+新規4ファイル、既存4ファイルの変更。
+
+- `src/Arpeggio.Daw/Presenters/Brief/BriefEditorPresenter.cs`
+- `src/Arpeggio.Daw/Views/Brief/BriefCreationView.axaml`
+- `src/Arpeggio.Daw/Views/Brief/BriefCreationView.axaml.cs`
+- `src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/Brief/BriefEditorPresenterTests.cs`
+- `docs/implementation.md`（本節の追記）
+
+### 未実行の確認事項
+
+依頼どおり build・test・アプリ起動・目視は実行していない。受け入れ条件の警告ゼロ・全テスト成功は未確認。依頼者側で以下を確認する。
+
+- `dotnet build Arpeggio.slnx` の警告0・エラー0。
+- `dotnet test Arpeggio.slnx` による既存全件と新規19ケースの成功。
+- SFX の隣にある作曲指示書タブと、折り返した既存タブの表示・選択。ウィンドウ最小サイズでのフォームスクロールと下部ボタンの到達性。
+- 空フォームの新規保存、上書き、キャンセル、全項目の読み込み、破損ファイル・I/O 失敗の表示と再試行。
+- 実 OS のクリップボードへの貼り付け結果が Render と一致し、コピー完了表示が3秒で消えること。コピー連打・ピッカー表示中のウィンドウ終了も確認する。
+- 指示書フォーム／タブ見出しでの Ctrl/Cmd+S と通常のコピー・貼り付け・Undo、および Song / SFX / 書き出し / MIDI の既存操作。
+
+実装上の残タスクはなし。実行による受け入れ確認は依頼者側に残る。
+
+## 提案
+
+- 何を: 未保存の作曲指示書を開き直す／ウィンドウを閉じるときの破棄確認。
+  なぜ: 現設計は独立した単純文書のため、未保存の手入力を失う操作への保護がない。
+  見積もり: 1ラン。このランでは実装していない。

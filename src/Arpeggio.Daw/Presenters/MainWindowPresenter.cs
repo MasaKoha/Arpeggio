@@ -9,6 +9,7 @@ using Arpeggio.Daw.Audio.Sfx;
 using Arpeggio.Daw.Editing;
 using Arpeggio.Daw.Presenters.Sfx;
 using Arpeggio.Daw.Presenters.Analysis;
+using Arpeggio.Daw.Presenters.Brief;
 using Arpeggio.Daw.Presenters.Export;
 using Arpeggio.Daw.Presenters.Instrument;
 using Arpeggio.Daw.Presenters.Midi;
@@ -49,6 +50,7 @@ namespace Arpeggio.Daw.Presenters
             SfxCreation = new SfxCreationPresenter(document, PrepareDocumentSwitch, Open);
             MidiImport = new MidiImportPresenter(document, view, OpenImportedSong);
             SfxEditor = new SfxEditorPresenter(document);
+            BriefEditor = new BriefEditorPresenter();
             SfxPreview = new SfxPreviewPlayer(playback);
             sfxSubscriptions.Add(SfxEditor.PreviewRequests.Subscribe(SfxPreview.Play));
             sfxSubscriptions.Add(SfxEditor.PreviewStops.Subscribe(_ => SfxPreview.Stop()));
@@ -82,6 +84,8 @@ namespace Arpeggio.Daw.Presenters
         public MidiImportPresenter MidiImport { get; }
         /// <summary>候補と編集中ファイルのパラメータ SFX 編集。</summary>
         public SfxEditorPresenter SfxEditor { get; }
+        /// <summary>Song と独立した作曲指示書の編集。</summary>
+        public BriefEditorPresenter BriefEditor { get; }
         /// <summary>通常再生と出力を共有するSFX専用試聴。</summary>
         public SfxPreviewPlayer SfxPreview { get; }
         /// <summary>現在の文書の保存先。</summary>
@@ -208,6 +212,7 @@ namespace Arpeggio.Daw.Presenters
         {
             if (isDisposed) { return; }
             isDisposed = true;
+            BriefEditor.Dispose();
             SfxEditor.Dispose();
             sfxSubscriptions.Dispose();
             SfxPreview.Dispose();

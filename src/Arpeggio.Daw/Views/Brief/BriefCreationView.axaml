@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.Brief.BriefCreationView">
+  <Grid RowDefinitions="*,Auto" Margin="{StaticResource Arpeggio.Margin.Small}">
+    <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel x:Name="FormFields" Spacing="{StaticResource Arpeggio.Space.Medium}">
+        <TextBlock Text="作曲指示書" Classes="heading" />
+        <TextBlock Text="タイトル" />
+        <TextBox x:Name="TitleInput" PlaceholderText="無題（空欄可）" AutomationProperties.Name="タイトル" />
+        <TextBlock Text="チップ" />
+        <ComboBox x:Name="ChipSelector" HorizontalAlignment="Stretch" AutomationProperties.Name="チップ" />
+        <TextBlock Text="テンポ目安（BPM・正の整数、空欄可）" TextWrapping="Wrap" />
+        <TextBox x:Name="TempoInput" Classes="numeric" PlaceholderText="指定なし" AutomationProperties.Name="テンポ目安（BPM）" />
+        <TextBlock Text="雰囲気" />
+        <TextBox x:Name="MoodInput" AcceptsReturn="True" MinLines="3" MaxLines="6" TextWrapping="Wrap" AutomationProperties.Name="雰囲気" />
+        <TextBlock Text="構成" />
+        <TextBox x:Name="StructureInput" AcceptsReturn="True" MinLines="3" MaxLines="6" TextWrapping="Wrap" AutomationProperties.Name="構成" />
+        <TextBlock Text="声の役割" />
+        <TextBox x:Name="InstrumentationInput" AcceptsReturn="True" MinLines="3" MaxLines="6" TextWrapping="Wrap" AutomationProperties.Name="声の役割" />
+        <TextBlock Text="参考" />
+        <TextBox x:Name="ReferencesInput" AcceptsReturn="True" MinLines="3" MaxLines="6" TextWrapping="Wrap" AutomationProperties.Name="参考" />
+        <TextBlock Text="制約" />
+        <TextBox x:Name="ConstraintsInput" AcceptsReturn="True" MinLines="3" MaxLines="6" TextWrapping="Wrap" AutomationProperties.Name="制約" />
+        <TextBlock Text="メモ" />
+        <TextBox x:Name="NotesInput" AcceptsReturn="True" MinLines="3" MaxLines="6" TextWrapping="Wrap" AutomationProperties.Name="メモ" />
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Spacing="{StaticResource Arpeggio.Space.Small}">
+      <TextBlock x:Name="DocumentPathText" Classes="secondary" TextWrapping="Wrap" />
+      <TextBlock x:Name="ErrorText" Foreground="{StaticResource Arpeggio.Danger}" TextWrapping="Wrap" />
+      <TextBlock x:Name="OperationMessage" Foreground="{StaticResource Arpeggio.Accent}" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,*">
+        <Button x:Name="SaveButton" Content="保存" HorizontalAlignment="Stretch" ToolTip.Tip="Ctrl / Cmd+S" />
+        <Button x:Name="OpenButton" Grid.Column="1" Content="開く" HorizontalAlignment="Stretch" />
+      </Grid>
+      <Button x:Name="CopyButton" Content="指示書テキストをコピー" HorizontalAlignment="Stretch" />
+    </StackPanel>
+  </Grid>
+</UserControl>
