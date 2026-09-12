@@ -365,3 +365,16 @@ arpeggio export wav /tmp/snes-demo.arpeggio.json /tmp/snes-demo.wav --sample-rat
 ```
 
 デモ再生成・WAV の非無音／無クリップ確認は `SnesBankCommandsTests` に含む。今回の実装ではビルド・テスト・WAV 書き出しは未実行。
+
+作曲指示書（`arpeggio brief`。[design-brief.md](design-brief.md)）から `arpeggio-compose` skill で AI に作らせた例が
+`examples/brief-demo.arpeggio.json`。元の指示書は `examples/brief-demo.brief.json`、生成に使ったバッチ操作は
+`examples/brief-demo-ops.json`（本体）と `examples/brief-demo-refinement-ops.json`（`analyze` の指摘を受けた微調整）。
+
+```sh
+arpeggio new /tmp/brief-demo.arpeggio.json --chip nes --tempo 96 --length-beats 176 --title "廃墟の朝"
+arpeggio apply /tmp/brief-demo.arpeggio.json --operations examples/brief-demo-ops.json
+arpeggio apply /tmp/brief-demo.arpeggio.json --operations examples/brief-demo-refinement-ops.json
+arpeggio analyze /tmp/brief-demo.arpeggio.json
+```
+
+44 小節（イントロ8→メイン16×2→アウトロ4）・110 秒。`analyze` はクリップ 0・無音割合 0% を返す。

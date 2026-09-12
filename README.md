@@ -110,6 +110,28 @@ CLI で行える編集・確認・書き出しは、MCP からも同じ語彙で
 曲データ（`.arpeggio.json`）はテキストなので、差分がそのまま読める。
 AI が書いた曲を人がレビューし、DAW で直す、という往復ができる。
 
+## 作曲指示書から曲を作る
+
+「作曲指示書（Composition Brief）」は、AI に曲を作らせるための構造化した発注書。
+Song とは無関係の独立文書（`*.brief.json`）で、DAW の「指示書」タブか CLI/MCP の `brief` コマンドで作る。
+指示書そのものは曲を生成しない。指示書テキストを取り出し、AI が既存の `song` / `note` / `apply` / `analyze` コマンドを
+実際に操作して初めて曲になる。
+
+```mermaid
+flowchart TD
+    A["作曲指示書を作る\n（DAWの指示書タブ / arpeggio brief create・tweak）"] --> B["指示書テキストを取り出す\n（DAWのコピー操作 / arpeggio brief text）"]
+    B --> C["AI（Codex 等）へ指示書テキストを渡す"]
+    C --> D["song new でチップ・テンポ・長さを決めて曲を新規作成"]
+    D --> E["note add / apply（バッチ操作）で\nメロディ・和声・ベースを実際に打ち込む"]
+    E --> F["analyze で無音・クリップ・音量を数値で自己検証"]
+    F -->|問題あり| E
+    F -->|問題なし| G["完成した Song ファイル（.arpeggio.json）"]
+    G --> H["人が DAW で聴いて微調整"]
+```
+
+指示書からここまでを自動でやらせる手順は `arpeggio-compose`（Claude Code の skill）にまとめてある。
+チップ・テンポが指示書で未指定なら、AI が曲の雰囲気に合わせて自分で決める。
+
 ## 気をつけること
 
 **NSF と VGM は実機のプレイヤーで検証していない。** 自動テストでは、独立に書いたパーサーと

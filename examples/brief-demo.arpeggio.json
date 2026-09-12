@@ -1,0 +1,2361 @@
+{
+  "version": 1,
+  "title": "\u5EC3\u589F\u306E\u671D",
+  "chip": "Nes",
+  "tempoBpm": 96,
+  "ticksPerBeat": 48,
+  "lengthTicks": 8448,
+  "loopStartTick": 0,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "\u671D\u306E\u8F2A\u90ED\u30FB\u4E3B\u65CB\u5F8B",
+      "kind": "NesPulse",
+      "duty": "Percent25",
+      "volumeMacro": {
+        "values": [
+          0,
+          1,
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          14,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          13
+        ],
+        "loopIndex": -1
+      },
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "dutyMacro": null
+    },
+    {
+      "id": 2,
+      "name": "\u77F3\u58C1\u306E\u6B8B\u97FF\u30FB\u548C\u58F0",
+      "kind": "NesPulse",
+      "duty": "Percent50",
+      "volumeMacro": {
+        "values": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          2,
+          4,
+          4,
+          4,
+          6,
+          6,
+          6,
+          8,
+          8,
+          8,
+          8,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          10
+        ],
+        "loopIndex": -1
+      },
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "dutyMacro": null
+    },
+    {
+      "id": 3,
+      "name": "\u5730\u5E73\u30FB\u4F4E\u97F3",
+      "kind": "NesTriangle",
+      "arpeggioMacro": null,
+      "pitchMacro": null
+    }
+  ],
+  "tracks": [
+    {
+      "channel": "Pulse",
+      "channelIndex": 0,
+      "name": "Pulse 1",
+      "muted": false,
+      "pan": 0,
+      "notes": [
+        {
+          "tick": 240,
+          "durationTicks": 117,
+          "midiNote": 69,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 408,
+          "durationTicks": 69,
+          "midiNote": 69,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 504,
+          "durationTicks": 57,
+          "midiNote": 77,
+          "volume": 8,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 576,
+          "durationTicks": 93,
+          "midiNote": 74,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 696,
+          "durationTicks": 45,
+          "midiNote": 72,
+          "volume": 8,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 792,
+          "durationTicks": 93,
+          "midiNote": 72,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 912,
+          "durationTicks": 33,
+          "midiNote": 69,
+          "volume": 8,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1008,
+          "durationTicks": 117,
+          "midiNote": 76,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1176,
+          "durationTicks": 69,
+          "midiNote": 67,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1272,
+          "durationTicks": 57,
+          "midiNote": 72,
+          "volume": 8,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1344,
+          "durationTicks": 93,
+          "midiNote": 76,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1488,
+          "durationTicks": 33,
+          "midiNote": 74,
+          "volume": 8,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1536,
+          "durationTicks": 69,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1608,
+          "durationTicks": 21,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1632,
+          "durationTicks": 81,
+          "midiNote": 77,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1728,
+          "durationTicks": 45,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1776,
+          "durationTicks": 69,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1872,
+          "durationTicks": 33,
+          "midiNote": 69,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1920,
+          "durationTicks": 117,
+          "midiNote": 77,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2064,
+          "durationTicks": 33,
+          "midiNote": 74,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2136,
+          "durationTicks": 45,
+          "midiNote": 72,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2208,
+          "durationTicks": 81,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2304,
+          "durationTicks": 45,
+          "midiNote": 69,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2352,
+          "durationTicks": 45,
+          "midiNote": 72,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2400,
+          "durationTicks": 81,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2496,
+          "durationTicks": 93,
+          "midiNote": 79,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2592,
+          "durationTicks": 45,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2640,
+          "durationTicks": 33,
+          "midiNote": 72,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2688,
+          "durationTicks": 69,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2760,
+          "durationTicks": 21,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2784,
+          "durationTicks": 81,
+          "midiNote": 72,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2904,
+          "durationTicks": 69,
+          "midiNote": 67,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3000,
+          "durationTicks": 45,
+          "midiNote": 74,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3072,
+          "durationTicks": 45,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3120,
+          "durationTicks": 45,
+          "midiNote": 77,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3168,
+          "durationTicks": 81,
+          "midiNote": 81,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3264,
+          "durationTicks": 117,
+          "midiNote": 79,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3408,
+          "durationTicks": 33,
+          "midiNote": 77,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3456,
+          "durationTicks": 69,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3552,
+          "durationTicks": 81,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3648,
+          "durationTicks": 117,
+          "midiNote": 69,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3792,
+          "durationTicks": 33,
+          "midiNote": 72,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3840,
+          "durationTicks": 69,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3912,
+          "durationTicks": 21,
+          "midiNote": 77,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3936,
+          "durationTicks": 81,
+          "midiNote": 81,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4032,
+          "durationTicks": 93,
+          "midiNote": 77,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4152,
+          "durationTicks": 57,
+          "midiNote": 74,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4224,
+          "durationTicks": 93,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4320,
+          "durationTicks": 69,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4416,
+          "durationTicks": 69,
+          "midiNote": 73,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4512,
+          "durationTicks": 69,
+          "midiNote": 69,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4608,
+          "durationTicks": 69,
+          "midiNote": 74,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4680,
+          "durationTicks": 21,
+          "midiNote": 76,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4704,
+          "durationTicks": 45,
+          "midiNote": 77,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4752,
+          "durationTicks": 33,
+          "midiNote": 81,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4800,
+          "durationTicks": 45,
+          "midiNote": 79,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4848,
+          "durationTicks": 45,
+          "midiNote": 77,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4896,
+          "durationTicks": 33,
+          "midiNote": 76,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4944,
+          "durationTicks": 33,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4992,
+          "durationTicks": 93,
+          "midiNote": 77,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5088,
+          "durationTicks": 69,
+          "midiNote": 81,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5184,
+          "durationTicks": 69,
+          "midiNote": 79,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5280,
+          "durationTicks": 45,
+          "midiNote": 77,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5328,
+          "durationTicks": 33,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5376,
+          "durationTicks": 45,
+          "midiNote": 76,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5424,
+          "durationTicks": 45,
+          "midiNote": 79,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5472,
+          "durationTicks": 81,
+          "midiNote": 81,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5568,
+          "durationTicks": 93,
+          "midiNote": 84,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5688,
+          "durationTicks": 57,
+          "midiNote": 81,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5760,
+          "durationTicks": 69,
+          "midiNote": 79,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5832,
+          "durationTicks": 21,
+          "midiNote": 76,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5856,
+          "durationTicks": 81,
+          "midiNote": 74,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5976,
+          "durationTicks": 69,
+          "midiNote": 76,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6072,
+          "durationTicks": 57,
+          "midiNote": 79,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6144,
+          "durationTicks": 45,
+          "midiNote": 74,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6192,
+          "durationTicks": 45,
+          "midiNote": 76,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6240,
+          "durationTicks": 81,
+          "midiNote": 83,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6336,
+          "durationTicks": 69,
+          "midiNote": 81,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6432,
+          "durationTicks": 81,
+          "midiNote": 79,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6528,
+          "durationTicks": 93,
+          "midiNote": 77,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6648,
+          "durationTicks": 57,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6720,
+          "durationTicks": 117,
+          "midiNote": 74,
+          "volume": 13,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6864,
+          "durationTicks": 33,
+          "midiNote": 69,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6912,
+          "durationTicks": 69,
+          "midiNote": 74,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7008,
+          "durationTicks": 81,
+          "midiNote": 77,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7104,
+          "durationTicks": 117,
+          "midiNote": 81,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7248,
+          "durationTicks": 33,
+          "midiNote": 77,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 7296,
+          "durationTicks": 93,
+          "midiNote": 76,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7416,
+          "durationTicks": 57,
+          "midiNote": 74,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 7488,
+          "durationTicks": 93,
+          "midiNote": 72,
+          "volume": 12,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7608,
+          "durationTicks": 57,
+          "midiNote": 76,
+          "volume": 11,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 7680,
+          "durationTicks": 96,
+          "midiNote": 77,
+          "volume": 10,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -4
+            }
+          ]
+        },
+        {
+          "tick": 7800,
+          "durationTicks": 60,
+          "midiNote": 76,
+          "volume": 10,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -4
+            }
+          ]
+        },
+        {
+          "tick": 7872,
+          "durationTicks": 168,
+          "midiNote": 74,
+          "volume": 9,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -4
+            }
+          ]
+        },
+        {
+          "tick": 8088,
+          "durationTicks": 168,
+          "midiNote": 69,
+          "volume": 8,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -4
+            }
+          ]
+        },
+        {
+          "tick": 8256,
+          "durationTicks": 192,
+          "midiNote": 74,
+          "volume": 7,
+          "instrumentId": 1,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "channel": "Pulse",
+      "channelIndex": 1,
+      "name": "Pulse 2",
+      "muted": false,
+      "pan": 0,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 192,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 192,
+          "durationTicks": 192,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 384,
+          "durationTicks": 192,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 576,
+          "durationTicks": 192,
+          "midiNote": 62,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 768,
+          "durationTicks": 192,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 960,
+          "durationTicks": 192,
+          "midiNote": 60,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1152,
+          "durationTicks": 192,
+          "midiNote": 55,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1344,
+          "durationTicks": 192,
+          "midiNote": 64,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1536,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 1680,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1824,
+          "durationTicks": 96,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 1920,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2064,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2208,
+          "durationTicks": 96,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2304,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2448,
+          "durationTicks": 144,
+          "midiNote": 60,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2592,
+          "durationTicks": 96,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2688,
+          "durationTicks": 144,
+          "midiNote": 55,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 2832,
+          "durationTicks": 144,
+          "midiNote": 64,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 2976,
+          "durationTicks": 96,
+          "midiNote": 55,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3072,
+          "durationTicks": 144,
+          "midiNote": 58,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3216,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3360,
+          "durationTicks": 96,
+          "midiNote": 58,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3456,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3600,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3744,
+          "durationTicks": 96,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 3840,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 3984,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4128,
+          "durationTicks": 96,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4224,
+          "durationTicks": 192,
+          "midiNote": 62,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4416,
+          "durationTicks": 192,
+          "midiNote": 64,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -3
+            }
+          ]
+        },
+        {
+          "tick": 4608,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 4752,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4896,
+          "durationTicks": 96,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 4992,
+          "durationTicks": 144,
+          "midiNote": 62,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5136,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5280,
+          "durationTicks": 96,
+          "midiNote": 62,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5376,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5520,
+          "durationTicks": 144,
+          "midiNote": 64,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5664,
+          "durationTicks": 96,
+          "midiNote": 57,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 5760,
+          "durationTicks": 144,
+          "midiNote": 64,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 5904,
+          "durationTicks": 144,
+          "midiNote": 67,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6048,
+          "durationTicks": 96,
+          "midiNote": 64,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6144,
+          "durationTicks": 144,
+          "midiNote": 59,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6288,
+          "durationTicks": 144,
+          "midiNote": 62,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6432,
+          "durationTicks": 96,
+          "midiNote": 59,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6528,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 6672,
+          "durationTicks": 144,
+          "midiNote": 57,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6816,
+          "durationTicks": 96,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 6912,
+          "durationTicks": 144,
+          "midiNote": 62,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 7056,
+          "durationTicks": 144,
+          "midiNote": 65,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7200,
+          "durationTicks": 96,
+          "midiNote": 62,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7296,
+          "durationTicks": 144,
+          "midiNote": 55,
+          "volume": 8,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "tick": 7440,
+          "durationTicks": 144,
+          "midiNote": 64,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7584,
+          "durationTicks": 96,
+          "midiNote": 55,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7680,
+          "durationTicks": 192,
+          "midiNote": 57,
+          "volume": 7,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 7872,
+          "durationTicks": 192,
+          "midiNote": 65,
+          "volume": 6,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 8064,
+          "durationTicks": 192,
+          "midiNote": 65,
+          "volume": 5,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -2
+            }
+          ]
+        },
+        {
+          "tick": 8256,
+          "durationTicks": 192,
+          "midiNote": 57,
+          "volume": 4,
+          "instrumentId": 2,
+          "effects": [
+            {
+              "kind": "VolumeSlide",
+              "value": -4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "channel": "Triangle",
+      "channelIndex": 0,
+      "name": "Triangle 1",
+      "muted": false,
+      "pan": 0,
+      "notes": [
+        {
+          "tick": 0,
+          "durationTicks": 384,
+          "midiNote": 38,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 384,
+          "durationTicks": 384,
+          "midiNote": 34,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 768,
+          "durationTicks": 384,
+          "midiNote": 41,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 1152,
+          "durationTicks": 384,
+          "midiNote": 36,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 1536,
+          "durationTicks": 384,
+          "midiNote": 38,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 1920,
+          "durationTicks": 384,
+          "midiNote": 34,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 2304,
+          "durationTicks": 384,
+          "midiNote": 41,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 2688,
+          "durationTicks": 384,
+          "midiNote": 36,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 3072,
+          "durationTicks": 384,
+          "midiNote": 43,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 3456,
+          "durationTicks": 384,
+          "midiNote": 41,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 3840,
+          "durationTicks": 384,
+          "midiNote": 34,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 4224,
+          "durationTicks": 384,
+          "midiNote": 33,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 4608,
+          "durationTicks": 384,
+          "midiNote": 38,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 4992,
+          "durationTicks": 384,
+          "midiNote": 34,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 5376,
+          "durationTicks": 384,
+          "midiNote": 41,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 5760,
+          "durationTicks": 384,
+          "midiNote": 36,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 6144,
+          "durationTicks": 384,
+          "midiNote": 43,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 6528,
+          "durationTicks": 384,
+          "midiNote": 33,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 6912,
+          "durationTicks": 384,
+          "midiNote": 34,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 7296,
+          "durationTicks": 384,
+          "midiNote": 36,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 7680,
+          "durationTicks": 192,
+          "midiNote": 38,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 7872,
+          "durationTicks": 192,
+          "midiNote": 34,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        },
+        {
+          "tick": 8064,
+          "durationTicks": 384,
+          "midiNote": 38,
+          "volume": 15,
+          "instrumentId": 3,
+          "effects": []
+        }
+      ]
+    },
+    {
+      "channel": "Noise",
+      "channelIndex": 0,
+      "name": "Noise 1",
+      "muted": false,
+      "pan": 0,
+      "notes": []
+    },
+    {
+      "channel": "Dpcm",
+      "channelIndex": 0,
+      "name": "Dpcm 1",
+      "muted": false,
+      "pan": 0,
+      "notes": []
+    }
+  ],
+  "snesEcho": {
+    "delayMilliseconds": 0,
+    "feedback": 0,
+    "volume": 0,
+    "firCoefficients": [
+      127,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+}

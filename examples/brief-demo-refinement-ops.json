@@ -1,0 +1,566 @@
+[
+  {
+    "kind": "UpdateInstrument",
+    "instrument": {
+      "id": 1,
+      "name": "朝の輪郭・主旋律",
+      "kind": "NesPulse",
+      "duty": "Percent25",
+      "volumeMacro": {
+        "values": [
+          0,
+          1,
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          14,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          14,
+          13
+        ],
+        "loopIndex": -1
+      },
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "dutyMacro": null
+    }
+  },
+  {
+    "kind": "UpdateInstrument",
+    "instrument": {
+      "id": 2,
+      "name": "石壁の残響・和声",
+      "kind": "NesPulse",
+      "duty": "Percent50",
+      "volumeMacro": {
+        "values": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          2,
+          4,
+          4,
+          4,
+          6,
+          6,
+          6,
+          8,
+          8,
+          8,
+          8,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          11,
+          10
+        ],
+        "loopIndex": -1
+      },
+      "arpeggioMacro": null,
+      "pitchMacro": null,
+      "dutyMacro": null
+    }
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1536,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1608,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1632,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1728,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1776,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1872,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 1920,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2064,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2136,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2208,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2304,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2352,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2400,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2496,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2592,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2640,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2688,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2760,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2784,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 2904,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3000,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3072,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3120,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3168,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3264,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3408,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3456,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3552,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3648,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3792,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3840,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3912,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 3936,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4032,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4152,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4224,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4320,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4416,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4512,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4608,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4680,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4704,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4752,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4800,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4848,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4896,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4944,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 4992,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5088,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5184,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5280,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5328,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5376,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5424,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5472,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5568,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5688,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5760,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5832,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5856,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 5976,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6072,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6144,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6192,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6240,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6336,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6432,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6528,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6648,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6720,
+    "volume": 13
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6864,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 6912,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7008,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7104,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7248,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7296,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7416,
+    "volume": 11
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7488,
+    "volume": 12
+  },
+  {
+    "kind": "UpdateNote",
+    "track": 0,
+    "tick": 7608,
+    "volume": 11
+  }
+]
