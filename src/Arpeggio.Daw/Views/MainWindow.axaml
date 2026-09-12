@@ -61,6 +61,11 @@
           <Button x:Name="SfxButton" ContentTemplate="{StaticResource Arpeggio.Content.Sfx}" Content="SFX を作る" ToolTip.Tip="SFX を作る" />
           <Button x:Name="MidiImportButton" Content="MIDI を取り込む" />
           <Button x:Name="ExportButton" ContentTemplate="{StaticResource Arpeggio.Content.Export}" Content="書き出し" ToolTip.Tip="Ctrl+E · WAV / OGG / NSF / VGM" />
+          <Button x:Name="ListeningNoteButton" Content="感想を書く">
+            <Button.Flyout>
+              <Flyout><transport:ListeningNoteView x:Name="ListeningNotePanel" /></Flyout>
+            </Button.Flyout>
+          </Button>
         </StackPanel>
       </Grid>
       </ScrollViewer>

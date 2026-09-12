@@ -3685,3 +3685,47 @@ VSTest のテストホスト通信が `SocketException (13): Permission denied`�
 - 何を: 未保存の作曲指示書を開き直す／ウィンドウを閉じるときの破棄確認。
   なぜ: 現設計は独立した単純文書のため、未保存の手入力を失う操作への保護がない。
   見積もり: 1ラン。このランでは実装していない。
+
+## 感想メモ機能 実装記録（2026-09-12）
+
+### 実装内容
+
+- トランスポート行の末尾に「感想を書く」ボタンを追加。EchoButton と同じ Flyout の組み立て方で、複数行入力・保存・一時結果表示を接続した。既存6タブと他のボタンの定義は変更していない。
+- `ListeningNotePresenter.Save(string)` は呼び出し時の `DawDocument.Path` に `.feedback.txt` を足し、`File.AppendAllText` で追記する。書式は `[yyyy-MM-dd HH:mm] <本文>` と改行2つ。時刻はローカル時刻、年月日時分の書式は InvariantCulture を使い、本文の改行・前後の空白を保持する。
+- 空文字・空白のみは保存ボタンを無効化し、Presenter でも追記しない。未保存曲は「先に曲を保存してください。」を通知する。I/O・アクセス権・パスの例外も保存失敗として公開する。
+- 保存結果は戻り値の bool と `Error` で公開し、成功時だけ View の入力を空にする。失敗時は本文を維持する。成功・失敗メッセージは Brief と同じ Rx の `Switch` と3秒タイマーで表示し、連続操作では古い消去予約を置き換える。
+- View の購読は `SetEvent()` に集約。MainWindow で Presenter の生成・View の Bind・双方の Dispose を接続した。メモ入力中のキーは曲編集ショートカットへ渡さない。
+- View は既存の幅・間隔・色・保存ボタン用テーマリソースと `PlaceholderText` を使う。AI 呼び出し、曲本体の保存、Core・CLI・MCP の変更はない。
+
+### テスト判断と静的確認
+
+- 必須: 既存メモの保持と複数回追記、タイムスタンプと空行、複数行本文の保持、曲・履歴・再生状態の非変更、未保存曲の拒否、空白入力の拒否、曲切り替え後の保存先、書き込み失敗と再試行。
+- 有用として追加: 連続操作・成功と失敗の切り替えによる一時表示期限の更新、所有元の Dispose 後のタイマー停止と書き込み拒否。古いタイマーによる早期消去と破棄後の副作用を防ぐ。
+- 冗長として省略: getter・コンストラクタの代入・薄い Bind 委譲だけのテスト。
+- テストコードは Fact 6件、Theory 1件（InlineData 4件）の計10ケース。実行件数ではない。
+- 静的確認: XAML の XML 構文、名前付き部品と Require の対応、StaticResource の存在、既存6タブの順序、ブロック namespace、日本語 public summary、末尾空白、ブレース数を確認。既存実装とローカル NuGet の Avalonia／Rx API 定義で使用型・拡張メソッドを照合した。コンパイル確認の代替ではない。
+- 変更前後の SHA-256 照合で、実装・テストの変更は下記7ファイルに限定されることを確認。設計書4件、Core・CLI・MCP、曲ファイル本体の保存処理は不変。本記録のみ追加で追記した。git 操作は行っていない。
+
+### 変更ファイル一覧
+
+新規4ファイル、既存4ファイルの変更。
+
+- `src/Arpeggio.Daw/Presenters/Transport/ListeningNotePresenter.cs`
+- `src/Arpeggio.Daw/Views/Transport/ListeningNoteView.axaml`
+- `src/Arpeggio.Daw/Views/Transport/ListeningNoteView.axaml.cs`
+- `src/Arpeggio.Daw/Presenters/MainWindowPresenter.cs`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml`
+- `src/Arpeggio.Daw/Views/MainWindow.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/Transport/ListeningNotePresenterTests.cs`
+- `docs/implementation.md`（本節の追記）
+
+### 未実行の確認事項
+
+依頼に従い `dotnet build`・`dotnet test`・アプリ起動・目視確認は実行していない。以下は依頼者側で確認する。
+
+- `dotnet build Arpeggio.slnx` の警告0・エラー0、および `dotnet test Arpeggio.slnx` による既存全件と新規10ケースの成功。
+- Flyout の表示、複数行入力、複数回保存による隣接メモへの追記、成功時の入力クリアと「保存しました」の3秒表示。
+- 未保存曲・書き込み失敗時の本文保持とエラーの3秒表示、空白のみの保存不可、失敗解消後の再試行。
+- 再生しながらの入力、Flyout 内の文字編集キー、通常幅・最小幅での既存6タブと他のトランスポートボタンの見た目・操作、連続保存・ウィンドウ終了時の表示タイマー解放。
+
+実装上の残タスクはなし。実行による受け入れ確認は依頼者側に残る。

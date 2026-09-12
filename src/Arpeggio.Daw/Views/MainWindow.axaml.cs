@@ -54,6 +54,7 @@ namespace Arpeggio.Daw.Views
         private readonly Button exportButton;
         private readonly Button echoButton;
         private readonly SnesEchoView snesEcho;
+        private readonly ListeningNoteView listeningNote;
         private readonly Flyout echoFlyout;
         private readonly Button revealExportButton;
         private readonly AudioFilePicker filePicker;
@@ -102,6 +103,10 @@ namespace Arpeggio.Daw.Views
                 ?? throw new InvalidOperationException("エコーの Flyout がありません。");
             snesEcho = echoFlyout.Content as SnesEchoView
                 ?? throw new InvalidOperationException("エコー Flyout の表示部品がありません。");
+            var listeningNoteFlyout = Require<Button>("ListeningNoteButton").Flyout as Flyout
+                ?? throw new InvalidOperationException("感想メモの Flyout がありません。");
+            listeningNote = listeningNoteFlyout.Content as ListeningNoteView
+                ?? throw new InvalidOperationException("感想メモ Flyout の表示部品がありません。");
             revealExportButton = Require<Button>("RevealExportButton");
             filePicker = new AudioFilePicker(this);
         }
@@ -141,6 +146,7 @@ namespace Arpeggio.Daw.Views
                 if (previousEditorTabIndex == SfxTabIndex) { sfxCreation.EnterTab(); }
             }));
             snesEcho.Bind(mainPresenter.SnesEcho, mainPresenter.Execute);
+            listeningNote.Bind(mainPresenter.ListeningNote);
             instruments.WavImportRequested += OnImportWav;
             sfxSubscriptions.Add(SfxViewEvents.Observe(sfxButton, Button.ClickEvent).Subscribe(arguments => OnSfx(sfxButton, arguments)));
             exportButton.Click += OnExport;
@@ -268,6 +274,7 @@ namespace Arpeggio.Daw.Views
             tracks.Dispose();
             instruments.Dispose();
             snesEcho.Dispose();
+            listeningNote.Dispose();
             notes.Dispose();
             analysis.Dispose();
             chipExport.Dispose();
@@ -354,6 +361,10 @@ namespace Arpeggio.Daw.Views
         }
         private void OnShortcut(object? sender, KeyEventArgs arguments)
         {
+            if (listeningNote.IsKeyboardFocusWithin)
+            {
+                return;
+            }
             if (editorTabs.SelectedIndex == BriefTabIndex && editorTabs.IsKeyboardFocusWithin)
             {
                 briefCreation.HandleShortcut(arguments);

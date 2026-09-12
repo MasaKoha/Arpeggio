@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Arpeggio.Daw.Views.Transport.ListeningNoteView">
+  <StackPanel Spacing="{StaticResource Arpeggio.Space.Medium}" Width="{StaticResource Arpeggio.Width.EchoPanel}">
+    <TextBlock Text="感想を書く" Classes="heading" />
+    <TextBox x:Name="NoteInput" AcceptsReturn="True" MinLines="4" MaxLines="8" TextWrapping="Wrap"
+             PlaceholderText="サビがうるさい、ベースが心地よい…" AutomationProperties.Name="曲を聴いた感想" />
+    <Button x:Name="SaveButton" Content="保存" Classes="primary" HorizontalAlignment="Stretch" IsEnabled="False"
+            ContentTemplate="{StaticResource Arpeggio.Content.Save}" />
+    <TextBlock x:Name="OperationMessage" Foreground="{StaticResource Arpeggio.Accent}" TextWrapping="Wrap" IsVisible="False" />
+    <TextBlock x:Name="ErrorMessage" Foreground="{StaticResource Arpeggio.Danger}" TextWrapping="Wrap" IsVisible="False" />
+  </StackPanel>
+</UserControl>
