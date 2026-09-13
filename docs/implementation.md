@@ -3729,3 +3729,40 @@ VSTest のテストホスト通信が `SocketException (13): Permission denied`�
 - 再生しながらの入力、Flyout 内の文字編集キー、通常幅・最小幅での既存6タブと他のトランスポートボタンの見た目・操作、連続保存・ウィンドウ終了時の表示タイマー解放。
 
 実装上の残タスクはなし。実行による受け入れ確認は依頼者側に残る。
+
+
+## 修正依頼ボタン 実装記録（2026-09-13）
+
+### 実装内容
+
+- `ListeningNotePresenter.RequestFix(string)` を追加。現在の `DawDocument.Path` に `.fix-request.txt` を付け、`File.WriteAllText` で最新の依頼1件を上書きする。既存の `TimestampFormat` を再利用し、書式は `[yyyy-MM-dd HH:mm] <本文>` と末尾改行1つ。本文の改行・前後の空白を保持する。
+- 空白入力は何もせず false、未保存曲は既存と同じエラーを通知する。I/O 例外は `Save` と同じ例外フィルタで捕捉する。成功時は `Error` を解除して「修正を依頼しました」を通知し、既存の `ObserveMessages` で3秒間表示する。
+- 「保存」の隣に「この内容で直してもらう」を追加。入力を共有し、両ボタンとも空白のみでは無効、成功時だけ本文を空にする。クリック購読は既存の `SetEvent()` と `CompositeDisposable` に接続した。
+- Presenter / View の既存 `Save` メソッドは変更していない。修正依頼から感想保存を呼び出さず、双方のファイル書き込みは独立する。Core・CLI・MCP・設計書は変更せず、AI 呼び出しや監視プロセスは追加していない。
+
+### テスト判断と静的確認
+
+- 必須: 短い本文での上書きによる前回内容の消去、タイムスタンプと末尾改行、複数行本文の保持、感想・曲・履歴・再生状態の維持、未保存曲と空白入力の拒否、I/O 失敗と再試行、双方の失敗後の独立性、成功文言と一時表示期限。
+- 有用として追加: 曲切り替え後の保存先追従、破棄後の上書き拒否と通知タイマー停止。別の曲への誤依頼と破棄後の副作用を防ぐ。
+- 冗長として省略: getter・定数の対応・薄い View 委譲だけのテスト。
+- 既存テストファイルに Fact 6件、Theory 1件（InlineData 4件）の計10ケース分を追加した。実行件数ではない。
+- 静的確認: XAML の XML 構文、6部品の名前と `Require` の一致、参照テーマリソースの存在、2ボタンの隣接と初期無効状態を確認した。既存の型・namespace と使用パターンを照合し、using の追加はない。ブロック namespace、末尾空白、禁止 API を確認した。
+- 作業開始時のソースと比較し、Presenter / View の既存 `Save`、既存テスト7メソッド、using 宣言は不変。コンパイル確認の代替ではない。
+
+### 変更ファイル一覧
+
+- `src/Arpeggio.Daw/Presenters/Transport/ListeningNotePresenter.cs`
+- `src/Arpeggio.Daw/Views/Transport/ListeningNoteView.axaml`
+- `src/Arpeggio.Daw/Views/Transport/ListeningNoteView.axaml.cs`
+- `tests/Arpeggio.Core.Tests/Daw/Presenters/Transport/ListeningNotePresenterTests.cs`
+- `docs/implementation.md`（本節の追記）
+
+### 未実行の確認事項
+
+依頼どおり `dotnet build`・`dotnet test`・アプリ起動・目視確認は実行していない。以下は依頼者側で確認する。
+
+- `dotnet build Arpeggio.slnx` の警告0・エラー0、および `dotnet test Arpeggio.slnx` による既存全件と新規10ケースの成功。
+- Flyout で両ボタンが横並びに収まり、共有入力の空白判定・成功時のクリア・失敗時の本文保持が動作すること。
+- 実際の連続依頼で `.fix-request.txt` が上書きされ、「修正を依頼しました」が3秒で消えること。既存「保存」の `.feedback.txt` 追記と「保存しました」の表示も確認する。
+
+実装上の残タスクはなし。実行による受け入れ確認は依頼者側に残る。

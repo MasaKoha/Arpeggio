@@ -12,10 +12,11 @@ using Xunit;
 
 namespace Arpeggio.Core.Tests.Daw.Presenters.Transport
 {
-    /// <summary>感想の追記、保存先の追従、失敗時の保護と一時表示の寿命を検証する。</summary>
+    /// <summary>感想の追記と修正依頼の上書き、失敗時の保護と一時表示の寿命を検証する。</summary>
     public sealed class ListeningNotePresenterTests
     {
         private const string FeedbackSuffix = ".feedback.txt";
+        private const string FixRequestSuffix = ".fix-request.txt";
         private const int FirstNoteTick = 0;
         private const int MiddleCMidiNote = 60;
         private const int BeforeMessageExpirySeconds = 2;
@@ -195,6 +196,212 @@ namespace Arpeggio.Core.Tests.Daw.Presenters.Transport
             Assert.Equal(countAtDispose, messages.Count);
             Assert.Throws<ObjectDisposedException>(() => presenter.Save("破棄後"));
             Assert.Equal(feedbackBefore, File.ReadAllBytes(fixture.Path + FeedbackSuffix));
+        }
+
+        /// <summary>最新の依頼だけを残し、本文の空白・改行を保持して感想・曲・履歴・再生状態を変更しない。</summary>
+        [Fact]
+        public void RequestFixOverwritesPreviousRequestWithoutChangingFeedbackOrSong()
+        {
+            using var fixture = new DawPresenterFixture();
+            fixture.Presenter.PianoRoll.Add(FirstNoteTick, MiddleCMidiNote);
+            fixture.Presenter.Transport.TogglePlayback();
+            ListeningNotePresenter presenter = fixture.Presenter.ListeningNote;
+            Assert.True(presenter.Save("記録だけに残す感想"));
+            byte[] feedbackBefore = File.ReadAllBytes(fixture.Path + FeedbackSuffix);
+            byte[] songFileBefore = File.ReadAllBytes(fixture.Path);
+            string songBefore = SongSerializer.Serialize(fixture.Document.Song);
+            int historyBefore = fixture.Document.Session.History.UndoCount;
+            string requestPath = fixture.Path + FixRequestSuffix;
+            const string FirstRequest = "  サビの音量を下げてください\nベースはこのままにしてください  ";
+            const string SecondRequest = "少し遅くして";
+            DateTime beforeRequest = DateTime.Now;
+
+            Assert.True(presenter.RequestFix(FirstRequest));
+            string firstEntry = File.ReadAllText(requestPath);
+            Assert.True(presenter.RequestFix(SecondRequest));
+            DateTime afterRequest = DateTime.Now;
+
+            AssertFixRequestEntry(firstEntry, FirstRequest, beforeRequest, afterRequest);
+            AssertFixRequestEntry(File.ReadAllText(requestPath), SecondRequest, beforeRequest, afterRequest);
+            Assert.Equal(feedbackBefore, File.ReadAllBytes(fixture.Path + FeedbackSuffix));
+            Assert.Equal(songFileBefore, File.ReadAllBytes(fixture.Path));
+            Assert.Equal(songBefore, SongSerializer.Serialize(fixture.Document.Song));
+            Assert.Equal(historyBefore, fixture.Document.Session.History.UndoCount);
+            Assert.True(fixture.Presenter.IsDirty);
+            Assert.True(fixture.Presenter.Transport.IsPlaying);
+        }
+
+        /// <summary>未保存曲の依頼はエラーを通知し、保存先ができれば感想の保存なしで依頼できる。</summary>
+        [Fact]
+        public void RequestFixRejectsUnsavedDocumentAndAllowsRetryAfterOpeningSong()
+        {
+            using var fixture = new DawPresenterFixture();
+            using var document = new DawDocument();
+            using var presenter = new ListeningNotePresenter(document);
+            var scheduler = new HistoricalScheduler();
+            var messages = new List<string>();
+            using IDisposable subscription = presenter.ObserveMessages(scheduler).Subscribe(messages.Add);
+
+            Assert.False(presenter.RequestFix("サビを静かにして"));
+
+            Assert.Contains("先に曲を保存してください", presenter.Error);
+            Assert.Equal(presenter.Error, Assert.Single(messages));
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(AfterMessageExpirySeconds));
+            Assert.Empty(messages[^1]);
+            Assert.False(File.Exists(fixture.Path + FixRequestSuffix));
+
+            document.Open(fixture.Path);
+            Assert.True(presenter.RequestFix("サビを静かにして"));
+            Assert.Contains("サビを静かにして", File.ReadAllText(fixture.Path + FixRequestSuffix));
+            Assert.Empty(presenter.Error);
+            Assert.False(File.Exists(fixture.Path + FeedbackSuffix));
+        }
+
+        /// <summary>空白入力で依頼を新規作成せず、既存の依頼や通知も消去しない。</summary>
+        [Theory]
+        [InlineData("")]
+        [InlineData(" ")]
+        [InlineData("\t\r\n")]
+        [InlineData("　")]
+        public void RequestFixWithBlankInputDoesNotCreateOrOverwriteFile(string text)
+        {
+            using var fixture = new DawPresenterFixture();
+            ListeningNotePresenter presenter = fixture.Presenter.ListeningNote;
+            string requestPath = fixture.Path + FixRequestSuffix;
+            var scheduler = new HistoricalScheduler();
+            var messages = new List<string>();
+            using IDisposable subscription = presenter.ObserveMessages(scheduler).Subscribe(messages.Add);
+
+            Assert.False(presenter.RequestFix(text));
+            Assert.False(File.Exists(requestPath));
+            Assert.Empty(messages);
+            Assert.True(presenter.RequestFix("残しておく修正依頼"));
+            byte[] requestBefore = File.ReadAllBytes(requestPath);
+
+            Assert.False(presenter.RequestFix(text));
+
+            Assert.Equal(requestBefore, File.ReadAllBytes(requestPath));
+            Assert.Equal("修正を依頼しました", Assert.Single(messages));
+        }
+
+        /// <summary>曲を切り替えた後の依頼は新しい曲の隣に書き出し、旧曲の依頼を保持する。</summary>
+        [Fact]
+        public void RequestFixUsesCurrentDocumentPathAfterSongSwitch()
+        {
+            using var fixture = new DawPresenterFixture();
+            ListeningNotePresenter presenter = fixture.Presenter.ListeningNote;
+            Assert.True(presenter.RequestFix("最初の曲を直して"));
+            byte[] originalRequest = File.ReadAllBytes(fixture.Path + FixRequestSuffix);
+            string nextPath = Path.Combine(Path.GetDirectoryName(fixture.Path)!, "next.arpeggio.json");
+            File.Copy(fixture.Path, nextPath);
+
+            fixture.Presenter.Open(nextPath);
+            Assert.True(presenter.RequestFix("次の曲を直して"));
+
+            Assert.Equal(originalRequest, File.ReadAllBytes(fixture.Path + FixRequestSuffix));
+            string nextRequest = File.ReadAllText(nextPath + FixRequestSuffix);
+            Assert.Contains("次の曲を直して", nextRequest);
+            Assert.DoesNotContain("最初の曲を直して", nextRequest);
+        }
+
+        /// <summary>片方の書き込みが失敗しても他方は成功し、原因の解消後は同じ本文で再試行できる。</summary>
+        [Fact]
+        public void SaveAndRequestFixRemainIndependentAfterFileFailures()
+        {
+            using var fixture = new DawPresenterFixture();
+            ListeningNotePresenter presenter = fixture.Presenter.ListeningNote;
+            string requestPath = fixture.Path + FixRequestSuffix;
+            string feedbackPath = fixture.Path + FeedbackSuffix;
+            var scheduler = new HistoricalScheduler();
+            var messages = new List<string>();
+            using IDisposable subscription = presenter.ObserveMessages(scheduler).Subscribe(messages.Add);
+            Directory.CreateDirectory(requestPath);
+            const string Request = "サビを直して";
+
+            Assert.False(presenter.RequestFix(Request));
+            Assert.Contains("修正依頼の書き出しに失敗しました:", presenter.Error);
+            Assert.Equal(presenter.Error, messages[^1]);
+            Assert.True(Directory.Exists(requestPath));
+            Assert.True(presenter.Save("保存できる感想"));
+            Assert.Empty(presenter.Error);
+            Assert.Contains("保存できる感想", File.ReadAllText(feedbackPath));
+            Directory.Delete(requestPath);
+            Assert.True(presenter.RequestFix(Request));
+
+            File.Delete(feedbackPath);
+            Directory.CreateDirectory(feedbackPath);
+            byte[] requestBefore = File.ReadAllBytes(requestPath);
+            Assert.False(presenter.Save("再試行する感想"));
+            Assert.Equal(requestBefore, File.ReadAllBytes(requestPath));
+            Assert.True(presenter.RequestFix("ベースも直して"));
+            Assert.Empty(presenter.Error);
+            Assert.Contains("ベースも直して", File.ReadAllText(requestPath));
+            Assert.True(Directory.Exists(feedbackPath));
+            Directory.Delete(feedbackPath);
+            requestBefore = File.ReadAllBytes(requestPath);
+            Assert.True(presenter.Save("再試行する感想"));
+            Assert.Equal(requestBefore, File.ReadAllBytes(requestPath));
+        }
+
+        /// <summary>保存と依頼の通知を区別し、操作の切り替えで表示期限を更新して三秒後に消す。</summary>
+        [Fact]
+        public void RequestFixAndSaveReplaceEachOthersMessageTimeout()
+        {
+            using var fixture = new DawPresenterFixture();
+            ListeningNotePresenter presenter = fixture.Presenter.ListeningNote;
+            var scheduler = new HistoricalScheduler();
+            var messages = new List<string>();
+            using IDisposable subscription = presenter.ObserveMessages(scheduler).Subscribe(messages.Add);
+            Assert.True(presenter.Save("記録する感想"));
+            Assert.Equal("保存しました", messages[^1]);
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(BeforeMessageExpirySeconds));
+
+            Assert.True(presenter.RequestFix("サビを直して"));
+            Assert.Equal("修正を依頼しました", messages[^1]);
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(BeforeMessageExpirySeconds));
+            Assert.Equal("修正を依頼しました", messages[^1]);
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(RemainingMessageSeconds));
+            Assert.Empty(messages[^1]);
+
+            Assert.True(presenter.RequestFix("ベースを直して"));
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(BeforeMessageExpirySeconds));
+            Assert.True(presenter.Save("追加の感想"));
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(BeforeMessageExpirySeconds));
+            Assert.Equal("保存しました", messages[^1]);
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(RemainingMessageSeconds));
+            Assert.Empty(messages[^1]);
+        }
+
+        /// <summary>依頼の通知待ちで破棄してもタイマーが残らず、破棄後に依頼を上書きできない。</summary>
+        [Fact]
+        public void DisposeCancelsRequestFixMessageAndPreventsFurtherRequests()
+        {
+            using var fixture = new DawPresenterFixture();
+            ListeningNotePresenter presenter = fixture.Presenter.ListeningNote;
+            var scheduler = new HistoricalScheduler();
+            var messages = new List<string>();
+            using IDisposable subscription = presenter.ObserveMessages(scheduler).Subscribe(messages.Add);
+            Assert.True(presenter.RequestFix("有効な依頼"));
+            byte[] requestBefore = File.ReadAllBytes(fixture.Path + FixRequestSuffix);
+
+            fixture.Presenter.Dispose();
+            int countAtDispose = messages.Count;
+            scheduler.AdvanceBy(TimeSpan.FromSeconds(AfterMessageExpirySeconds));
+
+            Assert.Equal(countAtDispose, messages.Count);
+            Assert.Throws<ObjectDisposedException>(() => presenter.RequestFix("破棄後の依頼"));
+            Assert.Equal(requestBefore, File.ReadAllBytes(fixture.Path + FixRequestSuffix));
+        }
+
+        private static void AssertFixRequestEntry(string entry, string text, DateTime beforeRequest, DateTime afterRequest)
+        {
+            string pattern = @"\A\[(?<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2})\] " +
+                Regex.Escape(text + Environment.NewLine) + @"\z";
+            Match match = Regex.Match(entry, pattern);
+            Assert.True(match.Success, $"修正依頼のタイムスタンプ・本文・末尾改行の書式が異なります: {entry}");
+            DateTime timestamp = DateTime.ParseExact(match.Groups["timestamp"].Value, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            DateTime firstPossibleMinute = beforeRequest.AddTicks(-(beforeRequest.Ticks % TimeSpan.TicksPerMinute));
+            Assert.InRange(timestamp, firstPossibleMinute, afterRequest);
         }
 
         private static void AssertEntry(string entry, string text, DateTime beforeSave, DateTime afterSave)

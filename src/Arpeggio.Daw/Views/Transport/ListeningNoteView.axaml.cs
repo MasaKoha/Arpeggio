@@ -12,24 +12,26 @@ using Avalonia.Threading;
 
 namespace Arpeggio.Daw.Views.Transport
 {
-    /// <summary>感想メモの入力と保存操作、一時的な保存結果の表示を接続する。</summary>
+    /// <summary>感想の入力と保存・修正依頼操作、一時的な結果表示を接続する。</summary>
     public partial class ListeningNoteView : UserControl, IDisposable
     {
         private readonly CompositeDisposable subscriptions = new CompositeDisposable();
         private readonly TextBox noteInput;
         private readonly Button saveButton;
+        private readonly Button requestFixButton;
         private readonly TextBlock operationMessage;
         private readonly TextBlock errorMessage;
         private ListeningNotePresenter listeningNotePresenter = null!;
         private bool isBound;
         private bool isDisposed;
 
-        /// <summary>Flyout 内の入力・保存・結果表示部品を解決する。</summary>
+        /// <summary>Flyout 内の入力・保存・修正依頼・結果表示部品を解決する。</summary>
         public ListeningNoteView()
         {
             AvaloniaXamlLoader.Load(this);
             noteInput = Require<TextBox>("NoteInput");
             saveButton = Require<Button>("SaveButton");
+            requestFixButton = Require<Button>("RequestFixButton");
             operationMessage = Require<TextBlock>("OperationMessage");
             errorMessage = Require<TextBlock>("ErrorMessage");
         }
@@ -47,7 +49,7 @@ namespace Arpeggio.Daw.Views.Transport
             SetEvent();
         }
 
-        /// <summary>入力と保存操作、一時表示タイマーの購読を解放する。</summary>
+        /// <summary>入力と保存・修正依頼操作、一時表示タイマーの購読を解放する。</summary>
         public void Dispose()
         {
             if (isDisposed)
@@ -62,16 +64,32 @@ namespace Arpeggio.Daw.Views.Transport
         {
             var scheduler = new SynchronizationContextScheduler(new AvaloniaSynchronizationContext());
             subscriptions.Add(noteInput.GetObservable(TextBox.TextProperty)
-                .Subscribe(text => saveButton.IsEnabled = !string.IsNullOrWhiteSpace(text)));
+                .Subscribe(text =>
+                {
+                    bool hasText = !string.IsNullOrWhiteSpace(text);
+                    saveButton.IsEnabled = hasText;
+                    requestFixButton.IsEnabled = hasText;
+                }));
             subscriptions.Add(listeningNotePresenter.ObserveMessages(scheduler).Subscribe(ShowMessage));
             subscriptions.Add(Observable.Create<Unit>(observer =>
                 saveButton.AddDisposableHandler(Button.ClickEvent, (_, _) => observer.OnNext(Unit.Default)))
                 .Subscribe(_ => Save()));
+            subscriptions.Add(Observable.Create<Unit>(observer =>
+                requestFixButton.AddDisposableHandler(Button.ClickEvent, (_, _) => observer.OnNext(Unit.Default)))
+                .Subscribe(_ => RequestFix()));
         }
 
         private void Save()
         {
             if (listeningNotePresenter.Save(noteInput.Text ?? string.Empty))
+            {
+                noteInput.Text = string.Empty;
+            }
+        }
+
+        private void RequestFix()
+        {
+            if (listeningNotePresenter.RequestFix(noteInput.Text ?? string.Empty))
             {
                 noteInput.Text = string.Empty;
             }
