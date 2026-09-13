@@ -8,10 +8,11 @@ using Arpeggio.Daw.Editing;
 
 namespace Arpeggio.Daw.Presenters.Transport
 {
-    /// <summary>現在の曲に対する感想を、曲ファイルと独立したメモへ追記する。</summary>
+    /// <summary>現在の曲に対する感想の追記と、最新の修正依頼の書き出しを扱う。</summary>
     public sealed class ListeningNotePresenter : IDisposable
     {
         private const string FeedbackSuffix = ".feedback.txt";
+        private const string FixRequestSuffix = ".fix-request.txt";
         private const string TimestampFormat = "yyyy-MM-dd HH:mm";
         private const int MessageDurationSeconds = 3;
         private readonly DawDocument document;
@@ -57,6 +58,33 @@ namespace Arpeggio.Daw.Presenters.Transport
             }
             Error = string.Empty;
             messages.OnNext("保存しました");
+            return true;
+        }
+
+        /// <summary>本文を修正依頼として書き出す。既存内容を上書きし、成功した場合だけ true を返す。</summary>
+        public bool RequestFix(string text)
+        {
+            ObjectDisposedException.ThrowIf(isDisposed, this);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+            string documentPath = document.Path;
+            if (documentPath.Length == 0)
+            {
+                return ReportFailure("先に曲を保存してください。");
+            }
+            try
+            {
+                string timestamp = DateTime.Now.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+                File.WriteAllText(documentPath + FixRequestSuffix, $"[{timestamp}] {text}{Environment.NewLine}");
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                return ReportFailure($"修正依頼の書き出しに失敗しました: {exception.Message}");
+            }
+            Error = string.Empty;
+            messages.OnNext("修正を依頼しました");
             return true;
         }
 
