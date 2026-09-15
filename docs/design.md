@@ -209,13 +209,20 @@ src/Arpeggio.Core/
 
 ### 合成パイプライン
 
+```mermaid
+flowchart TD
+    File["曲ファイル\n（.arpeggio.json）"] --> Load["読み込み・検証\n（SongSerializer / SongValidator）"]
+    Load --> Song["曲データ\n（Song）"]
+    Song --> Sequencer
+    subgraph Rendering["音声の合成（SongRenderer）"]
+        Sequencer["トラックごとに発音を時系列化\n（TrackSequencer）"] -->|サンプル位置付きの発音イベント| Channel["チャンネルごとに波形を合成\n（IChannelSynthesizer）"]
+        Channel -->|各チャンネルの float バッファ| Mixer["チップ固有のミキサーで混合"]
+    end
+    Mixer -->|ステレオ float PCM| Wav["WAV ファイルへ書き出す\n（WavWriter）"]
+    Mixer -->|ステレオ float PCM| Audio["DAW のオーディオ出力で再生する"]
 ```
-Song
- └ TrackSequencer × N  → NoteEvent 列（サンプル位置付き）
-      └ IChannelSynthesizer × N → float バッファ（各チャンネル）
-           └ チップ固有 Mixer → ステレオ float
-                └ SongRenderer.Render(Span<float>) → 呼び出し側（WavWriter / DAW のオーディオ出力）
-```
+
+曲ファイルの読み込みから、トラックごとの合成・ミキシングを経て WAV 書き出しと DAW 再生へ渡る音声の流れを示す。
 
 - **ホットパス（`Render`）ではアロケーション禁止**。バッファは `SongRenderer` 生成時に確保し、`Span<float>` へ書き込む。LINQ 禁止。`// perf:` コメントで意図を残す
 - 合成は「サンプル単位のレジスタエミュレーション」ではなく「チップの制約を再現した波形生成」。位相累積 ＋ デューティ比較で矩形波を作り、周期レジスタの量子化だけ実機に合わせる（ピッチの実機っぽいズレを再現するため）

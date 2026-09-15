@@ -293,6 +293,18 @@ Avalonia 12.1.2 の DAW、カスタム描画ピアノロール、トラック選
 
 ## M1-C の実装判断
 
+```mermaid
+flowchart TD
+    Master["正本の曲ファイル\n（.arpeggio.json）"] -->|開く| Working["作業用の編集セッション\n（DawDocument が所有する EditSession）"]
+    Edit["DAW での編集操作"] --> Working
+    Working -->|編集成功時に自動保存| Temporary["一時作業ファイル"]
+    Working -->|編集を記録| History["作業中の Undo / Redo 履歴"]
+    Working -->|Ctrl+S で現在の内容を渡す| Saving["正本用の編集セッション\n（EditSession.Save）"]
+    Saving -->|明示保存| Master
+```
+
+DAW の作業用セッションが一時ファイルと履歴を更新し、Ctrl+S による明示保存で正本へ反映する関係を示す。
+
 - **明示保存と Core の自動保存の両立**: Core の公開 API を変更できないため、DAW 内の `DawDocument` が一時作業ファイルの `EditSession` を所有する。編集・検証・自動保存・参照交換を既存 API に任せ、Ctrl+S でのみ正本用セッションに現在の内容を渡して `Save()` する。一時ファイルは Dispose で削除する。
 - **ドラッグ履歴**: ドラッグ途中でも `NoteEditor.Update` で公開し、押下前の履歴を保持して終了時に一操作へまとめる。無効位置への移動は Core の検証で拒否し、最後の有効位置を維持する。作業ファイルへの I/O と JSON コピーは UI の編集操作に発生するため、大曲でのドラッグ性能は実測対象。
 - **音声スレッド**: `IAudioOutput` と `PlaybackEngine` を明示的に結線。SDL3 stream の get コールバックに固定 pin バッファを渡す。停止時は get コールバックを解除して進行中呼び出しの完了を待ち、stream を破棄してから pin を解放する。通常の合成は `Render` だけで、UI は `Render` / `Seek` / `RenderAll` を呼ばない。

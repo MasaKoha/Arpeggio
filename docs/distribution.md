@@ -18,6 +18,23 @@ bash tools/build_app.sh win-arm64 1.0.0 1
 
 引数は RID・バージョン・ビルド番号。後ろ二つは省略すると `1.0.0`・`1` になる。macOS のパッケージ化には macOS 標準の `plutil`・`codesign`・`ditto` を使う。Windows ZIP の生成には `zip` と `curl` が必要で、macOS／Linux／Windows の Git Bash で実行できる。Windows 上でビルドする場合も .NET 10 SDK・`zip`・`curl` を PATH に用意する。
 
+```mermaid
+flowchart TD
+    Inputs["配布対象・バージョン・ビルド番号\n（RID・version・build-number）"] --> Script["配布スクリプトを実行する\n（tools/build_app.sh）"]
+    Script --> Publish["DAW を Release publish する\n.NET ランタイム・Avalonia・SDL3 を同梱"]
+    Publish --> Target{"配布対象の OS"}
+    Target -->|macOS| Bundle["アプリバンドルに配置する\n（Arpeggio.app・Info.plist・icns）"]
+    Bundle --> Sign["ad-hoc 署名を付けて検証する"]
+    Sign --> MacZip["ZIP にまとめる\n（ditto）"]
+    Target -->|Windows| Folder["実行ファイルと依存ファイルを配置する\n（Arpeggio フォルダ）"]
+    Folder --> Runtime["VC++ ランタイム導入用 exe を取得・同梱する"]
+    Runtime --> WindowsZip["ZIP にまとめる\n（zip）"]
+    MacZip --> Output["完成後に展開済み出力と ZIP を配置する\n（artifacts）"]
+    WindowsZip --> Output
+```
+
+DAW の publish から OS 別のパッケージ化・ZIP 化を経て、完成した配布物を artifacts へ配置するビルド経路を示す。
+
 | 対象 | 展開済みの出力 | 配布用 ZIP（上の指定の場合） |
 |---|---|---|
 | macOS Apple Silicon | `artifacts/osx-arm64/Arpeggio.app` | `artifacts/Arpeggio-1.0.0-1-osx-arm64.zip` |

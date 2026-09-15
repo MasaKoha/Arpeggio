@@ -204,6 +204,22 @@ randomize はロックを受け付けず、全レシピを入れ替える操作�
 
 ## 既存構造への写像
 
+```mermaid
+flowchart TD
+    Parameters["効果音のパラメータ\n（トーン・ノイズ・チップ固有設定）"] --> Compile["入力を検証し、60 Hz マクロとノートへ展開\n（SfxSongCompiler）"]
+    Compile --> Generated
+    Compile -->|正規化したパラメータ| Definition
+    subgraph Song["同じ曲データに保持（Song）"]
+        Generated["再生用の音色・マクロ・ノート"]
+        Definition["再編集用の SFX 定義\n（SfxEditor がパラメータ・版・出自・指紋を付与）"]
+    end
+    Generated --> Renderer["通常の合成経路で音声にする\n（SongRenderer）"]
+    Renderer --> Preview["DAW で試聴する"]
+    Renderer --> Export["WAV 書き出し・音声解析に使う"]
+```
+
+効果音のパラメータを生成済みの音色・ノートへ展開し、再編集用の定義とともに保持して通常の合成経路で鳴らす流れを示す。
+
 ### 生成する Song の規則
 
 全トラック構成は SongFactory / ChipLayout の NES 5 / GB 4 / SNES 8 を維持する。使わないトラックは空で残す。音色IDはトーン=1、ノイズ=2。無効レイヤーの音色・ノートは生成しない。トラック名は SongFactory 既定、Muted=false、Pan=0、DefaultInstrumentId=null。SNES 音色のPan=0、EchoSend=0、Song.SnesEcho は既定値を明示し、DelayMilliseconds=0で無効化する。
@@ -262,6 +278,21 @@ Song の末尾に optional な `sfx` を置く。未指定・nullは通常ソン
 | 「通常ソングとして編集」／detach | sfxだけを除去する一履歴。生成列と音は保持。自動的な逆変換や定義への再接続はしない |
 | 既知schemaの不正値 | 読み込み時にドキュメントエラー。生成列との不一致だけは上記の編集済み状態として受理 |
 | 未知schema / generator / random algorithm版 | 新アプリはsfxを不透明なJSONとして保持し、通常の再生・保存は可能。パラメータ編集・再生成を拒否し `UnsupportedSfxVersion`。未知schemaを既定値で部分復元しない |
+
+```mermaid
+flowchart TD
+    Validated["検証済みの曲データ"] --> HasDefinition{"SFX 定義がある"}
+    HasDefinition -->|なし| Ordinary["通常ソング・従来の SFX\nパラメータ編集は不可"]
+    HasDefinition -->|あり| Supported{"定義・生成規則・乱数方式が対応版"}
+    Supported -->|いいえ| Unknown["未知版の定義を保持\n再生・保存は可能、パラメータ編集・再生成は不可"]
+    Supported -->|はい| Hashes{"パラメータと生成領域の\n両方の指紋が一致"}
+    Hashes -->|はい| Editable["同期済み\nパラメータ編集が可能"]
+    Hashes -->|いいえ| Modified["同期切れ\n保存パラメータを表示し、パラメータ編集を止める"]
+    Modified -->|明示的に再生成を要求| Regenerate["保存パラメータから生成領域を全置換\n定義と両方の指紋も更新"]
+    Regenerate -->|成功| Editable
+```
+
+検証済みの曲について、定義の有無・対応版・二つの指紋からパラメータ編集の可否と同期状態への復帰方法を判断する流れを示す。
 
 未知版のJSON保持は今回追加する保存責務であり、現 Serializer が既に行うと解釈しない。既知版のDTOと未知版のJSON保持を保存境界で分け、音声側はsfxを解釈しない。読み込み・保存・SongValidatorに音声生成やマクロの自動再生成を持ち込まない。同期状態は指紋で判定し、パラメータと生成列を手で同時改変した高度な編集の同値性までは証明しない。
 

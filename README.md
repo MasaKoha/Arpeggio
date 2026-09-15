@@ -69,6 +69,18 @@ MIDI の取り込みもできる。効果音はプリセットから作れる（
 | `arpeggio-mcp` | stdio の MCP サーバー。Claude Code / Codex から直接叩く |
 | `arpeggio-daw` | Avalonia 製 DAW。人が再生・微調整する |
 
+```mermaid
+flowchart TD
+    Agent["AI エージェント"] --> Command["コマンド操作\n（arpeggio）"]
+    Agent --> Mcp["MCP 接続\n（arpeggio-mcp・stdio）"]
+    Person["人"] --> Daw["画面で編集・再生\n（arpeggio-daw）"]
+    Command --> Core["共通の曲データ・編集・合成\n（Arpeggio.Core）"]
+    Mcp --> Core
+    Daw --> Core
+```
+
+AI と人の操作入口が、曲データ・編集・合成を担う共通の Core につながる関係を示す。
+
 ## 状態
 
 | 段階 | 実装済みの内容 |
