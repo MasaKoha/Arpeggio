@@ -25,3 +25,6 @@ Thumbs.db
 # CLI の undo 履歴
 *.history/
 DebugOutput/
+
+# 生成物と検証記録。個人の環境パスを含むことがあるため追跡しない
+output/

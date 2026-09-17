@@ -23,7 +23,7 @@ pisuke-root/
 依頼者側で Debug ビルドを行い、**アプリ起動前**に次を実行する。本ランではビルド・起動を行っていない。
 
 ```sh
-cd /Users/masakoha/GitHub/pisuke-root/Arpeggio-av
+cd <検証用の作業ディレクトリ>   # 例: リポジトリと同じ親に置いた Arpeggio-av
 mkdir -p DebugOutput/agent-mailbox
 touch DebugOutput/agent-mailbox/.enabled
 # 上の作業ディレクトリから、ビルド済み Debug 版を検証用ソングのパス付きで起動する。
