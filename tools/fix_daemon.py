@@ -25,12 +25,21 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import os
 import tempfile
 import time
 from pathlib import Path
 
 POLL_SECONDS_DEFAULT = 3.0
-CODEX_RUN_SH = Path("/Users/masakoha/GitHub/pisuke-root/karakuri/tools/codex_run.sh")
+
+# Codex 起動ラッパーの場所は環境ごとに違う。ARPEGGIO_CODEX_RUN_SH で上書きできるようにし、
+# 既定はこのリポジトリと同じ親ディレクトリに karakuri を置いた構成を想定する。
+CODEX_RUN_SH = Path(
+    os.environ.get(
+        "ARPEGGIO_CODEX_RUN_SH",
+        Path(__file__).resolve().parents[3] / "karakuri" / "tools" / "codex_run.sh",
+    )
+)
 
 INSTRUCTION_TEMPLATE = """# Arpeggio 修正依頼: {song_name}
 
