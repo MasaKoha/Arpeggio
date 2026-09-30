@@ -4,8 +4,8 @@
 
 ## Codex の使い方（2026-09-08 ユーザー指示）
 
-- **実装ランは当分すべて `-p top`（gpt-6.1-sol。2026-09-30 に gpt-6-astra から切り替え、高価になったため）＋ `-c model_reasoning_effort=high`**。
-  `~/.claude/rules/ai-operations.md` の「top を選ぶ基準」より優先する。std へ落とさない。`docs/design-m3.md` の分割表に「既定 std」と書いてあるものも top で投げる
+- **実装ランは当分すべて `-p top`（gpt-6-astra）＋ `-c model_reasoning_effort=high`**。`~/.claude/rules/ai-operations.md` の
+  「top を選ぶ基準」より優先する。std へ落とさない。`docs/design-m3.md` の分割表に「既定 std」と書いてあるものも top で投げる
 - **仕様の判断も Codex に任せてよい**。設計ラン（実装を書かせず設計書だけ書かせる）→ メインがレビュー → 実装ランの順で回す
 - **「何を作るか」も Codex に提案させる**。実装ランの指示書に `## 提案（任意・このランでは実装しない）` 節を入れ、
   実装記録の末尾に気づきを 3 件まで書かせる。メインが 1 件ずつ採否を判定し、採用は次のランへ回す。
